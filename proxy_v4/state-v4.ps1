@@ -21,6 +21,7 @@ if (-not $st) {
         state = 'FAILED'; mode = 'UNKNOWN'; reasons = @(('state probe failed: ' + $stateError))
         clashRunning = $false; mixedPort = $false; systemProxy = 'unknown'
         owner = 'unknown'; firstHopOk = $false; exitViaChain = $null; uiSystemProxy = 'unknown'
+        udpProxied = 'unknown'; pathScope = 'UNKNOWN'; warnings = @()
     }
 }
 $p = Get-V4Paths
@@ -31,6 +32,8 @@ $result = [ordered]@{
     clashRunning = $st.clashRunning; mixedPort = $st.mixedPort
     systemProxy = $st.systemProxy; ownerRecorded = $st.owner
     uiSystemProxy = $st.uiSystemProxy
+    udpProxied = $st.udpProxied; pathScope = $st.pathScope
+    warnings = @($st.warnings)
     firstHopOk = $st.firstHopOk; exitViaChain = $st.exitViaChain
     integrity = $integrity
 }
@@ -48,7 +51,8 @@ else {
     'clashRunning   {0}' -f $result.clashRunning
     'mixedPort      {0}' -f $result.mixedPort
     'systemProxy    {0}   (owner record: {1})' -f $result.systemProxy, $result.ownerRecorded
-    'uiSystemProxy  {0}' -f $result.uiSystemProxy
+    'uiSystemProxy  {0}   pathScope {1}   udpProxied {2}' -f $result.uiSystemProxy, $result.pathScope, $result.udpProxied
+    if ($result.warnings.Count) { Write-Host 'warnings:'; $result.warnings | ForEach-Object { '  - ' + $_ } }
     'firstHopOk     {0}' -f $result.firstHopOk
     'exitViaChain   {0}' -f $result.exitViaChain
     'profile marker {0}   runtime marker {1}' -f $integrity.markerOk, $integrity.runtimeMarkerOk

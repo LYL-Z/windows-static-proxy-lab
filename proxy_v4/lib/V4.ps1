@@ -1374,6 +1374,16 @@ function Get-V4UiSystemProxy {
     return (Read-V4UiSystemProxyFile -Path $f)
 }
 
+function Get-V4UdpProxied {
+    try {
+        $p = Get-V4Paths
+        if (-not $p.RuntimeFile -or -not (Test-Path -LiteralPath $p.RuntimeFile)) { return $null }
+        $t = Read-V4File $p.RuntimeFile
+        if ($t -and $t -match '(?m)^\s+udp:\s*(true|false)\s*$') { return ($Matches[1] -eq 'true') }
+    } catch { }
+    return $null
+}
+
 function Get-V4StateCore {
     param(
         [object]$Settings,
@@ -1384,7 +1394,8 @@ function Get-V4StateCore {
         [object]$FirstHop,
         [scriptblock]$GetExitIp,
         [string]$SettingsError = '',
-        [object]$UiSystemProxy = $null
+        [object]$UiSystemProxy = $null,
+        [object]$UdpProxied = $null
     )
     $out = [ordered]@{
         ts = (Get-Date).ToString('s')
@@ -1396,11 +1407,17 @@ function Get-V4StateCore {
         firstHopOk = $false
         exitViaChain = $null
         uiSystemProxy = $(if ($null -eq $UiSystemProxy) { 'unknown' } elseif ($UiSystemProxy) { 'enabled' } else { 'disabled' })
+        udpProxied = $(if ($null -eq $UdpProxied) { 'unknown' } elseif ($UdpProxied) { 'enabled' } else { 'disabled' })
+        pathScope = $(if ($UdpProxied -eq $false) { 'TCP_ONLY' } else { 'UNKNOWN' })
+        warnings = @()
     }
     $actualProxyEnabled = [bool]($SystemProxy -and $SystemProxy.enabled)
     $uiMismatch = ($null -ne $UiSystemProxy -and [bool]$UiSystemProxy -ne $actualProxyEnabled)
     if ($uiMismatch) {
         $out.reasons += ('UI reports system proxy ' + $(if ($UiSystemProxy) { 'enabled' } else { 'disabled' }) + ', actual HKCU is ' + $(if ($actualProxyEnabled) { 'enabled' } else { 'disabled' }))
+    }
+    if ($UdpProxied -eq $false) {
+        $out.warnings += 'UDP/WebRTC is not proxied (upstream udp=false); UDP may use a direct/other path. TCP-only scope.'
     }
     if ($SettingsError) {
         $out.state = 'FAILED'; $out.mode = 'UNKNOWN'
@@ -1454,7 +1471,8 @@ function Get-V4State {
     }
     $exitProbe = { param($proxy) Get-V4ExitIp -Proxy $proxy }
     $uiProxy = Get-V4UiSystemProxy
-    return Get-V4StateCore -Settings $s -Owner $owner -SystemProxy $px -AppPids $pids -MixedPortOpen $mixed -FirstHop $hop -GetExitIp $exitProbe -SettingsError $settingsError -UiSystemProxy $uiProxy
+    $udpProxy = Get-V4UdpProxied
+    return Get-V4StateCore -Settings $s -Owner $owner -SystemProxy $px -AppPids $pids -MixedPortOpen $mixed -FirstHop $hop -GetExitIp $exitProbe -SettingsError $settingsError -UiSystemProxy $uiProxy -UdpProxied $udpProxy
 }
 
 function Get-V4Integrity {
