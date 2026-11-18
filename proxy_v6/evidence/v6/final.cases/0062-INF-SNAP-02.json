@@ -1,0 +1,17 @@
+{
+    "id":  "INF-SNAP-02",
+    "requirement":  "DATA-04",
+    "precondition":  "tampered snapshot file",
+    "injectedFault":  "hash mismatch",
+    "expected":  "refused before live write",
+    "actual":  "hash mismatch refused before any live write",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  815,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T05:55:04.515-08:00",
+    "finishedAt":  "2026-11-18T05:55:05.330-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-final-clean\\final.cases\\0062-INF-SNAP-02.json",
+    "testOutput":  ""
+}

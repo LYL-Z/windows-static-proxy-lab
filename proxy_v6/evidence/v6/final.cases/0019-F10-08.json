@@ -1,0 +1,17 @@
+{
+    "id":  "F10-08",
+    "requirement":  "F10",
+    "precondition":  "file restore ok; proxy restore fails",
+    "injectedFault":  "proxy delegate throws",
+    "expected":  "returns 40",
+    "actual":  "F10-08: returned 40",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 2",
+    "durationMs":  588,
+    "assertions":  2,
+    "startedAt":  "2026-11-18T05:54:33.574-08:00",
+    "finishedAt":  "2026-11-18T05:54:34.162-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-final-clean\\final.cases\\0019-F10-08.json",
+    "testOutput":  ""
+}

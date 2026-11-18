@@ -1,0 +1,17 @@
+{
+    "id":  "FT17",
+    "requirement":  "F11",
+    "precondition":  "test mode + mock writer that throws",
+    "injectedFault":  "mock failure",
+    "expected":  "operation aborts; real HKCU unchanged",
+    "actual":  "mock failure aborted the operation; real HKCU unchanged",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  741,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T05:55:51.567-08:00",
+    "finishedAt":  "2026-11-18T05:55:52.308-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-final-clean\\final.cases\\0088-FT17.json",
+    "testOutput":  ""
+}

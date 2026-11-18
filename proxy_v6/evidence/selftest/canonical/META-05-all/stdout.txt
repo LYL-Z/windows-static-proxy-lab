@@ -1,7 +1,7 @@
 
 == V6 TEST HARNESS 6.0.0 ==
-Run ID: 3ac8818de3404bc3a680c30ce4cae424
-Git HEAD: 36222c92c829a2ef08b71af2a3a3ff9a3c44b396
+Run ID: 2039942d7989410f9a7f3f721be3082b
+Git HEAD: c562c1899488d07b67d2e1fd804e3656e1db7a27
 Git branch: v5/short-run-hardening
 Filter: *
 --------------------------------------------------------------
@@ -10,5 +10,5 @@ Filter: *
 --------------------------------------------------------------
 Counts: registered=1 executed=0 passed=0 failed=0 skipped=1 available=1
 [NO-TESTS] no test executed; a green result is not permitted (exit 2).
-Evidence: C:\Users\Lenovo\AppData\Local\Temp\v6-tests\v6-selftest-20261118-050837-302-09b36eb4\META-05-all\evidence.json
+Evidence: C:\Users\Lenovo\AppData\Local\Temp\v6-tests\v6-selftest-20261118-055607-119-02020809\META-05-all\evidence.json
 RESULT: NO_TESTS_EXECUTED EXIT 2

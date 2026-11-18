@@ -1,0 +1,17 @@
+{
+    "id":  "F10-05",
+    "requirement":  "F10",
+    "precondition":  "restore fails",
+    "injectedFault":  "restore throws",
+    "expected":  "process reconciliation still attempted",
+    "actual":  "F10-05: start attempted after restore failure",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 2",
+    "durationMs":  629,
+    "assertions":  2,
+    "startedAt":  "2026-11-18T05:54:31.687-08:00",
+    "finishedAt":  "2026-11-18T05:54:32.317-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-final-clean\\final.cases\\0016-F10-05.json",
+    "testOutput":  ""
+}

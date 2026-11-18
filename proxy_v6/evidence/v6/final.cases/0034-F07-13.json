@@ -1,0 +1,17 @@
+{
+    "id":  "F07-13",
+    "requirement":  "F07",
+    "precondition":  "second write fails",
+    "injectedFault":  "recovery succeeds",
+    "expected":  "journal cleared after recovery",
+    "actual":  "F07-13: journal cleared after recovery",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 2",
+    "durationMs":  768,
+    "assertions":  2,
+    "startedAt":  "2026-11-18T05:54:44.300-08:00",
+    "finishedAt":  "2026-11-18T05:54:45.069-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-final-clean\\final.cases\\0034-F07-13.json",
+    "testOutput":  ""
+}

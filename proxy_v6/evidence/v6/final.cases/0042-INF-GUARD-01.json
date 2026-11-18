@@ -1,0 +1,17 @@
+{
+    "id":  "INF-GUARD-01",
+    "requirement":  "P4",
+    "precondition":  "V4_TEST_MODE=1",
+    "injectedFault":  "attempt real HKCU/process operations",
+    "expected":  "4/4 blocked; Get-V4Paths does not fall back",
+    "actual":  "registry writes blocked; process start/stop are safe no-ops; paths did not fall back",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  634,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T05:54:50.181-08:00",
+    "finishedAt":  "2026-11-18T05:54:50.816-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-final-clean\\final.cases\\0042-INF-GUARD-01.json",
+    "testOutput":  ""
+}

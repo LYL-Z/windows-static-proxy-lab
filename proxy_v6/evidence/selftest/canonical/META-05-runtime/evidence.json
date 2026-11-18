@@ -2,27 +2,27 @@
     "schemaVersion":  1,
     "tool":  "proxy_v6/tests/Harness.ps1",
     "harnessVersion":  "6.0.0",
-    "runId":  "97f0c320dad246dcbba76cfcba2e8c42",
+    "runId":  "1088045abb744cf69b09a3ff9c294df8",
     "host":  {
                  "psVersion":  "5.1.26100.9818",
                  "psEdition":  "Desktop",
                  "os":  "Microsoft Windows NT 10.0.26300.0",
                  "clr":  "4.0.30319.42000",
                  "is64BitProcess":  true,
-                 "pid":  56620
+                 "pid":  29556
              },
     "git":  {
                 "available":  true,
-                "head":  "36222c92c829a2ef08b71af2a3a3ff9a3c44b396",
+                "head":  "c562c1899488d07b67d2e1fd804e3656e1db7a27",
                 "branch":  "v5/short-run-hardening",
                 "dirty":  true,
                 "error":  null
             },
     "repoRoot":  "D:\\claude防封\\publish",
     "filter":  "*",
-    "startedAt":  "2026-11-18T05:08:43.479-08:00",
-    "finishedAt":  "2026-11-18T05:08:43.743-08:00",
-    "durationMs":  77,
+    "startedAt":  "2026-11-18T05:56:13.813-08:00",
+    "finishedAt":  "2026-11-18T05:56:14.155-08:00",
+    "durationMs":  86,
     "counts":  {
                    "registered":  1,
                    "executed":  0,
@@ -50,11 +50,11 @@
                       "status":  "skip",
                       "passed":  false,
                       "detail":  "skipped at runtime: fixture runtime skip: simulated missing dependency",
-                      "durationMs":  10,
+                      "durationMs":  12,
                       "assertions":  0,
-                      "startedAt":  "2026-11-18T05:08:43.509-08:00",
-                      "finishedAt":  "2026-11-18T05:08:43.528-08:00",
-                      "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-050837-302-09b36eb4\\META-05-runtime\\cases\\0001-FIX-SKIP-RUNTIME.json",
+                      "startedAt":  "2026-11-18T05:56:13.851-08:00",
+                      "finishedAt":  "2026-11-18T05:56:13.870-08:00",
+                      "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-055607-119-02020809\\META-05-runtime\\cases\\0001-FIX-SKIP-RUNTIME.json",
                       "testOutput":  ""
                   }
               ]

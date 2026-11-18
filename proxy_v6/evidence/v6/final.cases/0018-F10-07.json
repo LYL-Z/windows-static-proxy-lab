@@ -1,0 +1,17 @@
+{
+    "id":  "F10-07",
+    "requirement":  "F10",
+    "precondition":  "app was not running before",
+    "injectedFault":  "failure with snapshot",
+    "expected":  "stop only; never start",
+    "actual":  "F10-07: stopped only",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 2",
+    "durationMs":  634,
+    "assertions":  2,
+    "startedAt":  "2026-11-18T05:54:32.937-08:00",
+    "finishedAt":  "2026-11-18T05:54:33.571-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-final-clean\\final.cases\\0018-F10-07.json",
+    "testOutput":  ""
+}

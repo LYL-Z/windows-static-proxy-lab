@@ -1,0 +1,17 @@
+{
+    "id":  "F07-16",
+    "requirement":  "F07",
+    "precondition":  "app rewrites profiles.yaml while stopping",
+    "injectedFault":  "stale pre-snapshot text",
+    "expected":  "post-stop text is written",
+    "actual":  "F07-16: post-stop profile text used",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 2",
+    "durationMs":  723,
+    "assertions":  2,
+    "startedAt":  "2026-11-18T05:54:46.613-08:00",
+    "finishedAt":  "2026-11-18T05:54:47.336-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-final-clean\\final.cases\\0037-F07-16.json",
+    "testOutput":  ""
+}

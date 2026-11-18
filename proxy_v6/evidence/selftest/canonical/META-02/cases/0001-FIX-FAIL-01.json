@@ -8,10 +8,10 @@
     "status":  "fail",
     "passed":  false,
     "detail":  "assertion failed: intentional failure one (expected: 1; actual: 2)",
-    "durationMs":  21,
+    "durationMs":  23,
     "assertions":  1,
-    "startedAt":  "2026-11-18T05:08:38.743-08:00",
-    "finishedAt":  "2026-11-18T05:08:38.772-08:00",
-    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-050837-302-09b36eb4\\META-02\\cases\\0001-FIX-FAIL-01.json",
+    "startedAt":  "2026-11-18T05:56:08.694-08:00",
+    "finishedAt":  "2026-11-18T05:56:08.724-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-055607-119-02020809\\META-02\\cases\\0001-FIX-FAIL-01.json",
     "testOutput":  ""
 }

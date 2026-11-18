@@ -1,0 +1,17 @@
+{
+    "id":  "INF-LOCK-02",
+    "requirement":  "LOCK-02",
+    "precondition":  "winner holds lock",
+    "injectedFault":  "wrong token exit",
+    "expected":  "lock survives",
+    "actual":  "wrong token did not delete the winner lock",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  610,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T05:54:58.349-08:00",
+    "finishedAt":  "2026-11-18T05:54:58.959-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-final-clean\\final.cases\\0054-INF-LOCK-02.json",
+    "testOutput":  ""
+}

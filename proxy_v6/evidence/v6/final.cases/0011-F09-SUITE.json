@@ -1,0 +1,17 @@
+{
+    "id":  "F09-SUITE",
+    "requirement":  "F09",
+    "precondition":  "isolated V4 test root; a winner lock is held by the parent",
+    "injectedFault":  "Init runs while another process holds the lock; loser exits",
+    "expected":  "no settings write before lock; winner lock survives; illegal Init+DryRun exits 11",
+    "actual":  "all 3 sub-checks passed",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  22258,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T05:54:06.971-08:00",
+    "finishedAt":  "2026-11-18T05:54:29.230-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-final-clean\\final.cases\\0011-F09-SUITE.json",
+    "testOutput":  ""
+}

@@ -1,0 +1,17 @@
+{
+    "id":  "F08-09",
+    "requirement":  "F08",
+    "precondition":  "CRLF registry; target has no updated",
+    "injectedFault":  "CRLF line endings",
+    "expected":  "foreign untouched; target updated; CRLF preserved",
+    "actual":  "F08-09: CRLF preserved; foreign 222222 kept",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 2",
+    "durationMs":  586,
+    "assertions":  2,
+    "startedAt":  "2026-11-18T05:54:05.750-08:00",
+    "finishedAt":  "2026-11-18T05:54:06.336-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-final-clean\\final.cases\\0009-F08-09.json",
+    "testOutput":  ""
+}

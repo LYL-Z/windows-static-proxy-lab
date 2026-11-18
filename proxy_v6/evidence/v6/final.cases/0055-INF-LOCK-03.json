@@ -1,0 +1,17 @@
+{
+    "id":  "INF-LOCK-03",
+    "requirement":  "LOCK-05",
+    "precondition":  "lock file uses current pid with wrong start time",
+    "injectedFault":  "PID reuse",
+    "expected":  "treated as stale",
+    "actual":  "PID reuse detected by process start time",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  669,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T05:54:58.961-08:00",
+    "finishedAt":  "2026-11-18T05:54:59.631-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-final-clean\\final.cases\\0055-INF-LOCK-03.json",
+    "testOutput":  ""
+}

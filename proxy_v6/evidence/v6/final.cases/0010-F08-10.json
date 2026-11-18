@@ -1,0 +1,17 @@
+{
+    "id":  "F08-10",
+    "requirement":  "F08",
+    "precondition":  "current line is after the profile block",
+    "injectedFault":  "insertion shifts current index",
+    "expected":  "current updated; no duplicate; updated not corrupted",
+    "actual":  "F08-10: current updated after insertion; no duplicate",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 2",
+    "durationMs":  630,
+    "assertions":  2,
+    "startedAt":  "2026-11-18T05:54:06.338-08:00",
+    "finishedAt":  "2026-11-18T05:54:06.968-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-final-clean\\final.cases\\0010-F08-10.json",
+    "testOutput":  ""
+}

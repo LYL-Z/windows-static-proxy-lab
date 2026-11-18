@@ -1,0 +1,17 @@
+{
+    "id":  "F07-03",
+    "requirement":  "F07",
+    "precondition":  "first write ok",
+    "injectedFault":  "second write fails",
+    "expected":  "first write rolled back",
+    "actual":  "F07-03: second write failure rolled back",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 2",
+    "durationMs":  748,
+    "assertions":  2,
+    "startedAt":  "2026-11-18T05:54:36.973-08:00",
+    "finishedAt":  "2026-11-18T05:54:37.721-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-final-clean\\final.cases\\0024-F07-03.json",
+    "testOutput":  ""
+}

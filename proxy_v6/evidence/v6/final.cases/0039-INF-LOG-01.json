@@ -1,0 +1,17 @@
+{
+    "id":  "INF-LOG-01",
+    "requirement":  "LOG-01",
+    "precondition":  "evidence path exists as a file",
+    "injectedFault":  "log directory cannot be created",
+    "expected":  "Start-V4Log returns false; logging continues",
+    "actual":  "blocked log path returned false; Write-V4Log continued",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  700,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T05:54:48.072-08:00",
+    "finishedAt":  "2026-11-18T05:54:48.773-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-final-clean\\final.cases\\0039-INF-LOG-01.json",
+    "testOutput":  ""
+}

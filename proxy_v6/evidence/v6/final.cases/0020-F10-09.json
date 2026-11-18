@@ -1,0 +1,17 @@
+{
+    "id":  "F10-09",
+    "requirement":  "F10",
+    "precondition":  "process state unknown with snapshot",
+    "injectedFault":  "AppWasRunning=null",
+    "expected":  "returns 40; no false success",
+    "actual":  "F10-09: returned 40",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 2",
+    "durationMs":  638,
+    "assertions":  2,
+    "startedAt":  "2026-11-18T05:54:34.165-08:00",
+    "finishedAt":  "2026-11-18T05:54:34.803-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-final-clean\\final.cases\\0020-F10-09.json",
+    "testOutput":  ""
+}

@@ -1,0 +1,17 @@
+{
+    "id":  "INF-ATOMIC-03",
+    "requirement":  "TX-06",
+    "precondition":  "target locked",
+    "injectedFault":  "file occupied",
+    "expected":  "refused; target intact",
+    "actual":  "locked target refused, intact, staging cleaned",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  604,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T05:55:08.244-08:00",
+    "finishedAt":  "2026-11-18T05:55:08.848-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-final-clean\\final.cases\\0067-INF-ATOMIC-03.json",
+    "testOutput":  ""
+}

@@ -1,0 +1,17 @@
+{
+    "id":  "INF-YAML-01",
+    "requirement":  "DATA-02",
+    "precondition":  "credentials containing quote/newline/backslash",
+    "injectedFault":  "YAML injection attempt",
+    "expected":  "escaped; no injected top-level key",
+    "actual":  "quotes/newlines/backslashes escaped; no YAML line injection",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  576,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T05:55:45.865-08:00",
+    "finishedAt":  "2026-11-18T05:55:46.443-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-final-clean\\final.cases\\0080-INF-YAML-01.json",
+    "testOutput":  ""
+}

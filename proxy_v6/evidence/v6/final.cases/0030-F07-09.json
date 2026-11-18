@@ -1,0 +1,17 @@
+{
+    "id":  "F07-09",
+    "requirement":  "F07",
+    "precondition":  "app was not running before",
+    "injectedFault":  "second write fails",
+    "expected":  "app remains stopped",
+    "actual":  "F07-09: pre-existing stopped state preserved; recovery attempted stop",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 2",
+    "durationMs":  687,
+    "assertions":  2,
+    "startedAt":  "2026-11-18T05:54:41.428-08:00",
+    "finishedAt":  "2026-11-18T05:54:42.115-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-final-clean\\final.cases\\0030-F07-09.json",
+    "testOutput":  ""
+}

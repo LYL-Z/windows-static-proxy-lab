@@ -1,0 +1,17 @@
+{
+    "id":  "F07-08",
+    "requirement":  "F07",
+    "precondition":  "clean fixture",
+    "injectedFault":  "none",
+    "expected":  "all targets written; proxy owned; owner recorded",
+    "actual":  "F07-08: all targets written",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 2",
+    "durationMs":  683,
+    "assertions":  2,
+    "startedAt":  "2026-11-18T05:54:40.742-08:00",
+    "finishedAt":  "2026-11-18T05:54:41.426-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-final-clean\\final.cases\\0029-F07-08.json",
+    "testOutput":  ""
+}

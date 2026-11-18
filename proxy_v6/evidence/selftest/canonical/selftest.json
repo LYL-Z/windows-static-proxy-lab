@@ -1,12 +1,12 @@
 {
     "schemaVersion":  1,
     "tool":  "proxy_v6/tests/self/SelfTest.ps1",
-    "startedAt":  "2026-11-18T05:08:37.289-08:00",
-    "finishedAt":  "2026-11-18T05:08:46.337-08:00",
-    "durationMs":  9046,
+    "startedAt":  "2026-11-18T05:56:07.106-08:00",
+    "finishedAt":  "2026-11-18T05:56:17.042-08:00",
+    "durationMs":  9934,
     "repoRoot":  "D:\\claude防封\\publish",
     "git":  {
-                "head":  "36222c92c829a2ef08b71af2a3a3ff9a3c44b396",
+                "head":  "c562c1899488d07b67d2e1fd804e3656e1db7a27",
                 "branch":  "v5/short-run-hardening",
                 "dirty":  true
             },
@@ -41,7 +41,7 @@
                        "stdout":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-01\\stdout.txt",
                        "stderr":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-01\\stderr.txt",
                        "evidence":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-01\\evidence.json",
-                       "at":  "2026-11-18T05:08:38.293-08:00"
+                       "at":  "2026-11-18T05:56:08.196-08:00"
                    },
                    {
                        "id":  "META-02",
@@ -55,7 +55,7 @@
                        "stdout":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-02\\stdout.txt",
                        "stderr":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-02\\stderr.txt",
                        "evidence":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-02\\evidence.json",
-                       "at":  "2026-11-18T05:08:39.122-08:00"
+                       "at":  "2026-11-18T05:56:09.101-08:00"
                    },
                    {
                        "id":  "META-03",
@@ -69,7 +69,7 @@
                        "stdout":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-03\\stdout.txt",
                        "stderr":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-03\\stderr.txt",
                        "evidence":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-03\\evidence.json",
-                       "at":  "2026-11-18T05:08:39.956-08:00"
+                       "at":  "2026-11-18T05:56:10.005-08:00"
                    },
                    {
                        "id":  "META-04",
@@ -83,7 +83,7 @@
                        "stdout":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-04-empty\\stdout.txt",
                        "stderr":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-04-empty\\stderr.txt",
                        "evidence":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-04-empty\\evidence.json",
-                       "at":  "2026-11-18T05:08:41.471-08:00"
+                       "at":  "2026-11-18T05:56:11.620-08:00"
                    },
                    {
                        "id":  "META-05",
@@ -97,7 +97,7 @@
                        "stdout":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-05-mixed\\stdout.txt",
                        "stderr":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-05-mixed\\stderr.txt",
                        "evidence":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-05-mixed\\evidence.json",
-                       "at":  "2026-11-18T05:08:43.860-08:00"
+                       "at":  "2026-11-18T05:56:14.279-08:00"
                    },
                    {
                        "id":  "META-06",
@@ -111,7 +111,7 @@
                        "stdout":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-06\\stdout.txt",
                        "stderr":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-06\\stderr.txt",
                        "evidence":  null,
-                       "at":  "2026-11-18T05:08:45.460-08:00"
+                       "at":  "2026-11-18T05:56:16.131-08:00"
                    },
                    {
                        "id":  "META-07",
@@ -125,7 +125,7 @@
                        "stdout":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-07\\stdout.txt",
                        "stderr":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-07\\stderr.txt",
                        "evidence":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-07\\evidence.json",
-                       "at":  "2026-11-18T05:08:46.323-08:00"
+                       "at":  "2026-11-18T05:56:17.031-08:00"
                    }
                ]
 }
