@@ -396,7 +396,7 @@ function Set-V4Owner {
 
 # ------------------------------------------------------------------ generation --
 function Build-V4Profile {
-    param([object]$S, [string]$Mode = 'resilient')
+    param([object]$S, [string]$Mode = 'strict')
     $group = if ($Mode -eq 'resilient') {
 @"
 proxy-groups:
@@ -453,7 +453,7 @@ rules:
 }
 
 function Build-V4Runtime {
-    param([object]$S, [string]$Mode = 'resilient', [string]$Pipe, [string]$Secret)
+    param([object]$S, [string]$Mode = 'strict', [string]$Pipe, [string]$Secret)
     $profile = Build-V4Profile -S $S -Mode $Mode
     # keep everything from `proxies:` onward (proxies + groups + rules); the runtime
     # header below replaces the profile-only preamble
@@ -466,7 +466,7 @@ mode: rule
 mixed-port: $($S.mixedPort)
 allow-lan: false
 log-level: info
-ipv6: true
+ipv6: false
 unified-delay: true
 find-process-mode: "off"
 tcp-concurrent: true

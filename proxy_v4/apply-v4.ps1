@@ -11,8 +11,9 @@
 [CmdletBinding()]
 param(
     [switch]$Init,
-    [ValidateSet('resilient','strict')][string]$Mode = 'resilient',
+    [ValidateSet('resilient','strict')][string]$Mode = 'strict',
     [switch]$DryRun,
+    [switch]$Repair,
     [string]$StaticHost, [int]$StaticPort = 0, [string]$StaticUser, [string]$StaticPass,
     [string]$HopHost = '127.0.0.1', [int]$HopPort = 11119, [int]$MixedPort = 7897
 )
@@ -74,6 +75,20 @@ try {
         if (-not $hop.ok) { Fail 20 ("first hop not usable: " + $hop.detail) }
         Write-V4Log ("first hop verified: " + $hop.detail) -Level OK
 
+        # Repair: re-assert system-proxy ownership without touching configs or restarting.
+        if ($Repair) {
+            $prev = Get-V4SystemProxy
+            $prevVal = if ($prev.enabled) { $prev.server } else { 'off' }
+            Write-V4Log ("repair: observed system proxy = {0}" -f $prevVal) -Level WARN
+            $got = Get-V4ExitIp -Proxy ('socks5h://127.0.0.1:' + $s.mixedPort)
+            if ($got -ne $s.host) { Fail 31 ("chain unhealthy before repair: exit {0}" -f $got) }
+            Set-V4SystemProxy -Server ('127.0.0.1:' + $s.mixedPort)
+            $px = Get-V4SystemProxy
+            if (-not $px.enabled -or $px.server -ne ('127.0.0.1:' + $s.mixedPort)) { Fail 32 'repair could not set system proxy' }
+            Set-V4Owner -Owner 'clash' -SystemProxy $px.server -Note ("repair; previous=" + $prevVal)
+            Write-V4Log ("REPAIR OK: {0} -> {1}; exit {2}" -f $prevVal, $px.server, $got) -Level OK
+            return
+        }
         $ctrl = Get-V4Controller
         if (-not $ctrl.pipe) { Fail 10 'external-controller-pipe not discoverable; start Clash Verge once' }
 
@@ -105,7 +120,8 @@ try {
         $pt = Read-V4File $pfile
         if (-not $pt) { Fail 10 'profiles.yaml unreadable' }
         if ($pt -notmatch ('uid:\s*' + $uid)) {
-            $pt = $pt.TrimEnd() + "`n- uid: $uid`n  type: local`n  name: V4-Managed`n  file: v4-managed.yaml`n  updated: 1`n"
+            $epoch = [int](New-TimeSpan -Start ([datetime]'1970-01-01') -End (Get-Date)).TotalSeconds
+            $pt = $pt.TrimEnd() + "`n- uid: $uid`n  type: local`n  name: V4-Managed`n  file: v4-managed.yaml`n  updated: $epoch`n"
         }
         $pt = [regex]::Replace($pt, '(?m)^current:\s*\S+', ('current: ' + $uid))
         Set-V4Atomic -TargetPath $pfile -Content $pt -Validator { param($f) if ((Read-V4File $f) -notmatch '(?m)^current:\s*\S+') { throw 'profiles.yaml has no current entry' } } | Out-Null
