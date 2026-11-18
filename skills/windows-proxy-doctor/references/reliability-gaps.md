@@ -60,9 +60,10 @@ State output now includes:
 - warnings (UDP/WebRTC not proxied);
 - reasons for UI mismatch, first-hop failure, missing settings, exit mismatch.
 
-HEALTHY means the measured TCP proxy path is healthy. It does not mean all
-applications, UDP/WebRTC, DNS, or the whole machine are protected. Report the
-scope explicitly.
+When upstream udp=false, the state is DEGRADED with pathScope TCP_ONLY, not
+HEALTHY; the warning says UDP/WebRTC is not proxied. HEALTHY is reserved for a
+measured path within its declared scope. It never means all applications, DNS,
+or the whole machine are protected.
 
 ## Minimal improvement candidates
 
