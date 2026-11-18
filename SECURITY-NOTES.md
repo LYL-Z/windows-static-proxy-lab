@@ -26,7 +26,7 @@ credential that was ever written to disk in plaintext. Treat every snapshot dire
 
 ## V6 additions (2026-11-18)
 
-- `-Init` no longer accepts a password on the command line. Explicit migration uses `-CredentialFile <path>` (ACL-hardened); the old `-StaticPass`/`-StaticPassFile` spellings are rejected with a removal message. Prefer migrating from the current Clash profile. Never pass the password in argv or shell history.
+- `-Init` no longer accepts a password on the command line. Explicit migration uses `-CredentialFile <path>` (ACL-hardened); the old `-StaticPass`/`-StaticPassFile` spellings are rejected with a removal message. Harden the file first with `Protect-V4Acl` (or equivalent `icacls`); unhardened files are refused. Prefer migrating from the current Clash profile. Never pass the password in argv or shell history.
 - Snapshot/backup directories contain plaintext proxy credentials by design (needed for restore). Their ACL is now hardened before copying, but they are **not encrypted**. Do not upload `backup/` to cloud drives, tickets, or chats.
 - `Get-V4Settings` now refuses a config/settings ACL that is not hardened (code 12); re-run `-Init` under the lock to repair.
 - Repository/scripts/evidence ACLs were hardened against local `Authenticated Users` modification (see `proxy_v6/evidence/v6/repo-acl.json`).

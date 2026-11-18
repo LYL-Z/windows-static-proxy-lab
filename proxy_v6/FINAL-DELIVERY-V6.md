@@ -24,7 +24,15 @@
 - C-02：旧 `-StaticPass`/`-StaticPassFile` 在 CWD 有同名文件时也 exit 11 并输出 removal 文案 → **CLOSED（可审计）**。
 - F12：settings 缺失 + HKCU=0/UI=on → **FAILED + UI reason**，不是 DEGRADED/HEALTHY。
 - 新 HIGH：无。
-- 条件：C-01/C-12 用户书面处置；V6 未部署生产；R3-01/R3-02/R2A-06 等残余接受或修复；真实 apply/rollback/boot 等 WAITING-USER。
+- 条件：C-01/C-12 用户书面处置；V6 未部署生产；残余需接受或修复；真实 apply/rollback/boot 等 WAITING-USER。
+- 独立复审确认的残余（按名称，避免编号混淆）：
+  - R2A-06：journal 无提交阶段（MED，fail-closed）。
+  - 安全 R3-01：旧 proxy_diag/v2/v3 入口仍可直写 HKCU（MED）。
+  - 事务 R3-01：生产写门闩只覆盖注册表/进程入口，ACL 写入器、Start-V4ClashCore -Launch、settings/owner/journal 未在门闩内（MED）。
+  - R3-02：系统代理写入补偿仅覆盖进程内异常，非跨进程原子（LOW）。
+  - R3D-04：C-04 owner 无负向用例（LOW）；R3D-05：写补偿无失败用例（LOW）。
+  - R5D-01：凭据文件 ACL 加固此前只有“<受保护文件>”文字，现已补 Protect-V4Acl 示例（LOW）。
+  - C-01/C-12、NexIP 轮换仍为 BLOCKED/USER 项。
 
 ## 2. 十个 Gate（证据/状态）
 | Gate | 状态 | 证据与边界 |
