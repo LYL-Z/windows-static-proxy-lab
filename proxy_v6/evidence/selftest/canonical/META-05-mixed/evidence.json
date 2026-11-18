@@ -2,27 +2,27 @@
     "schemaVersion":  1,
     "tool":  "proxy_v6/tests/Harness.ps1",
     "harnessVersion":  "6.0.0",
-    "runId":  "0fb22383f5584db8a815ed7994e06bee",
+    "runId":  "2667f19333fb4e3687abc5845248ce93",
     "host":  {
                  "psVersion":  "5.1.26100.9818",
                  "psEdition":  "Desktop",
                  "os":  "Microsoft Windows NT 10.0.26300.0",
                  "clr":  "4.0.30319.42000",
                  "is64BitProcess":  true,
-                 "pid":  29556
+                 "pid":  40964
              },
     "git":  {
                 "available":  true,
                 "head":  "0268e173a47641c042301e27230e94502022d221",
-                "branch":  "v5/short-run-hardening",
-                "dirty":  true,
+                "branch":  "HEAD",
+                "dirty":  false,
                 "error":  null
             },
-    "repoRoot":  "D:\\claude防封\\publish",
+    "repoRoot":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-selftest-wt",
     "filter":  "*",
-    "startedAt":  "2026-11-18T06:17:12.418-08:00",
-    "finishedAt":  "2026-11-18T06:17:12.734-08:00",
-    "durationMs":  79,
+    "startedAt":  "2026-11-18T06:18:21.333-08:00",
+    "finishedAt":  "2026-11-18T06:18:21.641-08:00",
+    "durationMs":  80,
     "counts":  {
                    "registered":  2,
                    "executed":  1,
@@ -50,11 +50,11 @@
                       "status":  "pass",
                       "passed":  true,
                       "detail":  "assertions passed: 1",
-                      "durationMs":  7,
+                      "durationMs":  8,
                       "assertions":  1,
-                      "startedAt":  "2026-11-18T06:17:12.449-08:00",
-                      "finishedAt":  "2026-11-18T06:17:12.463-08:00",
-                      "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-061707-717-eda169b4\\META-05-mixed\\cases\\0001-FIX-SKIP-PASS.json",
+                      "startedAt":  "2026-11-18T06:18:21.366-08:00",
+                      "finishedAt":  "2026-11-18T06:18:21.379-08:00",
+                      "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-061815-266-45a93602\\META-05-mixed\\cases\\0001-FIX-SKIP-PASS.json",
                       "testOutput":  ""
                   },
                   {
@@ -69,9 +69,9 @@
                       "detail":  "skipped at registration: fixture registration skip: dependency not present",
                       "durationMs":  0,
                       "assertions":  0,
-                      "startedAt":  "2026-11-18T06:17:12.494-08:00",
-                      "finishedAt":  "2026-11-18T06:17:12.495-08:00",
-                      "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-061707-717-eda169b4\\META-05-mixed\\cases\\0002-FIX-SKIP-ONE.json",
+                      "startedAt":  "2026-11-18T06:18:21.410-08:00",
+                      "finishedAt":  "2026-11-18T06:18:21.411-08:00",
+                      "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-061815-266-45a93602\\META-05-mixed\\cases\\0002-FIX-SKIP-ONE.json",
                       "testOutput":  ""
                   }
               ]

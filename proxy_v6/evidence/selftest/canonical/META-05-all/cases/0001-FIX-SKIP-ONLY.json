@@ -10,8 +10,8 @@
     "detail":  "skipped at registration: fixture registration skip: only test skipped",
     "durationMs":  2,
     "assertions":  0,
-    "startedAt":  "2026-11-18T06:17:13.306-08:00",
-    "finishedAt":  "2026-11-18T06:17:13.317-08:00",
-    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-061707-717-eda169b4\\META-05-all\\cases\\0001-FIX-SKIP-ONLY.json",
+    "startedAt":  "2026-11-18T06:18:22.238-08:00",
+    "finishedAt":  "2026-11-18T06:18:22.248-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-061815-266-45a93602\\META-05-all\\cases\\0001-FIX-SKIP-ONLY.json",
     "testOutput":  ""
 }

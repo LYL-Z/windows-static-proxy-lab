@@ -2,27 +2,27 @@
     "schemaVersion":  1,
     "tool":  "proxy_v6/tests/Harness.ps1",
     "harnessVersion":  "6.0.0",
-    "runId":  "6c8760dae0af4b08aabc8d5ce180f479",
+    "runId":  "60808def823f42b288feff73fef669a9",
     "host":  {
                  "psVersion":  "5.1.26100.9818",
                  "psEdition":  "Desktop",
                  "os":  "Microsoft Windows NT 10.0.26300.0",
                  "clr":  "4.0.30319.42000",
                  "is64BitProcess":  true,
-                 "pid":  50756
+                 "pid":  49932
              },
     "git":  {
                 "available":  true,
                 "head":  "0268e173a47641c042301e27230e94502022d221",
-                "branch":  "v5/short-run-hardening",
-                "dirty":  true,
+                "branch":  "HEAD",
+                "dirty":  false,
                 "error":  null
             },
-    "repoRoot":  "D:\\claude防封\\publish",
+    "repoRoot":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-selftest-wt",
     "filter":  "*",
-    "startedAt":  "2026-11-18T06:17:15.781-08:00",
-    "finishedAt":  "2026-11-18T06:17:16.052-08:00",
-    "durationMs":  52,
+    "startedAt":  "2026-11-18T06:18:24.736-08:00",
+    "finishedAt":  "2026-11-18T06:18:24.982-08:00",
+    "durationMs":  53,
     "counts":  {
                    "registered":  1,
                    "executed":  1,
@@ -39,13 +39,13 @@
     "evidenceErrors":  [
                            {
                                "stage":  "evidence-dir",
-                               "message":  "cannot create evidence directory: path is a file, not a directory: C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-061707-717-eda169b4\\META-06-case-evidence\\cases-blocked",
-                               "at":  "2026-11-18T06:17:15.799-08:00"
+                               "message":  "cannot create evidence directory: path is a file, not a directory: C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-061815-266-45a93602\\META-06-case-evidence\\cases-blocked",
+                               "at":  "2026-11-18T06:18:24.754-08:00"
                            },
                            {
                                "stage":  "case-evidence",
                                "message":  "no evidence directory available for test FIX-EVIDENCE-01",
-                               "at":  "2026-11-18T06:17:15.833-08:00"
+                               "at":  "2026-11-18T06:18:24.789-08:00"
                            }
                        ],
     "cases":  [
@@ -61,8 +61,8 @@
                       "detail":  "assertions passed: 1",
                       "durationMs":  7,
                       "assertions":  1,
-                      "startedAt":  "2026-11-18T06:17:15.819-08:00",
-                      "finishedAt":  "2026-11-18T06:17:15.830-08:00",
+                      "startedAt":  "2026-11-18T06:18:24.774-08:00",
+                      "finishedAt":  "2026-11-18T06:18:24.785-08:00",
                       "evidenceFile":  "",
                       "testOutput":  ""
                   }

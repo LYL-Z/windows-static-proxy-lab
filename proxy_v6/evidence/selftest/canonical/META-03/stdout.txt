@@ -1,17 +1,17 @@
 
 == V6 TEST HARNESS 6.0.0 ==
-Run ID: 6061885de78449e782a8cc16b07528cd
+Run ID: 08c794bb06cb41f3997d27e9e7ad7ee0
 Git HEAD: 0268e173a47641c042301e27230e94502022d221
-Git branch: v5/short-run-hardening
+Git branch: HEAD
 Filter: *
 --------------------------------------------------------------
-[PASS] FIX-META03-01 (META-03) 8ms
+[PASS] FIX-META03-01 (META-03) 7ms
 [PASS] FIX-META03-02 (META-03) 5ms
 [HARNESS-ERROR] framework: unhandled framework exception: injected harness fault at stage: before-summary
-       �� Invoke-HarnessFaultStage��D:\claude����\publish\proxy_v6\tests\Harness.ps1 ��: �� 410 ��
-�� Invoke-TestRun��D:\claude����\publish\proxy_v6\tests\Harness.ps1 ��: �� 622 ��
-�� <ScriptBlock>��D:\claude����\publish\proxy_v6\tests\self\fixtures\harness-error.ps1 ��: �� 21 ��
+       �� Invoke-HarnessFaultStage��C:\Users\Lenovo\AppData\Local\Temp\v6-selftest-wt\proxy_v6\tests\Harness.ps1 ��: �� 410 ��
+�� Invoke-TestRun��C:\Users\Lenovo\AppData\Local\Temp\v6-selftest-wt\proxy_v6\tests\Harness.ps1 ��: �� 622 ��
+�� <ScriptBlock>��C:\Users\Lenovo\AppData\Local\Temp\v6-selftest-wt\proxy_v6\tests\self\fixtures\harness-error.ps1 ��: �� 21 ��
 --------------------------------------------------------------
 Counts: registered=2 executed=2 passed=2 failed=0 skipped=0 available=2
-Evidence: C:\Users\Lenovo\AppData\Local\Temp\v6-tests\v6-selftest-20261118-061707-717-eda169b4\META-03\evidence.json
+Evidence: C:\Users\Lenovo\AppData\Local\Temp\v6-tests\v6-selftest-20261118-061815-266-45a93602\META-03\evidence.json
 RESULT: HARNESS_ERROR EXIT 3

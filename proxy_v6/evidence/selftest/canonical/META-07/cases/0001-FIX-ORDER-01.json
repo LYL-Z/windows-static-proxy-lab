@@ -8,10 +8,10 @@
     "status":  "fail",
     "passed":  false,
     "detail":  "assertion failed: earlier failure must persist (actual: False)",
-    "durationMs":  20,
+    "durationMs":  19,
     "assertions":  1,
-    "startedAt":  "2026-11-18T06:17:16.634-08:00",
-    "finishedAt":  "2026-11-18T06:17:16.660-08:00",
-    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-061707-717-eda169b4\\META-07\\cases\\0001-FIX-ORDER-01.json",
+    "startedAt":  "2026-11-18T06:18:25.563-08:00",
+    "finishedAt":  "2026-11-18T06:18:25.589-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-061815-266-45a93602\\META-07\\cases\\0001-FIX-ORDER-01.json",
     "testOutput":  ""
 }

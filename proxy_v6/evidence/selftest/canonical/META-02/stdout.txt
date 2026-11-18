@@ -1,15 +1,15 @@
 
 == V6 TEST HARNESS 6.0.0 ==
-Run ID: e3718632825d4f2a8c669594810a7070
+Run ID: 2a2d88bafa954650adf7bf06c6c3ab29
 Git HEAD: 0268e173a47641c042301e27230e94502022d221
-Git branch: v5/short-run-hardening
+Git branch: HEAD
 Filter: *
 --------------------------------------------------------------
 [FAIL] FIX-FAIL-01 (META-02) 22ms
        assertion failed: intentional failure one (expected: 1; actual: 2)
-[FAIL] FIX-FAIL-02 (META-02) 8ms
-       unexpected exception: intentional unexpected exception | stack: �� <ScriptBlock>��D:\claude����\publish\proxy_v6\tests\self\fixtures\fail.ps1 ��: �� 18 �� | �� Invoke-HarnessCase��D:\claude����\publish\proxy_v6\tests\Harness.ps1 ��: �� 434 �� | �� Invoke-TestRun��D:\claude����\publish\proxy_v6\tests\Harness.ps1 ��: �� 619 �� | �� <ScriptBlock>��D:\claude����\publish\proxy_v6\tests\self\fixtures\fail.ps1 ��: �� 21 �� | at: ����λ�� D:\claude����\publish\proxy_v6\tests\self\fixtures\fail.ps1:18 �ַ�: 3 | +   throw 'intentional unexpected exception' | +   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+[FAIL] FIX-FAIL-02 (META-02) 7ms
+       unexpected exception: intentional unexpected exception | stack: �� <ScriptBlock>��C:\Users\Lenovo\AppData\Local\Temp\v6-selftest-wt\proxy_v6\tests\self\fixtures\fail.ps1 ��: �� 18 �� | �� Invoke-HarnessCase��C:\Users\Lenovo\AppData\Local\Temp\v6-selftest-wt\proxy_v6\tests\Harness.ps1 ��: �� 434 �� | �� Invoke-TestRun��C:\Users\Lenovo\AppData\Local\Temp\v6-selftest-wt\proxy_v6\tests\Harness.ps1 ��: �� 619 �� | �� <ScriptBlock>��C:\Users\Lenovo\AppData\Local\Temp\v6-selftest-wt\proxy_v6\tests\self\fixtures\fail.ps1 ��: �� 21 �� | at: ����λ�� C:\Users\Lenovo\AppData\Local\Temp\v6-selftest-wt\proxy_v6\tests\self\fixtures\fail.ps1:18 �ַ�: 3 | +   throw 'intentional unexpected exception' | +   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --------------------------------------------------------------
 Counts: registered=2 executed=2 passed=0 failed=2 skipped=0 available=2
-Evidence: C:\Users\Lenovo\AppData\Local\Temp\v6-tests\v6-selftest-20261118-061707-717-eda169b4\META-02\evidence.json
+Evidence: C:\Users\Lenovo\AppData\Local\Temp\v6-tests\v6-selftest-20261118-061815-266-45a93602\META-02\evidence.json
 RESULT: FAIL EXIT 1

@@ -8,10 +8,10 @@
     "status":  "pass",
     "passed":  true,
     "detail":  "assertions passed: 2",
-    "durationMs":  5,
+    "durationMs":  6,
     "assertions":  2,
-    "startedAt":  "2026-11-18T06:17:08.316-08:00",
-    "finishedAt":  "2026-11-18T06:17:08.321-08:00",
-    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-061707-717-eda169b4\\META-01\\cases\\0002-FIX-PASS-02.json",
+    "startedAt":  "2026-11-18T06:18:15.921-08:00",
+    "finishedAt":  "2026-11-18T06:18:15.927-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-061815-266-45a93602\\META-01\\cases\\0002-FIX-PASS-02.json",
     "testOutput":  ""
 }

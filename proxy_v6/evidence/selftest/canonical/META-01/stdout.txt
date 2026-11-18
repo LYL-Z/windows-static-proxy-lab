@@ -1,13 +1,13 @@
 
 == V6 TEST HARNESS 6.0.0 ==
-Run ID: 4b15d1a3cba5487caadf5ab55aeb3123
+Run ID: 317f7ce0e7a54cd091f7581389870fb3
 Git HEAD: 0268e173a47641c042301e27230e94502022d221
-Git branch: v5/short-run-hardening
+Git branch: HEAD
 Filter: *
 --------------------------------------------------------------
 [PASS] FIX-PASS-01 (META-01) 10ms
-[PASS] FIX-PASS-02 (META-01) 5ms
+[PASS] FIX-PASS-02 (META-01) 6ms
 --------------------------------------------------------------
 Counts: registered=2 executed=2 passed=2 failed=0 skipped=0 available=2
-Evidence: C:\Users\Lenovo\AppData\Local\Temp\v6-tests\v6-selftest-20261118-061707-717-eda169b4\META-01\evidence.json
+Evidence: C:\Users\Lenovo\AppData\Local\Temp\v6-tests\v6-selftest-20261118-061815-266-45a93602\META-01\evidence.json
 RESULT: PASS EXIT 0
