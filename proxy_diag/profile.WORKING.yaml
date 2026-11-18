@@ -1,0 +1,35 @@
+# NexIP 美国华盛顿 原生静态IP  ->  Clash Verge Rev / Mihomo
+# 拓扑: 应用 -> Clash(7897) -> 本机StarSky首跳(11119) -> 静态IP(9506, SOCKS5) -> 互联网
+mixed-port: 7897
+allow-lan: false
+mode: rule
+log-level: info
+ipv6: false
+unified-delay: true
+
+proxies:
+  # 首跳: 本机 StarSky 混合代理 (需保持 StarSky "加速中")
+  - name: "STAR-首跳"
+    type: http
+    server: 127.0.0.1
+    port: 11119
+
+  # 静态IP: 只接受美国来源IP接入, 故经首跳拨号
+  - name: "美国-华盛顿-SOCKS5"
+    type: socks5
+    server: 72.245.197.103
+    port: 9506
+    username: "<REDACTED>"
+    password: "<REDACTED-ROTATE-ME>"
+    udp: false
+    dialer-proxy: "STAR-首跳"
+
+proxy-groups:
+  - name: "PROXY"
+    type: select
+    proxies:
+      - "美国-华盛顿-SOCKS5"
+      - "DIRECT"
+
+rules:
+  - MATCH,PROXY

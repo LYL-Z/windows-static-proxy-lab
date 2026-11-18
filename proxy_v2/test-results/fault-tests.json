@@ -1,0 +1,30 @@
+﻿[
+    {
+        "test":  "A first-hop detector",
+        "expected":  "DOWN",
+        "actual":  "DOWN",
+        "pass":  true,
+        "detail":  "port 11199 not listening"
+    },
+    {
+        "test":  "B proxy-hijack detect",
+        "expected":  "MISMATCH",
+        "actual":  "MISMATCH",
+        "pass":  true,
+        "detail":  "STARSKY"
+    },
+    {
+        "test":  "C core-down detect",
+        "expected":  "DEGRADED",
+        "actual":  "DEGRADED",
+        "pass":  true,
+        "detail":  "NEXIP-CORE-DOWN"
+    },
+    {
+        "test":  "D recover after core kill",
+        "expected":  "OK",
+        "actual":  "OK",
+        "pass":  true,
+        "detail":  "restart=True"
+    }
+]

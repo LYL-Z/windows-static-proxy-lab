@@ -1,0 +1,183 @@
+{
+ "label": "chain-w1",
+ "samples": 15,
+ "passed": 15,
+ "successRate": 100.0,
+ "latencyMs": {
+  "connect": {
+   "p50": 0.7,
+   "p95": 23.4
+  },
+  "handshake": {
+   "p50": 0.0,
+   "p95": 0.7
+  },
+  "tls": {
+   "p50": 2293.2,
+   "p95": 2936.5
+  },
+  "ttfb": {
+   "p50": 333.3,
+   "p95": 393.7
+  },
+  "total": {
+   "p50": 2649.6,
+   "p90": 2803.2,
+   "p95": 3255.5,
+   "p99": 3255.5
+  }
+ },
+ "failures": [],
+ "raw": [
+  {
+   "ok": true,
+   "connect_ms": 1.0,
+   "socks_ms": 0.4,
+   "tls_ms": 2313.5,
+   "ttfb_ms": 334.7,
+   "total_ms": 2649.6,
+   "status": "HTTP/1.1 200 OK",
+   "ip": "72.245.197.103"
+  },
+  {
+   "ok": true,
+   "connect_ms": 21.5,
+   "socks_ms": 0.0,
+   "tls_ms": 2282.8,
+   "ttfb_ms": 333.0,
+   "total_ms": 2637.2,
+   "status": "HTTP/1.1 200 OK",
+   "ip": "72.245.197.103"
+  },
+  {
+   "ok": true,
+   "connect_ms": 17.1,
+   "socks_ms": 0.3,
+   "tls_ms": 2453.1,
+   "ttfb_ms": 323.2,
+   "total_ms": 2793.8,
+   "status": "HTTP/1.1 200 OK",
+   "ip": "72.245.197.103"
+  },
+  {
+   "ok": true,
+   "connect_ms": 0.7,
+   "socks_ms": 0.0,
+   "tls_ms": 2365.9,
+   "ttfb_ms": 309.5,
+   "total_ms": 2676.7,
+   "status": "HTTP/1.1 200 OK",
+   "ip": "72.245.197.103"
+  },
+  {
+   "ok": true,
+   "connect_ms": 22.4,
+   "socks_ms": 0.0,
+   "tls_ms": 2414.5,
+   "ttfb_ms": 366.4,
+   "total_ms": 2803.2,
+   "status": "HTTP/1.1 200 OK",
+   "ip": "72.245.197.103"
+  },
+  {
+   "ok": true,
+   "connect_ms": 0.0,
+   "socks_ms": 0.6,
+   "tls_ms": 2270.2,
+   "ttfb_ms": 367.3,
+   "total_ms": 2638.2,
+   "status": "HTTP/1.1 200 OK",
+   "ip": "72.245.197.103"
+  },
+  {
+   "ok": true,
+   "connect_ms": 12.0,
+   "socks_ms": 0.0,
+   "tls_ms": 2237.5,
+   "ttfb_ms": 300.9,
+   "total_ms": 2550.5,
+   "status": "HTTP/1.1 200 OK",
+   "ip": "72.245.197.103"
+  },
+  {
+   "ok": true,
+   "connect_ms": 0.0,
+   "socks_ms": 0.5,
+   "tls_ms": 2295.4,
+   "ttfb_ms": 342.2,
+   "total_ms": 2638.2,
+   "status": "HTTP/1.1 200 OK",
+   "ip": "72.245.197.103"
+  },
+  {
+   "ok": true,
+   "connect_ms": 15.1,
+   "socks_ms": 0.0,
+   "tls_ms": 2263.6,
+   "ttfb_ms": 393.7,
+   "total_ms": 2672.9,
+   "status": "HTTP/1.1 200 OK",
+   "ip": "72.245.197.103"
+  },
+  {
+   "ok": true,
+   "connect_ms": 0.5,
+   "socks_ms": 0.0,
+   "tls_ms": 2339.4,
+   "ttfb_ms": 323.7,
+   "total_ms": 2663.6,
+   "status": "HTTP/1.1 200 OK",
+   "ip": "72.245.197.103"
+  },
+  {
+   "ok": true,
+   "connect_ms": 0.0,
+   "socks_ms": 0.5,
+   "tls_ms": 2192.7,
+   "ttfb_ms": 333.3,
+   "total_ms": 2526.6,
+   "status": "HTTP/1.1 200 OK",
+   "ip": "72.245.197.103"
+  },
+  {
+   "ok": true,
+   "connect_ms": 0.5,
+   "socks_ms": 0.0,
+   "tls_ms": 2157.5,
+   "ttfb_ms": 338.7,
+   "total_ms": 2505.0,
+   "status": "HTTP/1.1 200 OK",
+   "ip": "72.245.197.103"
+  },
+  {
+   "ok": true,
+   "connect_ms": 0.0,
+   "socks_ms": 0.7,
+   "tls_ms": 2190.2,
+   "ttfb_ms": 318.7,
+   "total_ms": 2509.7,
+   "status": "HTTP/1.1 200 OK",
+   "ip": "72.245.197.103"
+  },
+  {
+   "ok": true,
+   "connect_ms": 0.0,
+   "socks_ms": 0.0,
+   "tls_ms": 2936.5,
+   "ttfb_ms": 317.9,
+   "total_ms": 3255.5,
+   "status": "HTTP/1.1 200 OK",
+   "ip": "72.245.197.103"
+  },
+  {
+   "ok": true,
+   "connect_ms": 23.4,
+   "socks_ms": 0.0,
+   "tls_ms": 2293.2,
+   "ttfb_ms": 341.2,
+   "total_ms": 2657.7,
+   "status": "HTTP/1.1 200 OK",
+   "ip": "72.245.197.103"
+  }
+ ]
+}

@@ -1,0 +1,32 @@
+﻿[
+    {
+        "file":  "clash-verge.yaml",
+        "sha256":  "B3EA4E0A2F1D18C0ACC595BCE3F72A73195436646CC45284325B662D749B2504",
+        "bytes":  1132,
+        "mtime":  "2026-11-18T03:21:58"
+    },
+    {
+        "file":  "config.yaml",
+        "sha256":  "74CB60DA39C121A7D17381419CF28C5C4B5062E583515F35491F845DECA5AC65",
+        "bytes":  686,
+        "mtime":  "2026-11-18T01:22:21"
+    },
+    {
+        "file":  "verge.yaml",
+        "sha256":  "7EDBFD4A8AB645EA53060206925090BA13F4BFF40BA1C16327249A01443F87BF",
+        "bytes":  4805,
+        "mtime":  "2026-11-18T01:25:05"
+    },
+    {
+        "file":  "profiles.yaml",
+        "sha256":  "8D9867400D1E125B456736EEF0D9FA763F9E3E785EF5E96923C27EE569EBD87F",
+        "bytes":  1017,
+        "mtime":  "2026-11-18T00:33:33"
+    },
+    {
+        "file":  "profiles\\LWMoQxn0PeIP.yaml",
+        "sha256":  "D09355E1C3BB4438E57510F16D78270AF9357DEAE50221B1E0B5201A771416F7",
+        "bytes":  776,
+        "mtime":  "2026-11-18T03:21:53"
+    }
+]

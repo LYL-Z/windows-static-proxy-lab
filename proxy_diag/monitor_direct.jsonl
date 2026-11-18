@@ -1,0 +1,2 @@
+{"ts": "2026-11-18T01:19:24", "ok": true, "stage": "tls+http", "ms": 4375.1, "exit_ip": "72.245.197.103", "err": null, "auth_sent": true}
+{"ts": "2026-11-18T01:19:59", "ok": true, "stage": "tls+http", "ms": 6619.1, "exit_ip": "72.245.197.103", "err": null, "auth_sent": true}

@@ -1,0 +1,186 @@
+[
+ {
+  "test": "tcp+passive",
+  "ok": true,
+  "detail": "",
+  "steps": [
+   [
+    "1 TCP connect",
+    "OK",
+    "290.7ms"
+   ],
+   [
+    "2 server speaks first",
+    "EOF",
+    "closed"
+   ]
+  ]
+ },
+ {
+  "test": "socks5-noauth",
+  "ok": false,
+  "detail": "",
+  "steps": [
+   [
+    "1 TCP connect",
+    "OK",
+    "257.6ms"
+   ],
+   [
+    "2 recv method",
+    "FAIL",
+    "ConnectionError after 317ms (ConnectionError('peer closed after 0/2 bytes'))"
+   ],
+   [
+    "!! FAILED",
+    "ConnectionError",
+    "peer closed after 0/2 bytes"
+   ]
+  ]
+ },
+ {
+  "test": "socks5-auth",
+  "ok": false,
+  "detail": "",
+  "steps": [
+   [
+    "1 TCP connect",
+    "OK",
+    "249.5ms"
+   ],
+   [
+    "2 recv method",
+    "FAIL",
+    "ConnectionResetError after 251ms (ConnectionResetError(10054, '远程主机强迫关闭了一个现有的连接。', None, 10054, None))"
+   ],
+   [
+    "!! FAILED",
+    "ConnectionResetError",
+    "[WinError 10054] 远程主机强迫关闭了一个现有的连接。"
+   ]
+  ]
+ },
+ {
+  "test": "http-connect-noauth",
+  "ok": false,
+  "detail": "",
+  "steps": [
+   [
+    "1 TCP connect",
+    "OK",
+    "253.6ms"
+   ],
+   [
+    "2 send CONNECT",
+    "OK",
+    "auth header (none)"
+   ],
+   [
+    "!! FAILED",
+    "ConnectionError",
+    "proxy CLOSED connection during CONNECT reply; got b''"
+   ]
+  ]
+ },
+ {
+  "test": "http-connect-auth",
+  "ok": false,
+  "detail": "",
+  "steps": [
+   [
+    "1 TCP connect",
+    "OK",
+    "243.2ms"
+   ],
+   [
+    "2 send CONNECT",
+    "OK",
+    "auth header Basic <masked 36 chars>"
+   ],
+   [
+    "!! FAILED",
+    "ConnectionResetError",
+    "[WinError 10054] 远程主机强迫关闭了一个现有的连接。"
+   ]
+  ]
+ },
+ {
+  "test": "tls-on-9506",
+  "ok": false,
+  "detail": "",
+  "steps": [
+   [
+    "1 TCP connect",
+    "OK",
+    "233.1ms"
+   ],
+   [
+    "2 TLS handshake",
+    "FAIL",
+    "SSLEOFError (SSLEOFError(8, '[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred in violation of protocol (_ssl.c:1006)'))"
+   ]
+  ]
+ },
+ {
+  "test": "port-profile",
+  "ok": true,
+  "detail": "open=[]",
+  "steps": [
+   [
+    "port 9506 (target)",
+    "OPEN",
+    "see tcp test"
+   ],
+   [
+    "port 21",
+    "closed",
+    "TimeoutError"
+   ],
+   [
+    "port 22",
+    "closed",
+    "TimeoutError"
+   ],
+   [
+    "port 25",
+    "closed",
+    "TimeoutError"
+   ],
+   [
+    "port 80",
+    "closed",
+    "TimeoutError"
+   ],
+   [
+    "port 443",
+    "closed",
+    "TimeoutError"
+   ],
+   [
+    "port 8080",
+    "closed",
+    "TimeoutError"
+   ],
+   [
+    "port 8443",
+    "closed",
+    "TimeoutError"
+   ],
+   [
+    "port 9507",
+    "closed",
+    "TimeoutError"
+   ],
+   [
+    "port 12345",
+    "closed",
+    "TimeoutError"
+   ],
+   [
+    "port 65530",
+    "closed",
+    "TimeoutError"
+   ]
+  ]
+ }
+]

@@ -1,0 +1,233 @@
+{
+ "label": "chain-w2",
+ "samples": 20,
+ "passed": 20,
+ "successRate": 100.0,
+ "latencyMs": {
+  "connect": {
+   "p50": 13.5,
+   "p95": 25.6
+  },
+  "handshake": {
+   "p50": 0.0,
+   "p95": 0.8
+  },
+  "tls": {
+   "p50": 2218.9,
+   "p95": 2523.2
+  },
+  "ttfb": {
+   "p50": 323.2,
+   "p95": 430.2
+  },
+  "total": {
+   "p50": 2558.1,
+   "p90": 2738.8,
+   "p95": 2932.0,
+   "p99": 2932.0
+  }
+ },
+ "failures": [],
+ "raw": [
+  {
+   "ok": true,
+   "connect_ms": 1.0,
+   "socks_ms": 0.8,
+   "tls_ms": 2188.2,
+   "ttfb_ms": 309.4,
+   "total_ms": 2499.5,
+   "status": "HTTP/1.1 200 OK",
+   "ip": "72.245.197.103"
+  },
+  {
+   "ok": true,
+   "connect_ms": 0.0,
+   "socks_ms": 0.0,
+   "tls_ms": 2309.8,
+   "ttfb_ms": 351.7,
+   "total_ms": 2662.7,
+   "status": "HTTP/1.1 200 OK",
+   "ip": "72.245.197.103"
+  },
+  {
+   "ok": true,
+   "connect_ms": 15.2,
+   "socks_ms": 0.0,
+   "tls_ms": 2265.7,
+   "ttfb_ms": 306.2,
+   "total_ms": 2587.0,
+   "status": "HTTP/1.1 200 OK",
+   "ip": "72.245.197.103"
+  },
+  {
+   "ok": true,
+   "connect_ms": 25.6,
+   "socks_ms": 0.0,
+   "tls_ms": 2135.4,
+   "ttfb_ms": 306.6,
+   "total_ms": 2468.2,
+   "status": "HTTP/1.1 200 OK",
+   "ip": "72.245.197.103"
+  },
+  {
+   "ok": true,
+   "connect_ms": 0.5,
+   "socks_ms": 0.0,
+   "tls_ms": 2252.5,
+   "ttfb_ms": 323.1,
+   "total_ms": 2576.1,
+   "status": "HTTP/1.1 200 OK",
+   "ip": "72.245.197.103"
+  },
+  {
+   "ok": true,
+   "connect_ms": 0.5,
+   "socks_ms": 0.0,
+   "tls_ms": 2218.9,
+   "ttfb_ms": 328.8,
+   "total_ms": 2548.2,
+   "status": "HTTP/1.1 200 OK",
+   "ip": "72.245.197.103"
+  },
+  {
+   "ok": true,
+   "connect_ms": 19.2,
+   "socks_ms": 0.3,
+   "tls_ms": 2159.3,
+   "ttfb_ms": 304.3,
+   "total_ms": 2483.1,
+   "status": "HTTP/1.1 200 OK",
+   "ip": "72.245.197.103"
+  },
+  {
+   "ok": true,
+   "connect_ms": 16.1,
+   "socks_ms": 0.0,
+   "tls_ms": 2107.0,
+   "ttfb_ms": 308.9,
+   "total_ms": 2432.0,
+   "status": "HTTP/1.1 200 OK",
+   "ip": "72.245.197.103"
+  },
+  {
+   "ok": true,
+   "connect_ms": 25.1,
+   "socks_ms": 0.0,
+   "tls_ms": 2069.6,
+   "ttfb_ms": 307.1,
+   "total_ms": 2401.8,
+   "status": "HTTP/1.1 200 OK",
+   "ip": "72.245.197.103"
+  },
+  {
+   "ok": true,
+   "connect_ms": 0.0,
+   "socks_ms": 0.0,
+   "tls_ms": 2168.5,
+   "ttfb_ms": 311.0,
+   "total_ms": 2479.6,
+   "status": "HTTP/1.1 200 OK",
+   "ip": "72.245.197.103"
+  },
+  {
+   "ok": true,
+   "connect_ms": 0.0,
+   "socks_ms": 0.5,
+   "tls_ms": 2254.5,
+   "ttfb_ms": 332.8,
+   "total_ms": 2587.8,
+   "status": "HTTP/1.1 200 OK",
+   "ip": "72.245.197.103"
+  },
+  {
+   "ok": true,
+   "connect_ms": 15.6,
+   "socks_ms": 0.0,
+   "tls_ms": 2020.3,
+   "ttfb_ms": 291.7,
+   "total_ms": 2327.5,
+   "status": "HTTP/1.1 200 OK",
+   "ip": "72.245.197.103"
+  },
+  {
+   "ok": true,
+   "connect_ms": 21.0,
+   "socks_ms": 0.0,
+   "tls_ms": 2147.8,
+   "ttfb_ms": 298.9,
+   "total_ms": 2467.7,
+   "status": "HTTP/1.1 200 OK",
+   "ip": "72.245.197.103"
+  },
+  {
+   "ok": true,
+   "connect_ms": 13.5,
+   "socks_ms": 0.4,
+   "tls_ms": 2288.1,
+   "ttfb_ms": 430.2,
+   "total_ms": 2732.2,
+   "status": "HTTP/1.1 200 OK",
+   "ip": "72.245.197.103"
+  },
+  {
+   "ok": true,
+   "connect_ms": 19.1,
+   "socks_ms": 0.0,
+   "tls_ms": 2309.7,
+   "ttfb_ms": 333.8,
+   "total_ms": 2662.5,
+   "status": "HTTP/1.1 200 OK",
+   "ip": "72.245.197.103"
+  },
+  {
+   "ok": true,
+   "connect_ms": 0.0,
+   "socks_ms": 0.4,
+   "tls_ms": 2382.6,
+   "ttfb_ms": 355.7,
+   "total_ms": 2738.8,
+   "status": "HTTP/1.1 200 OK",
+   "ip": "72.245.197.103"
+  },
+  {
+   "ok": true,
+   "connect_ms": 0.0,
+   "socks_ms": 0.4,
+   "tls_ms": 2191.4,
+   "ttfb_ms": 323.2,
+   "total_ms": 2515.0,
+   "status": "HTTP/1.1 200 OK",
+   "ip": "72.245.197.103"
+  },
+  {
+   "ok": true,
+   "connect_ms": 23.0,
+   "socks_ms": 0.0,
+   "tls_ms": 2197.4,
+   "ttfb_ms": 337.7,
+   "total_ms": 2558.1,
+   "status": "HTTP/1.1 200 OK",
+   "ip": "72.245.197.103"
+  },
+  {
+   "ok": true,
+   "connect_ms": 0.5,
+   "socks_ms": 0.0,
+   "tls_ms": 2220.1,
+   "ttfb_ms": 353.5,
+   "total_ms": 2574.1,
+   "status": "HTTP/1.1 200 OK",
+   "ip": "72.245.197.103"
+  },
+  {
+   "ok": true,
+   "connect_ms": 0.0,
+   "socks_ms": 0.5,
+   "tls_ms": 2523.2,
+   "ttfb_ms": 408.3,
+   "total_ms": 2932.0,
+   "status": "HTTP/1.1 200 OK",
+   "ip": "72.245.197.103"
+  }
+ ]
+}

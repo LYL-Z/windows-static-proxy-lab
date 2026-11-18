@@ -1,0 +1,56 @@
+# ============================================================
+# NexIP 美国华盛顿 原生静态IP —— Clash Verge Rev / Mihomo 配置
+# 生成时间: 2026-11-18 01:19:24
+# 目标: 单级代理 (Static IP 直连), 不再依赖 utun/TUN
+# ============================================================
+mixed-port: 7897
+allow-lan: false
+mode: rule
+log-level: info
+ipv6: false
+unified-delay: true
+tcp-concurrent: true
+find-process-mode: "off"
+profile:
+  store-selected: true
+
+proxies:
+  - name: "US-WA-SOCKS5"
+    type: socks5
+    server: 72.245.197.103
+    port: 9506
+    username: "<REDACTED>"
+    password: "<REDACTED-ROTATE-ME>"
+    udp: false
+  - name: "US-WA-HTTP"
+    type: http
+    server: 72.245.197.103
+    port: 9506
+    username: "<REDACTED>"
+    password: "<REDACTED-ROTATE-ME>"
+    tls: false
+
+proxy-groups:
+  # fallback: 优先 SOCKS5 -> 再 HTTP -> 最后 DIRECT(保底, 不断网)
+  - name: "PROXY"
+    type: fallback
+    url: "http://www.gstatic.com/generate_204"
+    interval: 300
+    lazy: true
+    timeout: 5000
+    proxies:
+      - "US-WA-SOCKS5"
+      - "US-WA-HTTP"
+      - "DIRECT"
+  # 手工切换用
+  - name: "MANUAL"
+    type: select
+    proxies:
+      - "US-WA-SOCKS5"
+      - "US-WA-HTTP"
+      - "DIRECT"
+
+rules:
+  - GEOIP,LAN,DIRECT,no-resolve
+  - GEOIP,CN,DIRECT
+  - MATCH,PROXY

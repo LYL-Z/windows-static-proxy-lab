@@ -1,0 +1,115 @@
+{
+    "passed":  13,
+    "scenarios":  [
+                      {
+                          "id":  "FT01",
+                          "scenario":  "corrupt config rejected",
+                          "expected":  "REJECTED",
+                          "actual":  "REJECTED",
+                          "pass":  true,
+                          "detail":  ""
+                      },
+                      {
+                          "id":  "FT02",
+                          "scenario":  "hash-mismatch snapshot refused",
+                          "expected":  "REFUSED",
+                          "actual":  "REFUSED",
+                          "pass":  true,
+                          "detail":  ""
+                      },
+                      {
+                          "id":  "FT03",
+                          "scenario":  "locked file: refuse + intact",
+                          "expected":  "REFUSED+INTACT",
+                          "actual":  "REFUSED+INTACT",
+                          "pass":  true,
+                          "detail":  ""
+                      },
+                      {
+                          "id":  "FT04",
+                          "scenario":  "second manager blocked by lock",
+                          "expected":  "REFUSED",
+                          "actual":  "REFUSED",
+                          "pass":  true,
+                          "detail":  ""
+                      },
+                      {
+                          "id":  "FT05",
+                          "scenario":  "start-timeout path returns false",
+                          "expected":  "TIMEOUT",
+                          "actual":  "TIMEOUT",
+                          "pass":  true,
+                          "detail":  "wait-loop, no app launched"
+                      },
+                      {
+                          "id":  "FT06",
+                          "scenario":  "exit verification observable",
+                          "expected":  "DEFINED",
+                          "actual":  "pids=2",
+                          "pass":  true,
+                          "detail":  "Stop-V4Clash verifies absence (no forced stop in test)"
+                      },
+                      {
+                          "id":  "FT07",
+                          "scenario":  "first-hop down detected",
+                          "expected":  "DOWN",
+                          "actual":  "DOWN",
+                          "pass":  true,
+                          "detail":  "port 65533 not listening"
+                      },
+                      {
+                          "id":  "FT08",
+                          "scenario":  "state survives dependency loss",
+                          "expected":  "A-STATE",
+                          "actual":  "HEALTHY",
+                          "pass":  true,
+                          "detail":  ""
+                      },
+                      {
+                          "id":  "FT09",
+                          "scenario":  "manager-stopped state defined",
+                          "expected":  "DEFINED",
+                          "actual":  "HEALTHY",
+                          "pass":  true,
+                          "detail":  ""
+                      },
+                      {
+                          "id":  "FT10",
+                          "scenario":  "refresh/update serialised by lock",
+                          "expected":  "SERIALISED",
+                          "actual":  "SERIALISED",
+                          "pass":  true,
+                          "detail":  ""
+                      },
+                      {
+                          "id":  "FT12",
+                          "scenario":  "ACL failure returns false",
+                          "expected":  "FALSE",
+                          "actual":  "FALSE",
+                          "pass":  true,
+                          "detail":  "no exception escapes"
+                      },
+                      {
+                          "id":  "FT13",
+                          "scenario":  "incomplete snapshot refused",
+                          "expected":  "REFUSED",
+                          "actual":  "REFUSED",
+                          "pass":  true,
+                          "detail":  "missing file detected before overwrite"
+                      },
+                      {
+                          "id":  "FT15",
+                          "scenario":  "secret + basic-auth redaction",
+                          "expected":  "REDACTED",
+                          "actual":  "REDACTED",
+                          "pass":  true,
+                          "detail":  ""
+                      }
+                  ],
+    "notCovered":  [
+                       "FT11 disk-full (needs a full volume)",
+                       "FT14 log-write failure (needs a read-only log target)"
+                   ],
+    "total":  13,
+    "ts":  "2026-11-18T03:49:09"
+}

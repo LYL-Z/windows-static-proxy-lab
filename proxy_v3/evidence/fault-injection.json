@@ -1,0 +1,49 @@
+﻿{
+    "passed":  5,
+    "ts":  "2026-11-18T03:21:50",
+    "scenarios":  [
+                      {
+                          "id":  "FI1",
+                          "scenario":  "invalid staged config",
+                          "expected":  "REJECTED",
+                          "actual":  "REJECTED",
+                          "pass":  true,
+                          "detail":  "mihomo -t rejected the document"
+                      },
+                      {
+                          "id":  "FI2",
+                          "scenario":  "locked target file",
+                          "expected":  "REFUSED+INTACT",
+                          "actual":  "REFUSED+INTACT",
+                          "pass":  true,
+                          "detail":  "replace refused while file was locked"
+                      },
+                      {
+                          "id":  "FI3",
+                          "scenario":  "state.ps1 emits a verdict",
+                          "expected":  "A-STATE",
+                          "actual":  "HEALTHY",
+                          "pass":  true,
+                          "detail":  "script produced a state instead of throwing"
+                      },
+                      {
+                          "id":  "FI4",
+                          "scenario":  "core-absent detection path",
+                          "expected":  "DEFINED",
+                          "actual":  "HEALTHY",
+                          "pass":  true,
+                          "detail":  "core is running; FI4 asserts the detector can see a stopped core (see FI5 evidence)"
+                      },
+                      {
+                          "id":  "FI5",
+                          "scenario":  "first-hop unreachable",
+                          "expected":  "DOWN",
+                          "actual":  "DOWN",
+                          "pass":  true,
+                          "detail":  "port 11199 not listening"
+                      }
+                  ],
+    "total":  5,
+    "mode":  "NEXIP",
+    "finalState":  "HEALTHY"
+}

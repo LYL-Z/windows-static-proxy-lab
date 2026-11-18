@@ -1,0 +1,22 @@
+﻿[
+    {
+        "list":  "zen.spamhaus.org",
+        "status":  "LISTED",
+        "answer":  "127.255.255.254"
+    },
+    {
+        "list":  "bl.spamcop.net",
+        "status":  "NOT LISTED",
+        "answer":  "NXDOMAIN"
+    },
+    {
+        "list":  "b.barracudacentral.org",
+        "status":  "NOT LISTED",
+        "answer":  "NXDOMAIN"
+    },
+    {
+        "list":  "dnsbl-1.uceprotect.net",
+        "status":  "NOT LISTED",
+        "answer":  "NXDOMAIN"
+    }
+]

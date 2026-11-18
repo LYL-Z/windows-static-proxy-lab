@@ -1,0 +1,7 @@
+backup/
+config/settings.json
+config/.lock
+*.bak
+*.log
+ConsoleHost_history*
+.DS_Store

@@ -1,0 +1,58 @@
+﻿[
+    {
+        "id":  "ajnnogdfpilb",
+        "name":  "\u003clocalized\u003e",
+        "permCount":  8,
+        "sensitive":  "tabs,scripting,debugger,nativeMessaging",
+        "hostPatterns":  2,
+        "mv":  3
+    },
+    {
+        "id":  "nbmnklcgnddb",
+        "name":  "\u003clocalized\u003e",
+        "permCount":  9,
+        "sensitive":  "debugger,nativeMessaging,tabs,scripting",
+        "hostPatterns":  1,
+        "mv":  3
+    },
+    {
+        "id":  "bhghoamapcdp",
+        "name":  "\u003clocalized\u003e",
+        "permCount":  5,
+        "sensitive":  "scripting",
+        "hostPatterns":  1,
+        "mv":  3
+    },
+    {
+        "id":  "hehggadaopoa",
+        "name":  "ChatGPT",
+        "permCount":  18,
+        "sensitive":  "debugger,downloads,history,nativeMessaging,scripting,tabs",
+        "hostPatterns":  1,
+        "mv":  3
+    },
+    {
+        "id":  "nmmhkkegccag",
+        "name":  "\u003clocalized\u003e",
+        "permCount":  6,
+        "sensitive":  "",
+        "hostPatterns":  1,
+        "mv":  2
+    },
+    {
+        "id":  "cejckpjfigeh",
+        "name":  "\u003clocalized\u003e",
+        "permCount":  1,
+        "sensitive":  "",
+        "hostPatterns":  1,
+        "mv":  3
+    },
+    {
+        "id":  "ghbmnnjooekp",
+        "name":  "\u003clocalized\u003e",
+        "permCount":  4,
+        "sensitive":  "",
+        "hostPatterns":  2,
+        "mv":  3
+    }
+]

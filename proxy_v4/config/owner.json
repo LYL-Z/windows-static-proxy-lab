@@ -1,0 +1,7 @@
+{
+    "owner":  "clash",
+    "systemProxy":  "127.0.0.1:7897",
+    "note":  "mode=resilient",
+    "pid":  26872,
+    "updatedAt":  "2026-11-18T03:48:12"
+}
