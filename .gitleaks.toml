@@ -1,0 +1,12 @@
+# V6 secret-scan configuration.
+# Historical hit: synthetic redaction fixture literal abcdef123456 in
+# proxy_v6/tests/cases/fixtures/Run-InfraCase.ps1. It is not a real credential.
+# The current fixture uses test-key-placeholder; the old commit remains in history
+# (no history rewrite without user approval), so a narrow path/regex allowlist is used.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Synthetic V6 test fixture, not a credential"
+paths = ['''proxy_v6/tests/cases/fixtures/Run-InfraCase\.ps1''']
+regexes = ['''abcdef123456''']

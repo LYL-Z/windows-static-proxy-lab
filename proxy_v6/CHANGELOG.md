@@ -46,3 +46,4 @@
 - 1c7fdad：最终证据（final.json head=0268e17, dirty=false, 97/97）。
 - ebbf2e6：干净 selftest 证据（head=0268e17, dirty=false, 7/7）。
 - 分支 v5/short-run-hardening 已推送；PR #1 保持 Draft，未合并 main。
+- gitleaks：新增 .gitleaks.toml 窄 allowlist，历史合成 fixture 命中披露；工作树/历史扫描 0。
