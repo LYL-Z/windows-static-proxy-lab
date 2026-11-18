@@ -295,6 +295,31 @@ try {
             Assert-Infra ($c.state -eq 'DEGRADED') ('UI on + first hop down reported ' + $c.state)
             $script:Actual = 'UI/actual proxy mismatch and first-hop failure are DEGRADED with reasons'
         }
+        'INF-F12-02' {
+            $off = [pscustomobject]@{ enabled=$false; server='127.0.0.1:7897' }
+            $r = Get-V4StateCore -Settings $null -Owner $null -SystemProxy $off -AppPids @(1) -MixedPortOpen $true -FirstHop $null -GetExitIp $null -SettingsError '' -UiSystemProxy $true
+            Assert-Infra ($r.state -eq 'FAILED') ('missing settings + UI mismatch reported ' + $r.state)
+            $text = ($r.reasons -join ' ')
+            Assert-Infra ($text -match 'settings.json missing') 'missing settings reason absent'
+            Assert-Infra ($text -match 'UI reports system proxy enabled') 'UI mismatch reason absent when settings are missing'
+            $script:Actual = 'missing settings reports FAILED and still includes the UI/HKCU mismatch reason'
+        }
+        'INF-F12-03' {
+            $file = Join-Path $root 'verge.yaml'
+            Put-Text $file ('enable_system_proxy: true' + $LF + 'proxy_host: 127.0.0.1' + $LF)
+            $env:V4_TEST_UI_CONFIG = $file
+            try {
+                Assert-Infra ((Get-V4UiSystemProxy) -eq $true) 'UI true not parsed'
+                Put-Text $file ('enable_system_proxy: false' + $LF)
+                Assert-Infra ((Get-V4UiSystemProxy) -eq $false) 'UI false not parsed'
+                Put-Text $file ('other: value' + $LF)
+                Assert-Infra ($null -eq (Get-V4UiSystemProxy)) 'missing key not reported as unknown'
+                Remove-Item $file -Force
+                Assert-Infra ($null -eq (Get-V4UiSystemProxy)) 'missing file not reported as unknown'
+            }
+            finally { Remove-Item Env:V4_TEST_UI_CONFIG -ErrorAction SilentlyContinue }
+            $script:Actual = 'verge.yaml enable_system_proxy true/false/missing parsed correctly'
+        }
         'INF-STATE-CORE-01' {
             $settings = [pscustomobject]@{ host='203.0.113.10'; mixedPort=7897; hopPort=11119 }
             $proxyOk = [pscustomobject]@{ enabled=$true; server='127.0.0.1:7897' }
@@ -466,7 +491,8 @@ try {
             $apply = Join-Path $repo 'proxy_v4\apply-v4.ps1'
             $passFile = Join-Path $root 'fixture.pass'
             Put-Text $passFile 'fixture-pass'
-            $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $apply -Init -StaticHost '203.0.113.10' -StaticPort 1080 -StaticUser 'fixture-user' -StaticPassFile $passFile -HopPort 11119 -MixedPort 7897 2>&1
+            if (-not (Protect-V4Acl -Path $passFile)) { throw 'could not harden test credential file' }
+            $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $apply -Init -StaticHost '203.0.113.10' -StaticPort 1080 -StaticUser 'fixture-user' -CredentialFile $passFile -HopPort 11119 -MixedPort 7897 2>&1
             $c = $LASTEXITCODE
             Assert-Infra ($c -eq 10) ('Init with no appdata should stop at paths, exit=' + $c)
             $settingsPath = Join-Path $root 'config\settings.json'
@@ -521,9 +547,22 @@ try {
             try { $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $apply -Init -StaticHost '203.0.113.10' -StaticPort 1080 -StaticUser 'fixture-user' -StaticPass 'fixture-pass' -HopPort 11119 -MixedPort 7897 2>&1 }
             finally { $ErrorActionPreference = $prevEap }
             $c = $LASTEXITCODE
-            Assert-Infra ($c -ne 0) 'removed -StaticPass parameter was accepted'
+            Assert-Infra ($c -eq 11) ('legacy -StaticPass exit=' + $c)
+            Assert-Infra ((($out -join ' ') -match 'was removed')) 'legacy -StaticPass did not produce a removal error'
             Assert-Infra (-not (Test-Path -LiteralPath (Join-Path $root 'config\settings.json'))) 'removed -StaticPass wrote settings'
-            $script:Actual = 'legacy -StaticPass parameter is rejected'
+            $script:Actual = 'legacy -StaticPass is rejected with a removal message'
+        }
+        'INF-APPLY-INIT-03' {
+            $apply = Join-Path $repo 'proxy_v4\apply-v4.ps1'
+            $prevEap = $ErrorActionPreference
+            $ErrorActionPreference = 'Continue'
+            try { $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $apply -Init -StaticHost '203.0.113.10' -StaticPort 1080 -StaticUser 'fixture-user' -StaticPassFile (Join-Path $root 'x.pass') -HopPort 11119 -MixedPort 7897 2>&1 }
+            finally { $ErrorActionPreference = $prevEap }
+            $c = $LASTEXITCODE
+            Assert-Infra ($c -eq 11) ('legacy -StaticPassFile exit=' + $c)
+            Assert-Infra ((($out -join ' ') -match 'was removed')) 'legacy -StaticPassFile did not produce a removal error'
+            Assert-Infra (-not (Test-Path -LiteralPath (Join-Path $root 'config\settings.json'))) 'removed -StaticPassFile wrote settings'
+            $script:Actual = 'legacy -StaticPassFile is rejected with a removal message'
         }
         'INF-STATE-SCRIPT-01' {
             New-Item -ItemType Directory -Path (Join-Path $root 'config') -Force | Out-Null
@@ -741,7 +780,7 @@ try {
                 @{ text='{"token":"tok-123"}'; forbidden='tok-123' },
                 @{ text='user: a b'; forbidden='a b' },
                 @{ text='socks5://user:pass@203.0.113.10:1080'; forbidden='user' },
-                @{ text='X-Api-Key: abcdef123456'; forbidden='abcdef123456' },
+                @{ text='X-Api-Key: test-key-placeholder'; forbidden='test-key-placeholder' },
                 @{ text='Cookie: session=abc'; forbidden='session=abc' }
             )
             foreach ($c in $checks) {

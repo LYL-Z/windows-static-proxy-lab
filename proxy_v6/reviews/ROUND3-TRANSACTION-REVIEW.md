@@ -2,6 +2,8 @@
 
 > 复审角色：round2-transaction（第三轮定向复审；不采信主代理自评）
 >
+> **最新状态**：本报告末尾 §DELTA 覆盖其后代码提交 `0268e17`（证据 `1c7fdad`、自验 `ebbf2e6`、HEAD `990d896`）；正文其余部分锚定 `d5f2134`。
+>
 > **复审对象（精确提交）**
 > - 代码：`d5f2134`（"fix(v6): verify snapshot before allowing rollback restart"）。`b9bb9a0`、`6e3cd09`、`01baaf5` 与 `d5f2134` 在 `proxy_v4/**` 与 `proxy_v6/tests/**` 上 **`git diff` 为空**（已核）。
 > - 证据：`b9bb9a0` 的 `proxy_v6/evidence/v6/final.json` + `final.cases/0001..0092`；`01baaf5` 只改 `evidence/v6/repo-acl.json`。
@@ -210,3 +212,64 @@
 - `proxy_v4/apply-v4.ps1`：`24` `Enable`；`132-143` builder；`167` `ProfileTextBuilder` 接线。
 - `proxy_v4/rollback-v4.ps1`：`13` `Enable`；`20-22` mixedPort；`43-48` 锁忙 33；`54-59` `restoreAttempted` 与 manifest 预校验；`62-77` 代理/启动/校验；`84-91` 锁内补救；`96-98` 外层 catch。
 - `proxy_v6/tests`：`Harness.ps1:441-443`；`Run-Tests.ps1:29-30`；`repro/Repro-F07.ps1:93,176-182,212-221,238-247`；`cases/70-ft.tests.ps1:26-31`；`cases/fixtures/Run-FT-Case.ps1:18-20,25-48,79-154`；`cases/fixtures/Run-InfraCase.ps1:511,538-574,577-598,599-621,677-712`。
+
+---
+
+# DELTA（第三轮后）— 定向复审 code `0268e17`（证据 `1c7fdad`，自验 `ebbf2e6`，HEAD `990d896`）
+
+> 复审对象（精确提交）
+> - **代码：`0268e17`**（2026-11-18 06:14:59，"fix(v6): remove CLI password, add F12 UI/state mismatch reporting"）。
+> - **证据：`1c7fdad`** 的 `proxy_v6/evidence/v6/final.json` + `final.cases/0001..0094`；**自验：`ebbf2e6`**（`evidence/selftest/canonical/selftest.json`）；**文档：`990d896`**（HEAD，仅 README/CHANGELOG/RELEASE-GATE/TASK-STATE + 证据重绑）。
+> - 复审开始时 HEAD=`990d896`，工作树干净。`990d896` 相对 `0268e17` 在 `proxy_v4/**`、`proxy_v6/tests/**` 上无差异（仅文档与证据文件）。复审结束时 HEAD=`076c975`（`990d896..076c975` 仅改 `RELEASE-GATE-V6.md`/`TASK-STATE.md`，**代码与测试无变化**）——本 DELTA 对 `0268e17` 的结论同样适用于 `076c975`。
+> - 与上一轮目标 `d5f2134` 的 delta 范围：8 个文件、+105/−18（`apply-v4.ps1`、`lib/V4.ps1`、`state-v4.ps1`、`SECURITY-AUDIT-V4.md`、`USER-GUIDE-V4.md`、3 个测试文件）。未重跑全量静态复审，只审 delta 及其影响面。
+
+## D1. 证据可信度
+
+| 项 | 提交证据 | 我的独立复跑（`git archive 0268e17` → `%TEMP%\r4tree-*`） |
+|---|---|---|
+| 命令 | `Run-Tests.ps1 -OutFile proxy_v6\evidence\v6\final.json` | 同入口，`-OutFile %TEMP%\r4-final-20261118-062006.json` |
+| 计数 | 94/94，skipped=0，exit 0 | **94/94，skipped=0，exit 0** |
+| 断言 | zeroAssert=0，sum=**130** | zeroAssert=0，min=1，sum=**130** |
+| 锚定 | `head=0268e17`、`dirty=false`；06:15:05→06:17:01（提交后 6s 开始） | git-archive 树（无 .git），代码与 0268e17 一致 |
+| 自验 | `selftest.json`：7/7、`head=0268e17`、`dirty=false`（06:18:15→06:18:25） | 未重跑（上一轮 7/7 已独立复现；本次未改 Harness） |
+
+结论：与提交证据**逐项一致**，94/94 与 `assertions` 总和 130 均可独立复现 → 可信。新增用例为 `INF-F12-01`、`INF-APPLY-INIT-02`。
+
+## D2. C-02（移除 `-StaticPass`）— 实质关闭，但关闭证据是假阳性
+
+**实质结论：C-02 可按 CLOSED 记。** 工具已不再接受口令**值**：`apply-v4.ps1:19` 改为 `[string]$StaticPassFile`，口令从文件读取（`:51-55`），仅用于 DPAPI 存储；我的探针确认 `settings.json` 内无明文（`contains_canary_plain=False`）。命令行不再携带口令值，这是 C-02 的实质要求。
+
+**但发现两处不准确（R3D-01，MED：证据/文档，不是可利用漏洞）：**
+
+1. **`-StaticPass` 仍可被 PowerShell 前缀绑定为 `-StaticPassFile`**（参数名唯一前缀）。实测（`%TEMP%`，`V4_TEST_MODE=1`，不触 HKCU）：
+   - CASE A：CWD 无 `fixture-pass` 文件 → exit **11**，输出 `credential file not found` → 说明参数被接受并当作**文件名**，不是"参数被拒"；
+   - CASE B：CWD 放入名为 `fixture-pass` 的文件 → exit **10**，`settings written`，口令从该文件读取 → 绑定与使用均确认。
+2. 因此 `INF-APPLY-INIT-02`（"legacy `-StaticPass` parameter is rejected"）是**假阳性**：它通过是因为"文件不存在 → Fail 11"，而非"参数被拒"。若 CWD 恰好存在同名文件，该用例会走向写 settings（用例会因此变红，但性质已变）。同理 `SECURITY-AUDIT-V4.md:7` 的"不再接受 `-StaticPass`"与 `ISSUE-LEDGER` 的"VERIFIED-CLOSED：移除参数"表述不准确。
+
+**建议（最小修复）**：加一个墓碑参数 `[string]$StaticPass`，绑定后立即 `Fail 11 'the -StaticPass parameter was removed; use -StaticPassFile <protected file>'`（不记录、不注册该值），并让 `INF-APPLY-INIT-02` 断言该文案；把 SECURITY-AUDIT/ISSUE-LEDGER 改成"参数值不再被接受；旧拼写会被显式拒绝"。
+
+**附带（R3D-02，LOW）**：`-StaticPassFile` 的内容**没有 ACL/owner 校验**（新加的 C-04 owner 检查只覆盖 config/settings/恢复目标），也没有"读后删除"提示；文档要求"受保护文件"但工具不验证。建议对 pass file 调 `Test-V4AclHardened`（失败即 Fail 12）或至少在 USER-GUIDE 写明"用后删除"。`TrimEnd` 只去 CR/LF，文件尾随空格会静默进入口令（只会导致认证失败，不会泄漏）。
+
+## D3. F12（UI/HKCU 不一致报告）— 分类与报告正确
+
+- 实现：`Get-V4UiSystemProxy`（生产读 `%APPDATA%\io.github.clash-verge-rev.clash-verge-rev\verge.yaml` 的 `enable_system_proxy`；测试模式读 `V4_TEST_UI_SYSTEM_PROXY`）；`Get-V4StateCore -UiSystemProxy` 新增 `uiSystemProxy` 字段，并在状态机之后只在不一致时把状态降为 `DEGRADED`（`FAILED` 不被覆盖）并附加明确 reason；`state-v4.ps1` 输出该字段。
+- 我的独立探针（生产模式 + 重定向 `$env:APPDATA` 到 `%TEMP%`，6/6）：`true`/`false` 解析、缺键/缺文件 → `unknown`（不误报）、UI on/HKCU on → `HEALTHY`、UI off/HKCU on → `DEGRADED` + `UI reports system proxy disabled, actual HKCU is enabled`。
+- **分类正确**：当前生产态（HKCU=0、UI=on、直连 54.202.22.253、Clash 出口 72.245.197.103）应报 `DEGRADED`（exit 2）+ "UI reports enabled, actual HKCU disabled"。不是 `FAILED`（链路本身可能可用），也不是 `HEALTHY`（UI 与真实状态不一致）——这是准确的"部分降级"语义。
+- **范围说明（重要）**：F12 只比较**布尔开关**，不比较 `ProxyServer`。事故态（HKCU enabled + `ProxyServer=x` + UI enabled）**不会**触发 F12 的 mismatch reason，但会被既有 `systemProxy != 127.0.0.1:<mixedPort>` 判为 `DEGRADED`（reason: `system proxy owned by x`）——即事故态仍可见，只是原因来自旧检查。F12 新增覆盖的是"UI on/HKCU off"（当前生产态）与"UI off/HKCU on"。
+- **残余（R3D-03，LOW）**：① 生产解析器（`verge.yaml`）没有用例——`INF-F12-01` 直接注入布尔值，绕过解析器；② 带引号的值（`enable_system_proxy: "true"`）解析为 `unknown`（实测），键名变更亦然 → **静默不报**（fail-open 于报告层，不影响安全）；③ 只认行首 `^enable_system_proxy:`，不支持 flow/嵌套 YAML。建议加一条"写临时 APPDATA + verge.yaml → 解析器"的用例。
+
+## D4. 其余 delta
+
+- **C-04 owner SID 检查**（`Test-V4AclHardened` 新增 owner ∈ {me, SYSTEM, Administrators}）：逻辑正确，fail-closed；但**没有专门用例**（94 个用例中新增的只有 F12 与 APPLY-INIT-02）；owner 校验位于 `V4.ps1:556-559`；owner SID 无法解析（孤立的已删除账户）时返回 false，且 `Protect-V4Acl` 会**先重写 DACL 再因 owner 不合规失败**（destructive attempt 后 fail-closed）。影响面低（回滚会 exit 40 并保留 journal），记为 **R3D-04 LOW**。
+- **C-08 脱敏**：新增 `x-api-key|api[_-]?key|apikey`，并把 URL-userinfo 规则提前；`INF-REDACT-03` 增加 `user`/`X-Api-Key` 断言。复核正则顺序：URL 规则先行后 key/value 规则仍覆盖 `Cookie:`；末尾重复的 URL 规则无害。**无新问题**。
+- **"系统代理写补偿"（安全侧 R3-02）**：`Write-V4SystemProxyRegistry`（`V4.ps1:1003-1026`）在两次 `Set-ItemProperty` 外层加 try/catch，异常时回写旧 `ProxyServer/ProxyEnable` 并重抛。**只覆盖进程内异常**：两次写之间被硬杀仍留下半写状态（`-Init`/`-Repair` 无 journal；事务路径有 journal+快照兜底）。事故型"完整写 x"不受该补偿影响（该路径已由门闩 + 事务恢复守护）。记为 **R3D-05 LOW**。
+- **门闩覆盖面（R3-01）**：delta 未触及 `Protect-V4Acl`/`Start-V4ClashCore -Launch`/settings/owner/journal 的未门禁面 → **R3-01（MED）仍开放**，与上一轮一致。
+- **R2A-06 等**：delta 未触及 journal 结构 → **R2A-06（MED）仍开放**；R2A-10/11/13/14/15 仍开放。
+
+## D5. 新 HIGH 与结论
+
+- **新 HIGH：无。** delta 只做参数替换、状态报告、ACL owner、脱敏与写补偿，未引入新的生产写路径或权限提升。
+- delta 后本维度裁定不变：**SHORT_RUN 可接受（事务/并发维度）**，前提是发布文本同时披露：R2A-06（MED）、R3-01（MED）、R3D-01（C-02 的"参数被拒"证据不成立/文档不准确）、R3D-02/03/04/05（LOW），以及"真实生产 apply/rollback 未验证"。
+- 若要把 C-02 的关闭做成"可审计"的，最低条件：墓碑参数 + `INF-APPLY-INIT-02` 断言显式拒绝文案 + 文档改写 + （可选）pass file ACL 校验。
+
+**本轮新增计数：0×HIGH，1×MED（R3D-01），4×LOW（R3D-02…05）。**

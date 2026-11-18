@@ -16,7 +16,8 @@ param(
     [ValidateSet('resilient','strict')][string]$Mode = 'strict',
     [switch]$DryRun,
     [switch]$Repair,
-    [string]$StaticHost, [int]$StaticPort = 0, [string]$StaticUser, [string]$StaticPassFile,
+    [string]$StaticHost, [int]$StaticPort = 0, [string]$StaticUser, [string]$CredentialFile,
+    [string]$StaticPass, [string]$StaticPassFile,
     [string]$HopHost = '127.0.0.1', [int]$HopPort = 11119, [int]$MixedPort = 7897
 )
 $ErrorActionPreference = 'Stop'
@@ -34,6 +35,9 @@ try {
     if ($Repair -and $DryRun) { Fail 11 '-Repair and -DryRun are mutually exclusive' }
     if ($Init -and $DryRun)   { Fail 11 '-Init and -DryRun are mutually exclusive' }
     if ($Init -and $Repair)   { Fail 11 '-Init and -Repair are mutually exclusive' }
+    foreach ($legacyParam in @('StaticPass', 'StaticPassFile')) {
+        if ($PSBoundParameters.ContainsKey($legacyParam)) { Fail 11 ('-' + $legacyParam + ' was removed; use -CredentialFile <protected file>') }
+    }
 
     # F09: the lock is acquired BEFORE any settings write, including -Init.
     $lock = Enter-V4Lock
@@ -49,9 +53,10 @@ try {
 
     if ($Init) {
         $staticPass = $null
-        if ($StaticPassFile) {
-            if (-not (Test-Path -LiteralPath $StaticPassFile)) { Fail 11 'credential file not found' }
-            $staticPass = Read-V4File $StaticPassFile
+        if ($CredentialFile) {
+            if (-not (Test-Path -LiteralPath $CredentialFile)) { Fail 11 'credential file not found' }
+            if (-not (Test-V4AclHardened -Path $CredentialFile -Allowed (Get-V4AllowedSidSet))) { Fail 11 'credential file ACL is not hardened' }
+            $staticPass = Read-V4File $CredentialFile
             if ($null -ne $staticPass) { $staticPass = $staticPass.TrimEnd([char[]]@([char]13, [char]10)) }
         }
         $explicit = @{

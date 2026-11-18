@@ -141,3 +141,57 @@ F11 latch 只覆盖 `proxy_v4/lib/V4.ps1` 的系统代理函数。以下 tracked
 - 未做跨用户 DPAPI、真实多用户竞争、锁 TOCTOU 动态复现；R3-02 的注册表部分失败为代码路径判断。
 - gitleaks 默认规则不覆盖 PII/DPAPI；自定义正则只能证明本次范围未命中。未打印任何真实 secret/PII 值。
 - 报告基于 d5f2134/b9bb9a0；当前 HEAD 01baaf5 的额外两个提交仅文档/ACL 记录，已核对无生产代码变化。审查末尾工作树被并发修改（`FINAL-ACCEPTANCE-V6.md` 有未提交修改、出现其他 round3 文件）；本报告不以这些并发文件为证据来源。
+
+---
+
+## DELTA — 2026-11-18 06:25 — 0268e17 / 1c7fdad / ebbf2e6 / 990d896
+
+**审查对象（delta）**：代码 0268e17；最终证据 1c7fdad；规范 selftest ebbf2e6；文档 990d896。当前检出 HEAD 为 076c975（990d896..076c975 仅 RELEASE-GATE/TASK-STATE 文档变化，已核对无生产代码变化）。工作树有另一代理的未提交 FINAL-ACCEPTANCE 修改，本 delta 不以其为证据。
+**范围**：只做 delta 复审，未重跑全量；未读写真实 HKCU/网络；未执行真实 apply/rollback/state。
+
+### D1. C-02：不能判 CLOSED（高残余；测试存在假阳性）
+
+- 新接口：apply-v4.ps1:19 已改为 -StaticPassFile；支持的显式 Init 路径可用（INF-APPLY-INIT-01 PASS），文档也已改为不再用命令行密码。
+- 但 **PowerShell 参数前缀匹配仍使 -StaticPass 被接受**：-StaticPass 是 -StaticPassFile 的无歧义前缀。实际以 test mode 运行 apply -Init ... -StaticPass <值>，结果为 exit 11、credential file not found，不是参数绑定拒绝；临时参数脚本也证明 -StaticPass 绑定到 StaticPassFile。
+- 影响：若用户沿用旧命令，密码仍进入 argv/PSReadLine 历史；只是被当成文件名后失败，不会写入 settings。原 C-02 的暴露面并未完全消除。
+- 测试假阳性：INF-APPLY-INIT-02 只断言 exit != 0 且无 settings；上述“把密码当文件名”的失败同样满足，因此测试通过但并没有证明参数被拒绝。
+- 建议：把参数改名为不以 StaticPass 开头的名字（如 -CredentialFile），或新增显式弃用的 -StaticPass 参数并在绑定后立即抛错；测试必须断言错误文本/参数拒绝，而不只是非零退出。C-02 在修复前应保持 OPEN/PARTIAL（高残余，仅旧语法）。
+
+### D2. F12：分类与报告正确（合成验证）
+
+- Get-V4UiSystemProxy 只读 APPDATA 下 Clash Verge verge.yaml 的 enable_system_proxy；Get-V4StateCore 新增 uiSystemProxy，并在 UI 与真实 HKCU 启用状态不一致时增加 reason、把非 FAILED 状态降为 DEGRADED；state-v4.ps1 的 JSON/文本均输出 uiSystemProxy。
+- 合成 Get-V4StateCore 结果：
+  - UI on / HKCU off -> DEGRADED，reason 含 “system proxy owned by off” 与 “UI reports system proxy enabled, actual HKCU is disabled”；
+  - UI off / HKCU on -> DEGRADED，reason 含 “UI reports system proxy disabled...”；
+  - 两者一致且链路正常 -> HEALTHY；
+  - Clash down -> FAILED，仍保留 UI mismatch reason（FAILED 比 DEGRADED 更严重，合理）。
+- 按 lead 提供的当前值（HKCU=0/UI=on，直连出口与 Clash 出口不同），预期状态是 DEGRADED（系统代理关闭 + UI 不一致），不是 HEALTHY；代码路径与 F12-RUNTIME-STATE-MISMATCH.md 一致。受“不触碰真实 HKCU/网络”约束，我未独立读取这些 live 值。
+- INF-F12-01 PASS；F12 专文、state 输出、测试三者一致。
+
+### D3. C-04 / C-08 / R3-02
+
+- C-04：Test-V4AclHardened 已增加 owner SID 校验；原始“早退保留 Everyone/Users/只读 ACE、不校验 owner/FullControl”的 C-04 可判 CLOSED。仍有一个低残余：不校验继承标志；构造“仅当前用户 FullControl、无继承”的受保护目录时 Protect-V4Acl 仍返回 true（隔离验证）。这是可用性/幂等性残余，不是新的权限放宽。
+- C-08：脱敏已把 URL userinfo 放在 key/value 规则之前，并加入 x-api-key/api_key/apikey；隔离验证 JSON、Cookie、URL username、X-Api-Key、apikey、api_key、client_secret、Proxy-Authorization 均被遮。C-08 可判 CLOSED；INF-REDACT-03 已把 URL 用例的 forbidden 从 user:pass 收紧为 user。
+- R3-02：Write-V4SystemProxyRegistry 已加本地补偿：写入失败时恢复旧 ProxyServer/ProxyEnable。用 fake registry 注入“第二次写失败”，验证事件为 new server、new enable、old server、old enable，最终恢复旧值；仍非跨进程原子（进程在两次写之间被杀仍可能不一致），R3-02 降为 PARTIAL/低残余，不是新 HIGH。
+
+### D4. 证据、gitleaks 与 PII（本轮新变化）
+
+- final.json：head=0268e17、dirty=false、94/94、0 skipped；selftest：head=0268e17、dirty=false、7/7。R2C-07 可判 CLOSED。
+- **gitleaks 不再为 0**：HEAD 精确树、工作树、全历史各 1 条 generic-api-key，文件为 proxy_v6/tests/cases/fixtures/Run-InfraCase.ps1:744，secret_len=8，提交 0268e17。该值是合成 X-Api-Key 测试字面量，不是真实凭据；但 SECURITY-REVIEW-V6.md 的“工作树/历史 0 findings”和 RELEASE-GATE Gate 11 PASS 已不成立。建议加 allowlist/使用不会触发的占位符，并重跑扫描；不要把合成值写进报告。
+- HEAD（076c975）PII 计数：公网 IPv4 19 unique / 537 occurrences / 39 files；Windows 用户目录路径 57 / 43 files / 1 username；项目绝对路径 97 / 32 files；盘符路径行 550 / 246 files；邮件 6 机构 + 2 test/example + 0 私人。C-12 仍 WAITING-USER，且计数较上一轮增加（F12/selftest 文档）。
+- gitleaks 历史：17 commits / 1172 unique blobs，1 条上述合成命中；无真实 DPAPI/GitHub token/私钥/代理凭据。
+
+### D5. 测试
+
+- Run-Tests.ps1 -Filter INF-* -OutFile <TEMP>：**51/51 PASS，exit 0**，HEAD=990d896（代码 0268e17）；包含 INF-F12-01、INF-APPLY-INIT-02。
+- 未独立运行全量 94/FT16-21（FT 读取真实 HKCU/WinHTTP）；final.json 仅只读核对。
+- 关键 delta 发现：INF-APPLY-INIT-02 是假阳性（见 D1）；94/94 中的这个用例不能作为 C-02 关闭依据。
+
+### D6. Delta 结论
+
+- **C-02：未关闭**；新支持的 -StaticPassFile 路径安全，但旧 -StaticPass 仍作为前缀被接受，密码仍可进入 argv/历史；测试未证明拒绝。按原 C-02 口径，这是 HIGH 残余，不是 NEW HIGH 代码路径。
+- **F12：分类/报告正确**；当前生产值按 lead 描述应为 DEGRADED，代码不自动改动网络。
+- **C-04/C-08：可判 CLOSED**（C-04 保留继承低残余；C-08 已验证）。
+- **R3-02：部分修复**（补偿有效，仍非原子）。
+- **新 HIGH**：F12/C-04/C-08/补偿路径未发现新的生产 HIGH；但 C-02 仍未关闭，因此最终不能把 Gate 1 标 PASS。另有新的 LOW：gitleaks 1 条合成命中，使 Gate 11 的“0 findings”失效。
+- 最终状态：**NOT_READY / SHORT_RUN_ACCEPTED WITH CONDITIONS**。阻断项：C-02 旧语法（HIGH）、C-01/C-12 用户书面接受、R3-01 旧写入面；Gate 11 需重新扫描/处理合成命中后才能 PASS。

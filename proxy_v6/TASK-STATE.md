@@ -12,7 +12,7 @@
 | 分支 | v5/short-run-hardening |
 | 初始冻结基线 | 36222c92c829a2ef08b71af2a3a3ff9a3c44b396 |
 | V6 修复 | abe0eaa -> c562c18 -> d5f2134 -> 0268e17 |
-| 最终证据 | 1c7fdad（final.json head=0268e17, dirty=false, 94/94）；ebbf2e6（selftest head=0268e17, dirty=false, 7/7） |
+| 最终证据 | 1c7fdad（final.json head=0268e17, dirty=false, 97/97）；ebbf2e6（selftest head=0268e17, dirty=false, 7/7） |
 | 当前工作树 | 干净；HEAD ebbf2e6；分支已推送 origin/v5/short-run-hardening |
 | 远端 | 已同步 990d896 |
 | 生产网络 | 系统代理当前关闭（ProxyEnable=0，ProxyServer=127.0.0.1:7897）；Baidu/Google/ipify 直连 200 |
@@ -22,9 +22,9 @@
 - P0 基线/事故调查：**完成**（F11 根因定位）
 - P1 持久化状态：**进行中**（本文件、账本、矩阵、Gate、CHANGELOG）
 - P2 子代理：**完成两轮**（A/B/C/D + round2-A/C + Agent E）
-- P3 F01–F10：**完成**（94 测试）
+- P3 F01–F10：**完成**（97 测试）
 - P4 故障注入：**完成**（隔离 mock/夹具）
-- P5 测试矩阵：**94/94 PASS**
+- P5 测试矩阵：**97/97 PASS**
 - P6 测试系统自验：**META 7/7 PASS**
 - P7 安全：C-03/C-10/C-11 关闭；C-01/C-02/C-12 残余披露
 - P8 生命周期隔离：**通过**（LIFE 用例）
@@ -54,6 +54,6 @@
 ## 5. 下一条可立即执行
 
 1. 完成 ISSUE-LEDGER/CHANGELOG/GATE/USER-GUIDE/SECURITY-REVIEW。
-2. [完成] 干净树 94 用例 + META；final.json/final.cases/selftest 已提交。
+2. [完成] 干净树 97 用例 + META；final.json/final.cases/selftest 已提交。
 3. 请 round2 复审对新提交复核 F11/R2A-01。
 4. 推送分支，保持 Draft PR，不合 main。

@@ -1,0 +1,93 @@
+{
+  "schema": "agent-e-final-acceptance-delta/v1",
+  "generatedAt": "2026-11-18T14:22:42.956Z",
+  "reviewer": "final-acceptance (Agent E)",
+  "exactTarget": {
+    "codeCommit": "0268e173a47641c042301e27230e94502022d221",
+    "evidenceCommit": "1c7fdad",
+    "selfTestCommit": "ebbf2e6",
+    "docsHead": "076c975d36dd1ba4f485d93af23161e1e775c136",
+    "origin": "990d896cba1135dbdbfbaec2d67848f641b72817",
+    "worktreeClean": true,
+    "repoHeadAtReport": "076c975d36dd1ba4f485d93af23161e1e775c136",
+    "note": "076c975 is docs-only (Gate/TASK-STATE) after 990d896; no code/evidence change"
+  },
+  "independentRuns": {
+    "infSubset": {
+      "runId": "2b4bf688eb2440daa8d5cae702282822",
+      "head": "990d896cba1135dbdbfbaec2d67848f641b72817",
+      "dirty": false,
+      "counts": {
+        "registered": 51,
+        "executed": 51,
+        "passed": 51,
+        "failed": 0,
+        "skipped": 0,
+        "available": 94
+      },
+      "zeroAssertions": 0,
+      "exitCode": 0,
+      "outcome": "PASS",
+      "filter": "INF-*"
+    },
+    "selfTest": {
+      "head": "990d896cba1135dbdbfbaec2d67848f641b72817",
+      "dirty": false,
+      "counts": {
+        "selected": 7,
+        "checks": 7,
+        "passed": 7,
+        "failed": 0
+      },
+      "exitCode": 0,
+      "outcome": "SELFTEST_PASS"
+    }
+  },
+  "committedEvidence": {
+    "finalJson": {
+      "head": "0268e173a47641c042301e27230e94502022d221",
+      "dirty": false,
+      "cases": 94,
+      "passed": 94,
+      "skipped": 0,
+      "zeroAssertions": 0,
+      "sumAssertions": 130,
+      "perCaseFiles": 94,
+      "missingEvidenceFiles": 0
+    },
+    "selfTest": {
+      "head": "0268e173a47641c042301e27230e94502022d221",
+      "dirty": false,
+      "checks": 7,
+      "passed": 7,
+      "exitCode": 0
+    }
+  },
+  "deltaFindings": {
+    "c02": "PARTIAL / NOT AUDITABLY CLOSED: -StaticPass removed as a parameter name, but PowerShell unique-prefix binding resolves legacy -StaticPass to -StaticPassFile; no file -> exit 11, same-named file in CWD -> exit 10 and settings written; INF-APPLY-INIT-02 is a false positive; command-line secret history exposure remains for old syntax. Recommend explicit tombstone parameter and assertion.",
+    "f12": "CLASSIFICATION OK; REPORTING PARTIAL: UI mismatch reason/DEGRADED only when settings exist; current production settings.json absent -> Get-V4StateCore returns FAILED 'settings.json missing' before UI mismatch branch; uiSystemProxy field still visible; Get-V4UiSystemProxy file parser and settings-missing+UI-on case not tested",
+    "newHigh": false,
+    "c04": "owner SID checked; inheritance-flag/non-inherited DACL residual remains; SECURITY-REVIEW C-04 CLOSED overclaims",
+    "c08": "URL userinfo/JSON/API-key/Cookie redaction fixed; INF-REDACT-03 pass",
+    "r302": "local compensation added; not cross-process atomic and no failure-case test",
+    "r301": "OPEN MED: legacy proxy_diag/proxy_v2/proxy_v3 still write HKCU directly",
+    "gateDocs": "stale at 076c975: RELEASE-GATE Gate 10 FAIL/F11 PENDING/SHORT_RUN not reached; ISSUE-LEDGER F11 FIXED-PENDING; TASK-STATE old HEAD",
+    "c01c12": "still PARTIAL/WAITING-USER",
+    "c02PrefixBinding": {
+      "noFileExit": 11,
+      "noFileSettings": false,
+      "sameNamedFileExit": 10,
+      "sameNamedFileSettings": true
+    }
+  },
+  "deltaVerdict": "NOT_READY",
+  "conditions": [
+    "C-02 tombstone: explicitly reject -StaticPass incl. old spelling; INF-APPLY-INIT-02 must assert explicit rejection message",
+    "F12 settings-missing reporting/doc/test correction",
+    "C-01/C-12 user written acceptance",
+    "Update Gate/ISSUE-LEDGER/TASK-STATE to round3/C-02/94/1c7fdad/ebbf2e6 and current HEAD",
+    "R3-01/R3-02 and R2A-06/C-04 residuals fix or accept",
+    "Real production apply/rollback/boot/24h/72h remain deferred; no production claim"
+  ],
+  "boundary": "No real apply/rollback/state; no HKCU/system proxy/Clash/appdata/network/task/credential modifications by Agent E; no module install."
+}

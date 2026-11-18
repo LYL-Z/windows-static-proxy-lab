@@ -162,3 +162,54 @@
 ---
 
 本报告只新增评审/证据文件，未改生产代码或跟踪文件（除本报告与可选的 `agent-e-acceptance-round2.json`）。审查对象与时间已固定；后续提交若改代码，需重新验收。
+
+---
+
+## DELTA — `0268e17` / `990d896`（2026-11-18T06:22-08:00）
+
+**对象（精确）**：代码 `0268e17`；证据 `1c7fdad`（final.json head=0268e17, dirty=false, 94/94）；canonical self-test `ebbf2e6`（head=0268e17, dirty=false, 7/7）；docs `990d896`；报告时 repo HEAD=`076c975`（仅 Gate/TASK-STATE docs 更正，未改代码/证据），origin 同点。
+
+### D.1 独立执行的增量证据
+
+| 项 | 结果 |
+|---|---|
+| 目标 INF 子集（`Run-Tests.ps1 -Filter 'INF-*'`，TEMP） | **51/51 PASS，exit 0**；head=990d896，dirty=false；0 零断言、0 skip；available=94 |
+| META-01..07（TEMP） | **7/7 PASS，exit 0**；head=990d896，dirty=false |
+| 提交的 final.json（只读） | head=0268e17，dirty=false，**94/94**，0 skip，0 zero-assertion，sum=130，94 个 per-case 文件齐全 |
+| 提交的 selftest（只读） | head=0268e17，dirty=false，**7/7**，exit 0 |
+| C-02 源码核对 | 参数名改为 `-StaticPassFile`；但 PowerShell 唯一前缀绑定使旧拼写 `-StaticPass` **仍绑定到 `StaticPassFile`**。独立复现：CWD 无 `fixture-pass` → exit 11（credential file not found）；CWD 放入同名文件 → exit 10 且 settings 被写。故 `INF-APPLY-INIT-02`（“旧参数被拒”）是**假阳性**；文档/账本的“不再接受 -StaticPass”不准确 |
+| F12 代码核对 | `Get-V4UiSystemProxy` 读取 `verge.yaml` 的 `enable_system_proxy`；`Get-V4StateCore` 加 `uiSystemProxy` 并在 UI/HKCU 不一致时 DEGRADED + reason；`state-v4` 输出该字段；`INF-F12-01` PASS |
+| C-04/C-08/R3-02 | owner SID 校验已加；URL/JSON/API-key 脱敏已加（INF-REDACT-03 PASS）；系统代理两次写加失败补偿 |
+| 新 HIGH | **未发现**（增量只读状态/脱敏/ACL owner/写补偿；无新增 HKCU/网络写路径） |
+
+### D.2 逐项确认
+
+- **C-02：PARTIAL / 不可审计地关闭**。参数名确实改为 `-StaticPassFile`，但 PowerShell 的唯一前缀绑定让旧命令行 `-StaticPass <密码>` **仍然可运行**（被当作 `-StaticPassFile <密码>`）：在临时 CWD 中无同名文件时 exit 11，有同名文件时 exit 10 且写 settings。也就是说：
+  1) 旧拼写的秘密值仍会进入命令行/PSReadLine 历史（原 C-02 的核心暴露）；
+  2) `INF-APPLY-INIT-02` 的“参数被拒”通过只是因为文件不存在，不是显式拒绝，是假阳性；
+  3) 文档/账本“不再接受 -StaticPass”不准确。
+
+  建议最小修复：增加墓碑参数 `[string]$StaticPass`，绑定后立即 `Fail 11 'removed; use -StaticPassFile <protected file>'`（不记录值）；`INF-APPLY-INIT-02` 断言该文案且在有同名文件时也不得写 settings；同步改文档。另有 LOW：`-StaticPassFile` 内容未做 ACL 校验，用户需保证文件受保护。
+- **F12：分类正确，报告部分**。A+C（F11 应急恢复 + UI/实际不一致，非新污染）的定性合理；代码在 **settings 存在时**会把 UI/HKCU 不一致报为 DEGRADED 并附 reason，`INF-F12-01` 已覆盖。**但当前 production `proxy_v4/config/settings.json` 不存在**；`Get-V4StateCore` 在 `SettingsError`/`Settings=null` 时**先 return FAILED**，不会走到 UI mismatch 分支。独立复现：missing settings → `FAILED`，`uiSystemProxy=enabled`，reasons 仅 `settings.json missing`（无 UI 不一致 reason）；with settings → `DEGRADED` + UI reason。即：**当前生产状态脚本实际会报 FAILED（settings missing），不是文档所写“DEGRADED + UI reason”**；`uiSystemProxy` 字段仍可见，但缺点 explicit reason。建议把 UI mismatch 检查移到 early return 之前（或在该分支补 reason），并加“settings missing + UI on”用例；否则 F12 文档需限定“settings 存在时”。`Get-V4UiSystemProxy` 的 `verge.yaml` 文件解析也未被 INF-F12-01 覆盖（测试只直接传 `-UiSystemProxy`），属测试缺口。
+- **C-04**：owner SID 校验已加；但 `Test-V4AclHardened` 仍不检查继承标志/不设置 owner，round3-security 的 C-04 “非继承 DACL 早退”残余仍在；SECURITY-REVIEW 的 `C-04 CLOSED` 仍属过度声明（MED/LOW）。
+- **C-08**：URL userinfo、JSON key、`X-Api-Key`/`apikey`、Cookie 已遮；`INF-REDACT-03` 已加强并 PASS；可判 CLOSED（残余 `Harness.Protect-HarnessText` 与生产 `Get-V4Redacted` 是两套实现，未合并）。
+- **R3-02**：系统代理两次写加本地补偿；仍非跨进程原子，且补偿无独立失败用例；保持 MED/部分修复。
+- **R3-01**：旧 `proxy_diag`/`proxy_v2`/`proxy_v3` 入口仍可直接写 HKCU；本轮未改，仍 OPEN MED（F11 类风险可经旧入口重现）。
+- **Gate 文档仍滞后**：`RELEASE-GATE-V6.md`（076c975）仍写 Gate 10 **FAIL**、F11 专项 **PENDING**、“SHORT_RUN_ACCEPTED 未达”；`ISSUE-LEDGER` F11 仍 `FIXED-PENDING-INDEPENDENT-REVIEW`；`TASK-STATE` 仍写旧 HEAD/远端（ebbf2e6/990d896）。实际上 round3 两份报告已随 `0268e17` 提交、C-02 已关闭、最终证据为 `1c7fdad`/`ebbf2e6`；这些记录需更新，否则发布记录与代码不一致。
+- **C-01/C-12**：仍为 PARTIAL/WAITING-USER（明文快照、公网 IP/路径/用户名）；需用户书面接受/决定。
+- **R2A-06**：journal commit phase 仍 OPEN（MED，fail-closed）；R2A-10/11/13/14/15、R3-03/04/05 等 LOW 保持 OPEN/ACCEPTED。
+
+### D.3 增量裁定
+
+**Delta verdict: NOT_READY**。
+
+代码层短跑证据仍然强（94/94、自验 7/7、目标 INF 51/51），增量未新增功能性 HIGH；但 **C-02 因前缀绑定未可审计关闭**，且 F12 在当前 settings 缺失状态下报告不全，不能签署。转为 **SHORT_RUN_ACCEPTED（有条件）** 的最低条件：
+
+1. **C-02 tombstone**：显式拒绝 `-StaticPass`（含旧拼写）并让 `INF-APPLY-INIT-02` 断言显式拒绝文案，不再依赖“文件不存在”；文档/账本改写为“旧拼写被拒绝”。
+2. **F12 报告修正**：把 UI mismatch 检查放到 settings 缺失 early return 之前，或明确文档仅适用于 settings 存在；补 `settings missing + UI on` 用例与 `Get-V4UiSystemProxy` 文件解析用例（当前 production settings 缺失，state 实际 FAILED 而非 DEGRADED+reason）。
+3. **C-01/C-12 用户书面处置**：接受 ACL 保护的明文快照、公开 IP/路径/用户名范围，或完成加密/脱敏。
+4. **Gate/账本/TASK-STATE 更新**：Gate 10/F11、C-02/C-04/C-15、94/94/1c7fdad/ebbf2e6、HEAD 990d896/076c975 与 origin 同步状态；不得保留 Gate 10 FAIL/F11 PENDING。
+5. **R3-01/R3-02 处置**：旧 diag/v2/v3 写 HKCU 入口加退役/latch（或书面接受）；R3-02 补补偿失败用例或接受非原子残余；R2A-06/C-04 残余保持披露。
+6. **真实环境范式**：真实 apply/rollback/boot/24h/72h 未执行，继续 DEFERRED-BY-USER；LONG_RUN 不在本次；凭据轮换 BLOCKED-USER。
+
+**明确不接受**：把隔离 94/94 当作真实生产 apply/rollback/boot 验证；本 delta 没有执行/验证真实 HKCU/网络/Clash。

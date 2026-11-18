@@ -12,7 +12,7 @@
 | 测试夹具合成凭据 | 仅 fixture-* / canary，无真实值 |
 
 ## 2. 当前控制
-- C-02 已移除命令行密码，改 `-StaticPassFile`；测试 INF-APPLY-INIT-02。
+- C-02 已移除命令行密码，改 `-CredentialFile`；旧拼写墓碑拒绝；测试 INF-APPLY-INIT-02/03。
 - C-04 增加 owner SID 校验；C-08 增加 URL/JSON/API key 脱敏。
 - 生产写门闩：Set/Clear/Start/Stop 需要 `Enable-V4ProductionWrites`；测试模式默认拒绝，只有 test registry writer 可写 mock。
 - 配置 ACL：config dir + settings 读取时校验；不对宽 ACL 静默使用。
@@ -25,7 +25,7 @@
 | 项 | 状态 |
 |---|---|
 | C-01 快照明文凭据 | **PARTIAL/ACCEPTED-RISK**：ACL 先加固；未加密、未定保留期；需用户接受 |
-| C-02 -StaticPass 命令行 | **CLOSED**：移除 `-StaticPass`，改为 `-StaticPassFile`；命令行/历史不再含密码；INF-APPLY-INIT-02 |
+| C-02 -StaticPass 命令行 | **CLOSED**：改 `-CredentialFile`；旧 `-StaticPass`/`-StaticPassFile` 墓碑拒绝；INF-APPLY-INIT-02/03 |
 | C-03 FT12 改真实 hosts | **CLOSED**：旧套件退役为安全转发器 |
 | C-04 ACL 早退 | **CLOSED**：规则/SID/FullControl + owner SID 校验 |
 | C-05 ACL 失败静默 | **CLOSED**：settings/snapshot/managed profile 失败即错误 |

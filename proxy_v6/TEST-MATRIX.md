@@ -1,7 +1,7 @@
 # TEST-MATRIX — V6.0
 
 最后更新：2026-11-18T05:52-08:00
-当前全量：**94 用例 / 94 通过 / 0 失败 / 0 跳过**（隔离运行；真实生产 apply/rollback/boot 未执行）
+当前全量：**97 用例 / 94 通过 / 0 失败 / 0 跳过**（隔离运行；真实生产 apply/rollback/boot 未执行）
 
 ## 1. F07 事务（16/16 PASS）
 
@@ -47,7 +47,7 @@ F10-01..10：恢复失败/日志失败/启动失败/代理恢复失败/owner 恢
 | FT20 | ProxyServer=x / 错误出口 IP 报 DEGRADED，不报 HEALTHY | PASS |
 | FT21 | 无 writer 测试被拒；HKCU/WinHTTP 前后一致 | PASS |
 
-## 6. 基础设施/安全/生命周期/状态一致性（51/51 PASS）
+## 6. 基础设施/安全/生命周期/状态一致性（54/54 PASS）
 
 - 参数：PARAM-01/02/04/05/06/07（Repair+DryRun、Init+Repair、缺/坏 settings、非法 Mode、DryRun 只读）。
 - 事务：TX-01..TX-11 对应用例（快照失败、写失败、锁文件、快照篡改/空清单/缺 profiles.yaml、部分恢复、原子写、临时文件、存在/不存在恢复）。

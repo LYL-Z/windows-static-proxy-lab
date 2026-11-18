@@ -36,10 +36,12 @@ Clash Verge 的 `verge.yaml` 仍保存：
 
 ## 5. 状态检测修复
 `Get-V4State` 现在读取 UI 的 `enable_system_proxy`（只读）并与真实 HKCU 比较：
-- HTTP 状态输出新增 `uiSystemProxy`；
-- UI 与 HKCU 不一致时报告额外 reason，并降为 DEGRADED；
+- 状态输出新增 `uiSystemProxy`；
+- UI 与 HKCU 不一致时报告额外 reason；
+- 在有 settings 且其他路径正常时降为 DEGRADED；
+- **当前生产 settings.json 缺失**时，状态仍是 FAILED（settings missing），但 reasons 会同时包含 UI/HKCU 不一致，不能据此报 HEALTHY；
 - 不再用 UI 或节点测速单条件判 HEALTHY。
-测试：`INF-F12-01`。
+测试：`INF-F12-01`（DEGRADED）、`INF-F12-02`（FAILED + UI reason）、`INF-F12-03`（verge.yaml true/false/missing）。
 
 ## 6. 处理建议
 - 当前保持 `ProxyEnable=0`，所有站点可用；不自动改回，避免中断。

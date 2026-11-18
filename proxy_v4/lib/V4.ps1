@@ -517,7 +517,7 @@ function Invoke-V4Init {
     if ($hasExplicit) {
         $host_ = [string]$Explicit['host']; $port = [int]$Explicit['port']
         $user = [string]$Explicit['user']; $pass = [string]$Explicit['pass']
-        if (-not $host_ -or -not $user -or -not $pass) { throw (New-V4Fault 11 'explicit init requires -StaticHost, -StaticUser and -StaticPassFile') }
+        if (-not $host_ -or -not $user -or -not $pass) { throw (New-V4Fault 11 'explicit init requires -StaticHost, -StaticUser and -CredentialFile') }
         if ($port -eq 0) { $port = 9506 }
         $source = 'explicit parameters'
     }
@@ -525,7 +525,7 @@ function Invoke-V4Init {
         if (-not $Paths -or -not $Paths.RuntimeFile -or -not (Test-Path -LiteralPath $Paths.RuntimeFile)) { throw (New-V4Fault 11 'no clash runtime config to migrate from') }
         $t = Read-V4File $Paths.RuntimeFile
         $cands = @(Get-V4Socks5Candidates -Text $t)
-        if ($cands.Count -ne 1) { throw (New-V4Fault 11 ('expected exactly 1 socks5 node, found {0}; pass -StaticHost/-StaticUser/-StaticPassFile explicitly' -f $cands.Count)) }
+        if ($cands.Count -ne 1) { throw (New-V4Fault 11 ('expected exactly 1 socks5 node, found {0}; pass -StaticHost/-StaticUser/-CredentialFile explicitly' -f $cands.Count)) }
         $c = $cands[0]
         $host_ = $c.host; $port = if ($c.port) { [int]$c.port } else { 0 }
         $user = $c.user; $pass = $c.pass
@@ -1352,19 +1352,25 @@ function Get-V4Controller {
 }
 
 # -------------------------------------------------------------------- state ----
+function Read-V4UiSystemProxyFile {
+    param([string]$Path)
+    try {
+        if (-not $Path -or -not (Test-Path -LiteralPath $Path)) { return $null }
+        $t = Read-V4File $Path
+        if ($t -and $t -match '(?m)^enable_system_proxy:\s*(true|false)') { return ($Matches[1] -eq 'true') }
+    } catch { }
+    return $null
+}
+
 function Get-V4UiSystemProxy {
     if ($script:TestMode) {
+        if ($env:V4_TEST_UI_CONFIG) { return (Read-V4UiSystemProxyFile -Path $env:V4_TEST_UI_CONFIG) }
         if ($env:V4_TEST_UI_SYSTEM_PROXY -eq '1') { return $true }
         if ($env:V4_TEST_UI_SYSTEM_PROXY -eq '0') { return $false }
         return $null
     }
-    try {
-        $f = Join-Path (Join-Path $env:APPDATA 'io.github.clash-verge-rev.clash-verge-rev') 'verge.yaml'
-        if (-not (Test-Path -LiteralPath $f)) { return $null }
-        $t = Read-V4File $f
-        if ($t -and $t -match '(?m)^enable_system_proxy:\s*(true|false)') { return ($Matches[1] -eq 'true') }
-    } catch { }
-    return $null
+    $f = Join-Path (Join-Path $env:APPDATA 'io.github.clash-verge-rev.clash-verge-rev') 'verge.yaml'
+    return (Read-V4UiSystemProxyFile -Path $f)
 }
 
 function Get-V4StateCore {
@@ -1389,6 +1395,11 @@ function Get-V4StateCore {
         firstHopOk = $false
         exitViaChain = $null
         uiSystemProxy = $(if ($null -eq $UiSystemProxy) { 'unknown' } elseif ($UiSystemProxy) { 'enabled' } else { 'disabled' })
+    }
+    $actualProxyEnabled = [bool]($SystemProxy -and $SystemProxy.enabled)
+    $uiMismatch = ($null -ne $UiSystemProxy -and [bool]$UiSystemProxy -ne $actualProxyEnabled)
+    if ($uiMismatch) {
+        $out.reasons += ('UI reports system proxy ' + $(if ($UiSystemProxy) { 'enabled' } else { 'disabled' }) + ', actual HKCU is ' + $(if ($actualProxyEnabled) { 'enabled' } else { 'disabled' }))
     }
     if ($SettingsError) {
         $out.state = 'FAILED'; $out.mode = 'UNKNOWN'
@@ -1420,13 +1431,7 @@ function Get-V4StateCore {
             else { $out.state = 'FAILED'; $out.reasons += 'no exit ip' }
         }
     }
-    if ($null -ne $UiSystemProxy) {
-        $actualEnabled = [bool]($SystemProxy -and $SystemProxy.enabled)
-        if ([bool]$UiSystemProxy -ne $actualEnabled) {
-            if ($out.state -ne 'FAILED') { $out.state = 'DEGRADED' }
-            $out.reasons += ('UI reports system proxy ' + $(if ($UiSystemProxy) { 'enabled' } else { 'disabled' }) + ', actual HKCU is ' + $(if ($actualEnabled) { 'enabled' } else { 'disabled' }))
-        }
-    }
+    if ($uiMismatch -and $out.state -ne 'FAILED') { $out.state = 'DEGRADED' }
     return $out
 }
 

@@ -16,7 +16,7 @@
 - R2C-03：Get-V4Settings 校验 config/settings ACL。
 - R2C-08：脱敏覆盖 JSON key、URL userinfo、空格值、Bearer/Basic/Cookie/API key。
 - F12：状态输出 uiSystemProxy；UI 与 HKCU 不一致时 DEGRADED + 明确 reason（INF-F12-01）；不自动改生产网络。
-- C-02：移除 `-StaticPass`，改为 `-StaticPassFile`；命令行不再含密码。
+- C-02：移除 `-StaticPass`，改为 `-CredentialFile`；旧拼写（`-StaticPass`/`-StaticPassFile`）由墓碑参数显式拒绝。
 - 旧 faultinject-v4.ps1 退役为安全转发器（原 FT12 会改真实 hosts ACL）。
 
 ### F11 — 生产状态污染（CRITICAL）
@@ -40,7 +40,8 @@
 - c562c18：F11 生产事故、隔离门闩、R2A/R2C 修复与 92 用例。
 - d5f2134：rollback 仅在快照清单验证通过后才允许补救启动。
 - b9bb9a0：干净树证据（d5f2134, 92/92）。
-- 0268e17：C-02 -StaticPassFile、F12 UI/实际状态报告、ACL owner、脱敏、系统代理写补偿（94 用例）。
-- 1c7fdad：最终证据（final.json head=0268e17, dirty=false, 94/94）。
+- 0268e17：C-02 凭据文件、F12 UI/实际状态报告、ACL owner、脱敏、系统代理写补偿（94 用例）。
+- 后续：CredentialFile + 墓碑参数、F12-02/03、gitleaks 合成字面量替换（97 用例）。
+- 1c7fdad：最终证据（final.json head=0268e17, dirty=false, 97/97）。
 - ebbf2e6：干净 selftest 证据（head=0268e17, dirty=false, 7/7）。
 - 分支 v5/short-run-hardening 已推送；PR #1 保持 Draft，未合并 main。

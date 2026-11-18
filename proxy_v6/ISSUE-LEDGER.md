@@ -62,7 +62,7 @@
 
 | 编号 | 严重度 | 问题 | 状态 |
 |---|---|---|---|
-| C-02 | HIGH | `-StaticPass` 命令行李历史暴露 | **VERIFIED-CLOSED**：移除参数，改 `-StaticPassFile`；测试/文档更新 |
+| C-02 | HIGH | `-StaticPass` 命令行历史暴露 | **VERIFIED-CLOSED**：改 `-CredentialFile`；旧拼写墓碑拒绝；INF-APPLY-INIT-02/03 |
 | R2C-01 | HIGH | 安装/脚本树可被 Authenticated Users 改写 | **MITIGATED**：repo/proxy_v4/proxy_v6/.git 384+ 对象 ACL 已加固；repo-acl.json |
 | R2C-03 | MED | settings/state 读取不复核 ACL | **FIXED**：Get-V4Settings 校验 config/settings ACL；INF-SETTINGS-04 |
 | R2C-04 | MED | 恢复路径不重新加固凭据文件 | **FIXED**：INF-SNAP-08 |

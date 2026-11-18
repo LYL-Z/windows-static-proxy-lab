@@ -44,6 +44,6 @@ powershell -ExecutionPolicy Bypass -File D:\claude防封\proxy_v4\apply-v4.ps1 -
 
 ## V6 安全警告
 
-- `-Init` 已不接受命令行密码；显式迁移改用 `-StaticPassFile <受保护文件>`。优先从当前 Clash profile 迁移。
+- `-Init` 已不接受命令行密码；显式迁移改用 `-CredentialFile <受保护文件>`。旧的 `-StaticPass`/`-StaticPassFile` 会被拒绝。优先从当前 Clash profile 迁移。
 - `backup/` 快照含明文代理凭据；ACL 已加固但未加密，不要上传或共享。
 - 真实 apply 前先 `-DryRun`；失败时不要手工删除 `config\transaction.json`，先看 ISSUE-LEDGER/R2A-06。
