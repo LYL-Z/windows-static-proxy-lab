@@ -1292,6 +1292,7 @@ proxies:
 
 $group
 rules:
+  - GEOIP,CN,DIRECT
   - MATCH,PROXY
 "@
 }
