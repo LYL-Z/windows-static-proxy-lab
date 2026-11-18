@@ -8,10 +8,10 @@
     "status":  "pass",
     "passed":  true,
     "detail":  "assertions passed: 1",
-    "durationMs":  2429,
+    "durationMs":  2462,
     "assertions":  1,
-    "startedAt":  "2026-11-18T05:55:13.206-08:00",
-    "finishedAt":  "2026-11-18T05:55:15.635-08:00",
-    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-final-clean\\final.cases\\0071-INF-DRYRUN-01.json",
+    "startedAt":  "2026-11-18T05:59:37.565-08:00",
+    "finishedAt":  "2026-11-18T05:59:40.028-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-final-d5f\\final.cases\\0071-INF-DRYRUN-01.json",
     "testOutput":  ""
 }

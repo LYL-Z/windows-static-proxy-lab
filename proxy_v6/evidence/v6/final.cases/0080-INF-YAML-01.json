@@ -8,10 +8,10 @@
     "status":  "pass",
     "passed":  true,
     "detail":  "assertions passed: 1",
-    "durationMs":  576,
+    "durationMs":  590,
     "assertions":  1,
-    "startedAt":  "2026-11-18T05:55:45.865-08:00",
-    "finishedAt":  "2026-11-18T05:55:46.443-08:00",
-    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-final-clean\\final.cases\\0080-INF-YAML-01.json",
+    "startedAt":  "2026-11-18T06:00:10.289-08:00",
+    "finishedAt":  "2026-11-18T06:00:10.879-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-final-d5f\\final.cases\\0080-INF-YAML-01.json",
     "testOutput":  ""
 }

@@ -8,10 +8,10 @@
     "status":  "pass",
     "passed":  true,
     "detail":  "assertions passed: 1",
-    "durationMs":  21535,
+    "durationMs":  21591,
     "assertions":  1,
-    "startedAt":  "2026-11-18T05:55:20.615-08:00",
-    "finishedAt":  "2026-11-18T05:55:42.151-08:00",
-    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-final-clean\\final.cases\\0076-INF-ROLLBACK-03.json",
+    "startedAt":  "2026-11-18T05:59:45.123-08:00",
+    "finishedAt":  "2026-11-18T06:00:06.715-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-final-d5f\\final.cases\\0076-INF-ROLLBACK-03.json",
     "testOutput":  ""
 }
