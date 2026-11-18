@@ -1,0 +1,17 @@
+{
+    "id":  "F07-13",
+    "requirement":  "F07",
+    "precondition":  "second write fails",
+    "injectedFault":  "recovery succeeds",
+    "expected":  "journal cleared after recovery",
+    "actual":  "F07-13: journal cleared after recovery",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "body completed without assertions or exceptions",
+    "durationMs":  657,
+    "assertions":  0,
+    "startedAt":  "2026-11-18T05:22:19.606-08:00",
+    "finishedAt":  "2026-11-18T05:22:20.263-08:00",
+    "evidenceFile":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\v6\\full.json.cases\\0033-F07-13.json",
+    "testOutput":  ""
+}

@@ -1,0 +1,17 @@
+{
+    "id":  "INF-YAML-01",
+    "requirement":  "DATA-02",
+    "precondition":  "credentials containing quote/newline/backslash",
+    "injectedFault":  "YAML injection attempt",
+    "expected":  "escaped; no injected top-level key",
+    "actual":  "quotes/newlines/backslashes escaped; no YAML line injection",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "body completed without assertions or exceptions",
+    "durationMs":  553,
+    "assertions":  0,
+    "startedAt":  "2026-11-18T05:20:34.187-08:00",
+    "finishedAt":  "2026-11-18T05:20:34.740-08:00",
+    "evidenceFile":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\v6\\full.json.cases\\0067-INF-YAML-01.json",
+    "testOutput":  ""
+}

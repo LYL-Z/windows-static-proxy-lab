@@ -1,0 +1,78 @@
+{
+    "schemaVersion":  1,
+    "tool":  "proxy_v6/tests/Harness.ps1",
+    "harnessVersion":  "6.0.0",
+    "runId":  "8704d81c10fe45d8a58fbf4ce8f8090c",
+    "host":  {
+                 "psVersion":  "5.1.26100.9818",
+                 "psEdition":  "Desktop",
+                 "os":  "Microsoft Windows NT 10.0.26300.0",
+                 "clr":  "4.0.30319.42000",
+                 "is64BitProcess":  true,
+                 "pid":  54248
+             },
+    "git":  {
+                "available":  true,
+                "head":  "36222c92c829a2ef08b71af2a3a3ff9a3c44b396",
+                "branch":  "v5/short-run-hardening",
+                "dirty":  true,
+                "error":  null
+            },
+    "repoRoot":  "D:\\claude防封\\publish",
+    "filter":  "*",
+    "startedAt":  "2026-11-18T05:08:41.896-08:00",
+    "finishedAt":  "2026-11-18T05:08:42.155-08:00",
+    "durationMs":  73,
+    "counts":  {
+                   "registered":  2,
+                   "executed":  1,
+                   "passed":  1,
+                   "failed":  0,
+                   "skipped":  1,
+                   "available":  2
+               },
+    "exitCode":  0,
+    "outcome":  "PASS",
+    "harnessErrors":  [
+
+                      ],
+    "evidenceErrors":  [
+
+                       ],
+    "cases":  [
+                  {
+                      "id":  "FIX-SKIP-PASS",
+                      "requirement":  "META-05",
+                      "precondition":  "isolated child process",
+                      "injectedFault":  "none",
+                      "expected":  "this test executes and passes",
+                      "actual":  "all assertions passed",
+                      "status":  "pass",
+                      "passed":  true,
+                      "detail":  "assertions passed: 1",
+                      "durationMs":  7,
+                      "assertions":  1,
+                      "startedAt":  "2026-11-18T05:08:41.925-08:00",
+                      "finishedAt":  "2026-11-18T05:08:41.939-08:00",
+                      "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-050837-302-09b36eb4\\META-05-mixed\\cases\\0001-FIX-SKIP-PASS.json",
+                      "testOutput":  ""
+                  },
+                  {
+                      "id":  "FIX-SKIP-ONE",
+                      "requirement":  "META-05",
+                      "precondition":  "dependency intentionally absent",
+                      "injectedFault":  "registration skip",
+                      "expected":  "this test is recorded as skipped, never as passed",
+                      "actual":  "skipped",
+                      "status":  "skip",
+                      "passed":  false,
+                      "detail":  "skipped at registration: fixture registration skip: dependency not present",
+                      "durationMs":  0,
+                      "assertions":  0,
+                      "startedAt":  "2026-11-18T05:08:41.966-08:00",
+                      "finishedAt":  "2026-11-18T05:08:41.968-08:00",
+                      "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-050837-302-09b36eb4\\META-05-mixed\\cases\\0002-FIX-SKIP-ONE.json",
+                      "testOutput":  ""
+                  }
+              ]
+}

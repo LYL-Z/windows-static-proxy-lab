@@ -1,0 +1,17 @@
+{
+    "id":  "INF-LOCK-03",
+    "requirement":  "LOCK-05",
+    "precondition":  "lock file uses current pid with wrong start time",
+    "injectedFault":  "PID reuse",
+    "expected":  "treated as stale",
+    "actual":  "PID reuse detected by process start time",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "body completed without assertions or exceptions",
+    "durationMs":  598,
+    "assertions":  0,
+    "startedAt":  "2026-11-18T05:26:08.707-08:00",
+    "finishedAt":  "2026-11-18T05:26:09.305-08:00",
+    "evidenceFile":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\v6\\full.json.cases\\0053-INF-LOCK-03.json",
+    "testOutput":  ""
+}

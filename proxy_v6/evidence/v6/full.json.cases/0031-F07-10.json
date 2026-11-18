@@ -1,0 +1,17 @@
+{
+    "id":  "F07-10",
+    "requirement":  "F07",
+    "precondition":  "writes/start/proxy ok",
+    "injectedFault":  "owner write fails",
+    "expected":  "system proxy restored",
+    "actual":  "F07-10: proxy and owner restored on late failure",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "body completed without assertions or exceptions",
+    "durationMs":  664,
+    "assertions":  0,
+    "startedAt":  "2026-11-18T05:25:55.163-08:00",
+    "finishedAt":  "2026-11-18T05:25:55.827-08:00",
+    "evidenceFile":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\v6\\full.json.cases\\0031-F07-10.json",
+    "testOutput":  ""
+}

@@ -1,0 +1,17 @@
+{
+    "id":  "F07-05",
+    "requirement":  "F07",
+    "precondition":  "writes ok; start ok",
+    "injectedFault":  "chain exit mismatch",
+    "expected":  "system proxy restored",
+    "actual":  "F07-05: system proxy restored",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "body completed without assertions or exceptions",
+    "durationMs":  669,
+    "assertions":  0,
+    "startedAt":  "2026-11-18T05:25:51.900-08:00",
+    "finishedAt":  "2026-11-18T05:25:52.570-08:00",
+    "evidenceFile":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\v6\\full.json.cases\\0026-F07-05.json",
+    "testOutput":  ""
+}

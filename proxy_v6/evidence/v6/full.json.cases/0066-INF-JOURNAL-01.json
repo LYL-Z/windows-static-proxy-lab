@@ -1,0 +1,17 @@
+{
+    "id":  "INF-JOURNAL-01",
+    "requirement":  "TX-05",
+    "precondition":  "pending transaction journal",
+    "injectedFault":  "previous process died",
+    "expected":  "apply refuses with exit 34; clear works",
+    "actual":  "unexpected exception",
+    "status":  "fail",
+    "passed":  false,
+    "detail":  "unexpected exception: infra case INF-JOURNAL-01 failed (exit 1):   | stack: at Invoke-InfraCase, D:\\claude防封\\publish\\proxy_v6\\tests\\cases\\60-infra.tests.ps1: line 14 | at \u003cScriptBlock\u003e, D:\\claude防封\\publish\\proxy_v6\\tests\\cases\\60-infra.tests.ps1: line 67 | at Invoke-HarnessCase, D:\\claude防封\\publish\\proxy_v6\\tests\\Harness.ps1: line 434 | at Invoke-TestRun, D:\\claude防封\\publish\\proxy_v6\\tests\\Harness.ps1: line 618 | at \u003cScriptBlock\u003e, D:\\claude防封\\publish\\proxy_v6\\tests\\Run-Tests.ps1: line 58 | at: At D:\\claude防封\\publish\\proxy_v6\\tests\\cases\\60-infra.tests.ps1:14 char:7 | +       throw (\u0027infra case \u0027 + $Id + \u0027 failed (exit \u0027 + [string]$r.Exit ... | +       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+    "durationMs":  1159,
+    "assertions":  0,
+    "startedAt":  "2026-11-18T05:20:33.026-08:00",
+    "finishedAt":  "2026-11-18T05:20:34.186-08:00",
+    "evidenceFile":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\v6\\full.json.cases\\0066-INF-JOURNAL-01.json",
+    "testOutput":  ""
+}

@@ -1,0 +1,17 @@
+{
+    "id":  "INF-LOG-01",
+    "requirement":  "LOG-01",
+    "precondition":  "evidence path exists as a file",
+    "injectedFault":  "log directory cannot be created",
+    "expected":  "Start-V4Log returns false; logging continues",
+    "actual":  "blocked log path returned false; Write-V4Log continued",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "body completed without assertions or exceptions",
+    "durationMs":  659,
+    "assertions":  0,
+    "startedAt":  "2026-11-18T05:20:07.198-08:00",
+    "finishedAt":  "2026-11-18T05:20:07.858-08:00",
+    "evidenceFile":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\v6\\full.json.cases\\0033-INF-LOG-01.json",
+    "testOutput":  ""
+}

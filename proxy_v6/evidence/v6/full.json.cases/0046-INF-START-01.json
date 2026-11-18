@@ -1,0 +1,17 @@
+{
+    "id":  "INF-START-01",
+    "requirement":  "LIFE-05",
+    "precondition":  "port already listening",
+    "injectedFault":  "duplicate-start attempt",
+    "expected":  "no launch",
+    "actual":  "already-listening path did not launch a duplicate",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "body completed without assertions or exceptions",
+    "durationMs":  534,
+    "assertions":  0,
+    "startedAt":  "2026-11-18T05:18:22.895-08:00",
+    "finishedAt":  "2026-11-18T05:18:23.430-08:00",
+    "evidenceFile":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\v6\\full.json.cases\\0046-INF-START-01.json",
+    "testOutput":  ""
+}

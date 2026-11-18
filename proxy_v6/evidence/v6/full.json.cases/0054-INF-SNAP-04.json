@@ -1,0 +1,17 @@
+{
+    "id":  "INF-SNAP-04",
+    "requirement":  "TX-08",
+    "precondition":  "one live target locked",
+    "injectedFault":  "restore failure on one file",
+    "expected":  "failure reported; other file restored",
+    "actual":  "partial restore reported failure and still restored the unlocked file",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "body completed without assertions or exceptions",
+    "durationMs":  753,
+    "assertions":  0,
+    "startedAt":  "2026-11-18T05:18:28.915-08:00",
+    "finishedAt":  "2026-11-18T05:18:29.669-08:00",
+    "evidenceFile":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\v6\\full.json.cases\\0054-INF-SNAP-04.json",
+    "testOutput":  ""
+}

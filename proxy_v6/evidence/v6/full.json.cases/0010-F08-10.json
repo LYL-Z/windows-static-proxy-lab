@@ -1,0 +1,17 @@
+{
+    "id":  "F08-10",
+    "requirement":  "F08",
+    "precondition":  "current line is after the profile block",
+    "injectedFault":  "insertion shifts current index",
+    "expected":  "current updated; no duplicate; updated not corrupted",
+    "actual":  "F08-10: current updated after insertion; no duplicate",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "body completed without assertions or exceptions",
+    "durationMs":  570,
+    "assertions":  0,
+    "startedAt":  "2026-11-18T05:25:21.152-08:00",
+    "finishedAt":  "2026-11-18T05:25:21.722-08:00",
+    "evidenceFile":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\v6\\full.json.cases\\0010-F08-10.json",
+    "testOutput":  ""
+}

@@ -1,0 +1,17 @@
+{
+    "id":  "F10-09",
+    "requirement":  "F10",
+    "precondition":  "process state unknown with snapshot",
+    "injectedFault":  "AppWasRunning=null",
+    "expected":  "returns 40; no false success",
+    "actual":  "F10-09: returned 40",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "body completed without assertions or exceptions",
+    "durationMs":  549,
+    "assertions":  0,
+    "startedAt":  "2026-11-18T05:25:48.001-08:00",
+    "finishedAt":  "2026-11-18T05:25:48.550-08:00",
+    "evidenceFile":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\v6\\full.json.cases\\0020-F10-09.json",
+    "testOutput":  ""
+}

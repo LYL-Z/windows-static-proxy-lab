@@ -15,7 +15,15 @@
 Set-StrictMode -Version 1.0
 $ErrorActionPreference = 'Stop'
 
-$script:Root        = Split-Path -Parent $PSScriptRoot
+# V6 test isolation: only an explicit env switch may redirect the mutable root.
+# Production runs (no V4_TEST_MODE) keep the historical layout next to lib.
+$script:TestMode = ($env:V4_TEST_MODE -eq '1')
+if ($script:TestMode) {
+    $testRoot = $env:V4_TEST_ROOT
+    if (-not $testRoot) { $testRoot = Join-Path $env:TEMP ('v4-test-' + $PID) }
+    $script:Root = [System.IO.Path]::GetFullPath($testRoot)
+}
+else { $script:Root = Split-Path -Parent $PSScriptRoot }
 $script:ConfigDir   = Join-Path $script:Root 'config'
 $script:BackupDir   = Join-Path $script:Root 'backup'
 $script:SettingsPath = Join-Path $script:ConfigDir 'settings.json'
@@ -25,8 +33,15 @@ $script:Marker       = '# proxy_v4 managed - do not edit by hand'
 $script:Secrets      = New-Object System.Collections.Generic.List[string]
 $script:LogFile      = $null
 
-foreach ($d in @($script:ConfigDir, $script:BackupDir)) {
-    if (-not (Test-Path $d)) { New-Item -ItemType Directory -Path $d -Force | Out-Null }
+# S07: nothing is created at dot-source time. DryRun must not leave config/backup
+# directories behind; each writer creates exactly what it needs.
+function Assert-V4ProductionOperation {
+    param([string]$Name)
+    if ($script:TestMode) { throw ('V4 test mode blocks real operation: ' + $Name) }
+}
+function Ensure-V4Dir {
+    param([string]$Path)
+    if (-not (Test-Path -LiteralPath $Path)) { New-Item -ItemType Directory -Path $Path -Force | Out-Null }
 }
 
 # ------------------------------------------------------------------ logging --
@@ -35,9 +50,13 @@ function Register-V4Secret { param([string]$Value) if ($Value -and -not $script:
 function Get-V4Redacted {
     param([string]$Text)
     if (-not $Text) { return $Text }
-    foreach ($s in $script:Secrets) { if ($s -and $s.Length -ge 4) { $Text = $Text.Replace($s, '***') } }
-    $Text = [regex]::Replace($Text, '(?i)(password\s*[:=]\s*)"?[^\s",\}]+', '$1"***"')
-    $Text = [regex]::Replace($Text, '(?i)(Basic\s+)([A-Za-z0-9+/=]{8,})', '$1***')
+    foreach ($s in $script:Secrets) { if ($s -and $s.Length -ge 3) { $Text = $Text.Replace($s, '***') } }
+    $Text = [regex]::Replace($Text, '(?i)\b(password|passwd|pwd|pass|secret)(\s*[:=]\s*)[^\r\n]+', '$1$2***')
+    $Text = [regex]::Replace($Text, '(?i)\b(username|user)(\s*[:=]\s*)("[^"]*"|''[^'']*''|[^\s,;}]+)', '$1$2***')
+    $Text = [regex]::Replace($Text, '(?i)\b(token)(\s*[:=]\s*)("[^"]*"|''[^'']*''|[^\s,;}]+)', '$1$2***')
+    $Text = [regex]::Replace($Text, '(?i)(Basic\s+)([A-Za-z0-9+/=]{4,})', '$1***')
+    $Text = [regex]::Replace($Text, '(?i)(Bearer\s+)([A-Za-z0-9._~+/=-]{4,})', '$1***')
+    $Text = [regex]::Replace($Text, '(?i)([a-z][a-z0-9+.-]*://)[^/@\s]+@', '$1***@')
     return $Text
 }
 
@@ -46,16 +65,218 @@ function Write-V4Log {
     $m = Get-V4Redacted $Message
     $line = '{0} [{1,-5}] {2}' -f (Get-Date -Format 'HH:mm:ss'), $Level, $m
     $color = switch ($Level) { 'OK' {'Green'} 'WARN' {'Yellow'} 'ERROR' {'Red'} 'STEP' {'Cyan'} default {'Gray'} }
-    Write-Host $line -ForegroundColor $color
+    try { Write-Host $line -ForegroundColor $color } catch { }
     if ($script:LogFile) { try { Add-Content -LiteralPath $script:LogFile -Value $line -Encoding UTF8 } catch { } }
 }
 
 function Start-V4Log {
     param([string]$Name)
-    $dir = Join-Path $script:Root 'evidence'
-    if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
-    $script:LogFile = Join-Path $dir ('{0}-{1}.log' -f $Name, (Get-Date -Format 'yyyyMMdd-HHmmss'))
-    Add-Content -LiteralPath $script:LogFile -Value ("# proxy_v4 {0}" -f (Get-Date -Format 's')) -Encoding UTF8
+    try {
+        $dir = Join-Path $script:Root 'evidence'
+        Ensure-V4Dir $dir
+        if (-not (Protect-V4Acl -Path $dir)) { $script:LogFile = $null; return $false }
+        $script:LogFile = Join-Path $dir ('{0}-{1}-{2}.log' -f $Name, (Get-Date -Format 'yyyyMMdd-HHmmss-fff'), ([guid]::NewGuid().ToString('N').Substring(0,6)))
+        Add-Content -LiteralPath $script:LogFile -Value ('# proxy_v4 ' + (Get-Date -Format 's')) -Encoding UTF8
+        if (-not (Protect-V4Acl -Path $script:LogFile)) {
+            Remove-Item -LiteralPath $script:LogFile -Force -ErrorAction SilentlyContinue
+            $script:LogFile = $null
+            return $false
+        }
+        return $true
+    }
+    catch {
+        $script:LogFile = $null
+        return $false
+    }
+}
+
+# ------------------------------------------------------- recovery orchestration --
+function Write-V4RecoveryNote {
+    param($Log, [string]$Message, [string]$Level = 'WARN')
+    if ($Log) { try { & $Log $Message $Level } catch { } }
+}
+
+function Invoke-V4Recovery {
+    param(
+        [string]$SnapshotDir,
+        [int]$Code,
+        [object]$AppWasRunning,
+        [scriptblock]$StopApp,
+        [scriptblock]$Restore,
+        [scriptblock]$RestoreProxy,
+        [scriptblock]$RestoreOwner,
+        [scriptblock]$StartApp,
+        [scriptblock]$Log
+    )
+    $restoreOk = $true
+    $processOk = $true
+    $proxyOk = $true
+    try {
+        Write-V4RecoveryNote $Log 'mid-transaction failure; starting recovery' 'WARN'
+        if ($null -eq $AppWasRunning -and $SnapshotDir) {
+            $processOk = $false
+            Write-V4RecoveryNote $Log 'recovery: process state is unknown; cannot prove restoration' 'ERROR'
+        }
+        # Stop before copying so the app cannot regenerate a file mid-restore.
+        if ($SnapshotDir -and $StopApp) {
+            try { & $StopApp | Out-Null }
+            catch { $processOk = $false; Write-V4RecoveryNote $Log ('recovery stop failed: ' + $_.Exception.Message) 'ERROR' }
+        }
+        if ($SnapshotDir -and $Restore) {
+            try { & $Restore $SnapshotDir | Out-Null }
+            catch { $restoreOk = $false; Write-V4RecoveryNote $Log ('recovery restore failed: ' + $_.Exception.Message) 'ERROR' }
+        }
+        if ($RestoreProxy) {
+            try { & $RestoreProxy | Out-Null }
+            catch { $proxyOk = $false; Write-V4RecoveryNote $Log ('recovery proxy restore failed: ' + $_.Exception.Message) 'ERROR' }
+        }
+        if ($RestoreOwner) {
+            try { & $RestoreOwner | Out-Null }
+            catch { $restoreOk = $false; Write-V4RecoveryNote $Log ('recovery owner restore failed: ' + $_.Exception.Message) 'ERROR' }
+        }
+        if ($null -ne $AppWasRunning) {
+            try {
+                if ($AppWasRunning) {
+                    if ($StartApp) {
+                        if (-not (& $StartApp)) { $processOk = $false; Write-V4RecoveryNote $Log 'recovery: app did not restart' 'ERROR' }
+                    }
+                    else { $processOk = $false }
+                }
+                else {
+                    if ($StopApp) { & $StopApp | Out-Null }
+                }
+            }
+            catch { $processOk = $false; Write-V4RecoveryNote $Log ('recovery process step failed: ' + $_.Exception.Message) 'ERROR' }
+        }
+        if ($restoreOk -and $processOk -and $proxyOk) { return $Code }
+        return 40
+    }
+    catch {
+        Write-V4RecoveryNote $Log ('recovery aborted unexpectedly: ' + $_.Exception.Message) 'ERROR'
+        return 40
+    }
+}
+
+# ---------------------------------------------------- transaction journal --
+function Get-V4JournalPath { return (Join-Path $script:ConfigDir 'transaction.json') }
+
+function Get-V4Journal {
+    $p = Get-V4JournalPath
+    if (-not (Test-Path -LiteralPath $p)) { return $null }
+    try {
+        $j = Get-Content -LiteralPath $p -Raw -Encoding UTF8 | ConvertFrom-Json
+        if (-not $j -or -not $j.snapshot) { return [pscustomobject]@{ corrupt = $true; data = $null } }
+        return [pscustomobject]@{ corrupt = $false; data = $j }
+    }
+    catch { return [pscustomobject]@{ corrupt = $true; data = $null } }
+}
+
+function Write-V4Journal {
+    param([string]$SnapshotDir, [string]$Reason = 'apply')
+    Ensure-V4Dir $script:ConfigDir
+    $o = [ordered]@{
+        schema = 1
+        snapshot = $SnapshotDir
+        reason = $Reason
+        started = (Get-Date).ToString('o')
+        pid = $PID
+    }
+    Set-V4Atomic -TargetPath (Get-V4JournalPath) -Content ($o | ConvertTo-Json -Depth 4) | Out-Null
+}
+
+function Clear-V4Journal {
+    param([switch]$WhatIf)
+    $p = Get-V4JournalPath
+    if (-not (Test-Path -LiteralPath $p)) { return $true }
+    if ($WhatIf) { return $false }
+    Remove-Item -LiteralPath $p -Force -ErrorAction SilentlyContinue
+    return (-not (Test-Path -LiteralPath $p))
+}
+
+# ------------------------------------------------------- transaction engine --
+function Invoke-V4ApplyTransaction {
+    param([object]$Context)
+    $ops = $Context.Ops
+    $snap = $null
+    $applied = $false
+    $journalWritten = $false
+    $wasRunning = $null
+    $beforeProxy = $null
+    $ownerBefore = $null
+    $ownerKnown = $false
+    $code = 0
+    $msg = ''
+    try {
+        # Capture the state we may have to put back. These are read-only probes.
+        if ($ops.GetSystemProxy) { $beforeProxy = & $ops.GetSystemProxy }
+        if ($ops.GetOwnerText) {
+            try { $ownerBefore = & $ops.GetOwnerText; $ownerKnown = $true } catch { }
+        }
+        if ($ops.IsAppRunning) { $wasRunning = [bool](& $ops.IsAppRunning) }
+        $snap = & $ops.Snapshot $Context.Reason
+        if ($ops.WriteJournal) {
+            try { & $ops.WriteJournal $snap $Context.Reason | Out-Null; $journalWritten = $true }
+            catch { throw [pscustomobject]@{ code = 34; msg = ('cannot write transaction journal: ' + $_.Exception.Message) } }
+        }
+        # F07: dirty immediately before the FIRST live write.
+        $applied = $true
+        & $ops.WriteAtomic $Context.Paths.ProfilesFile $Context.ProfileText $Context.ProfileValidator | Out-Null
+        & $ops.WriteAtomic $Context.Paths.ProfileFile $Context.ProfileYaml $Context.RuntimeValidator | Out-Null
+        & $ops.WriteAtomic $Context.Paths.RuntimeFile $Context.RuntimeYaml $Context.RuntimeValidator | Out-Null
+        if (-not (& $ops.StartApp 45 $Context.Settings.mixedPort)) {
+            throw [pscustomobject]@{ code = 30; msg = 'app did not listen in time' }
+        }
+        $got = & $ops.GetExitIp ('socks5h://127.0.0.1:' + $Context.Settings.mixedPort)
+        if ($got -ne $Context.Settings.host) {
+            throw [pscustomobject]@{ code = 31; msg = ('chain exit ' + $got) }
+        }
+        & $ops.SetSystemProxy ('127.0.0.1:' + $Context.Settings.mixedPort)
+        $px = & $ops.GetSystemProxy
+        if (-not $px.enabled -or $px.server -ne ('127.0.0.1:' + $Context.Settings.mixedPort)) {
+            throw [pscustomobject]@{ code = 32; msg = 'system proxy not set' }
+        }
+        foreach ($target in @($Context.Paths.ProfileFile, $Context.Paths.RuntimeFile)) {
+            $aclOk = & $ops.ProtectAcl $target
+            if ($aclOk -eq $false) { throw [pscustomobject]@{ code = 12; msg = ('ACL hardening failed: ' + $target) } }
+        }
+        & $ops.SetOwner ('127.0.0.1:' + $Context.Settings.mixedPort) ('mode=' + $Context.Mode)
+        if ($journalWritten -and $ops.ClearJournal) {
+            try { if (-not (& $ops.ClearJournal)) { Write-V4RecoveryNote $ops.Log 'transaction succeeded but the journal could not be cleared' 'WARN' } }
+            catch { Write-V4RecoveryNote $ops.Log ('transaction journal clear failed: ' + $_.Exception.Message) 'WARN' }
+        }
+        return [pscustomobject]@{ ok = $true; exitCode = 0; error = ''; snapshot = $snap; applied = $applied; restored = $false; journalWritten = $journalWritten }
+    }
+    catch {
+        $fault = $_.TargetObject
+        if ($fault -and $fault.code) { $code = [int]$fault.code; $msg = [string]$fault.msg }
+        else { $code = 1; $msg = $_.Exception.Message }
+        if (-not $msg) { $msg = $_.Exception.Message }
+        if ($Context.Redact) { try { $msg = & $Context.Redact $msg } catch { } }
+        if ($snap -or $applied -or ($null -ne $wasRunning)) {
+            $restoreProxy = $null
+            if ($beforeProxy) {
+                $bp = $beforeProxy
+                $restoreProxy = {
+                    if ($bp.enabled) { & $ops.SetSystemProxy $bp.server }
+                    elseif ($ops.ClearSystemProxy) { & $ops.ClearSystemProxy }
+                }
+            }
+            $recoverStart = { & $ops.StartApp 30 $Context.Settings.mixedPort }
+            $recoverStop = { & $ops.StopApp $Context.Settings.mixedPort }
+            $recoverOwner = $null
+            if ($ownerKnown -and $ops.RestoreOwner) {
+                $ob = $ownerBefore
+                $recoverOwner = { & $ops.RestoreOwner $ob }
+            }
+            $recoverCode = Invoke-V4Recovery -SnapshotDir $snap -Code $code -AppWasRunning $wasRunning -StopApp $recoverStop -Restore $ops.Restore -RestoreProxy $restoreProxy -RestoreOwner $recoverOwner -StartApp $recoverStart -Log $ops.Log
+            $code = $recoverCode
+            if ($journalWritten -and $code -ne 40 -and $ops.ClearJournal) {
+                try { if (-not (& $ops.ClearJournal)) { Write-V4RecoveryNote $ops.Log 'recovery succeeded but the journal could not be cleared' 'WARN' } }
+                catch { Write-V4RecoveryNote $ops.Log ('recovery journal clear failed: ' + $_.Exception.Message) 'WARN' }
+            }
+        }
+        return [pscustomobject]@{ ok = $false; exitCode = $code; error = $msg; snapshot = $snap; applied = $applied; restored = ($code -ne 40) }
+    }
 }
 
 # --------------------------------------------------------------- primitives --
@@ -78,6 +299,23 @@ function Unprotect-V4Secret {
 
 function Get-V4Paths {
     $r = @{ InstallDir=$null; Exe=$null; Core=$null; AppData=$null; ProfilesDir=$null; RuntimeFile=$null; ProfileFile=$null }
+    if ($script:TestMode) {
+        # Test mode NEVER falls back to the real installation/appdata.
+        $ad = $env:V4_TEST_APPDATA
+        if ($ad) {
+            $r.AppData = [System.IO.Path]::GetFullPath($ad)
+            $r.ProfilesDir = Join-Path $r.AppData 'profiles'
+            $r.RuntimeFile = if ($env:V4_TEST_RUNTIME) { [System.IO.Path]::GetFullPath($env:V4_TEST_RUNTIME) } else { Join-Path $r.AppData 'clash-verge.yaml' }
+        }
+        $inst = $env:V4_TEST_INSTALL
+        if ($inst) {
+            $r.InstallDir = [System.IO.Path]::GetFullPath($inst)
+            $r.Exe = if ($env:V4_TEST_EXE) { $env:V4_TEST_EXE } else { Join-Path $r.InstallDir 'clash-verge.exe' }
+        }
+        if ($env:V4_TEST_CORE) { $r.Core = $env:V4_TEST_CORE }
+        elseif ($r.InstallDir) { $r.Core = Join-Path $r.InstallDir 'verge-mihomo.exe' }
+        return $r
+    }
     foreach ($c in @("$env:ProgramFiles\Clash Verge", "${env:ProgramFiles(x86)}\Clash Verge")) {
         if (Test-Path (Join-Path $c 'clash-verge.exe')) { $r.InstallDir = $c; break }
     }
@@ -93,10 +331,37 @@ function Get-V4Paths {
 }
 
 # ------------------------------------------------------------------- settings --
+function Get-V4FaultMessage {
+    param($ErrorRecord)
+    if ($ErrorRecord -and $ErrorRecord.TargetObject -and $ErrorRecord.TargetObject.code -and $ErrorRecord.TargetObject.msg) { return [string]$ErrorRecord.TargetObject.msg }
+    if ($ErrorRecord -and $ErrorRecord.Exception) { return [string]$ErrorRecord.Exception.Message }
+    return 'unknown error'
+}
+
+function New-V4Fault {
+    param([int]$Code, [string]$Message)
+    return [pscustomobject]@{ code = $Code; msg = $Message }
+}
+
+function Assert-V4SettingsInput {
+    param([string]$Host_, [int]$Port, [string]$Username, [string]$Password, [string]$HopHost, [int]$HopPort, [int]$MixedPort)
+    if (-not $Host_ -or $Host_ -notmatch '^\d{1,3}(\.\d{1,3}){3}$') { throw (New-V4Fault 11 'static host must be IPv4') }
+    foreach ($p in @($Port, $HopPort, $MixedPort)) { if ($p -lt 1 -or $p -gt 65535) { throw (New-V4Fault 11 'port out of range') } }
+    if (-not $Username) { throw (New-V4Fault 11 'username is empty') }
+    if (-not $Password) { throw (New-V4Fault 11 'password is empty') }
+    if (-not $HopHost) { throw (New-V4Fault 11 'first-hop host is empty') }
+}
+
 function Get-V4Settings {
-    if (-not (Test-Path $script:SettingsPath)) { throw "settings.json not found - run: apply-v4.ps1 -Init" }
-    $j = Get-Content $script:SettingsPath -Raw -Encoding UTF8 | ConvertFrom-Json
-    $pw = Unprotect-V4Secret $j.staticProxy.passwordDpapi
+    if (-not (Test-Path -LiteralPath $script:SettingsPath)) { throw (New-V4Fault 11 'settings.json missing; run with -Init first') }
+    try { $j = Get-Content -LiteralPath $script:SettingsPath -Raw -Encoding UTF8 | ConvertFrom-Json }
+    catch { throw (New-V4Fault 11 'settings.json is not valid JSON') }
+    if (-not $j -or -not $j.staticProxy -or -not $j.firstHop) { throw (New-V4Fault 11 'settings.json structure is invalid') }
+    try { Assert-V4SettingsInput -Host_ $j.staticProxy.host -Port ([int]$j.staticProxy.port) -Username $j.staticProxy.username -Password 'present' -HopHost $j.firstHop.host -HopPort ([int]$j.firstHop.port) -MixedPort ([int]$j.mixedPort) }
+    catch { throw (New-V4Fault 11 ('settings.json values invalid: ' + $_.Exception.Message)) }
+    if (-not $j.staticProxy.passwordDpapi) { throw (New-V4Fault 11 'settings.json has no DPAPI credential') }
+    try { $pw = Unprotect-V4Secret $j.staticProxy.passwordDpapi }
+    catch { throw (New-V4Fault 11 'stored credential cannot be decrypted for this user') }
     Register-V4Secret $pw
     Register-V4Secret $j.staticProxy.username
     return [pscustomobject]@{
@@ -107,8 +372,24 @@ function Get-V4Settings {
     }
 }
 
+function Save-V4SettingsObject {
+    param([object]$Value)
+    Ensure-V4Dir $script:ConfigDir
+    if (-not (Protect-V4Acl -Path $script:ConfigDir)) { throw (New-V4Fault 12 'cannot harden config directory ACL') }
+    $json = $Value | ConvertTo-Json -Depth 5
+    $validator = { param($f)
+        $x = Get-Content -LiteralPath $f -Raw -Encoding UTF8 | ConvertFrom-Json
+        if (-not $x.staticProxy.passwordDpapi) { throw 'settings.json lost its DPAPI credential' }
+        if (-not $x.staticProxy.host) { throw 'settings.json lost its host' }
+    }
+    Set-V4Atomic -TargetPath $script:SettingsPath -Content $json -Validator $validator | Out-Null
+    if (-not (Protect-V4Acl -Path $script:SettingsPath)) { throw (New-V4Fault 12 'cannot harden settings.json ACL') }
+    Write-V4Log 'settings written (credential stored DPAPI-encrypted)' -Level OK
+}
+
 function Save-V4Settings {
     param([string]$Host_, [int]$Port, [string]$Username, [string]$Password, [string]$HopHost, [int]$HopPort, [int]$MixedPort)
+    Assert-V4SettingsInput -Host_ $Host_ -Port $Port -Username $Username -Password $Password -HopHost $HopHost -HopPort $HopPort -MixedPort $MixedPort
     $obj = [ordered]@{
         schema = 1
         generatedBy = 'proxy_v4'
@@ -116,93 +397,279 @@ function Save-V4Settings {
         firstHop = [ordered]@{ host = $HopHost; port = $HopPort }
         mixedPort = $MixedPort
     }
-    Write-V4File -Path $script:SettingsPath -Content ($obj | ConvertTo-Json -Depth 5)
-    Protect-V4Acl -Path $script:ConfigDir
-    Write-V4Log ("settings written (credential stored DPAPI-encrypted)") -Level OK
+    Save-V4SettingsObject -Value $obj
+}
+
+# ------------------------------------------------------------------------ init --
+function Get-V4YamlScalar {
+    param([string]$Rest)
+    $s = ([string]$Rest).Trim()
+    if (-not $s) { return '' }
+    $dq = [char]34
+    $sq = [char]39
+    $bs = [char]92
+    if ($s[0] -eq $dq) {
+        $sb = New-Object System.Text.StringBuilder
+        $i = 1
+        while ($i -lt $s.Length) {
+            $ch = $s[$i]
+            if ($ch -eq $bs -and ($i + 1) -lt $s.Length) {
+                $n = $s[$i + 1]
+                if ($n -eq 'n') { [void]$sb.Append([char]10) }
+                elseif ($n -eq 'r') { [void]$sb.Append([char]13) }
+                elseif ($n -eq 't') { [void]$sb.Append([char]9) }
+                elseif ($n -eq '"') { [void]$sb.Append('"') }
+                elseif ($n -eq '\') { [void]$sb.Append('\') }
+                else { [void]$sb.Append($n) }
+                $i += 2
+                continue
+            }
+            if ($ch -eq $dq) { break }
+            [void]$sb.Append($ch)
+            $i++
+        }
+        return $sb.ToString()
+    }
+    if ($s[0] -eq $sq) {
+        $sb = New-Object System.Text.StringBuilder
+        $i = 1
+        while ($i -lt $s.Length) {
+            $ch = $s[$i]
+            if ($ch -eq $sq) {
+                if (($i + 1) -lt $s.Length -and $s[$i + 1] -eq $sq) { [void]$sb.Append($sq); $i += 2; continue }
+                break
+            }
+            [void]$sb.Append($ch)
+            $i++
+        }
+        return $sb.ToString()
+    }
+    $m = [regex]::Match($s, '^(?<v>.*?)(?:[ \t]+#.*)?$')
+    return $m.Groups['v'].Value.Trim()
+}
+
+function Get-V4Socks5Candidates {
+    param([string]$Text)
+    if (-not $Text) { return @() }
+    $blocks = [regex]::Matches($Text, '(?ms)^[ \t]*-\s+name:\s*(?<name>[^\r\n]+)(?<body>.*?)(?=^[ \t]*-\s+name:|\z)')
+    $cands = @()
+    foreach ($b in $blocks) {
+        $body = $b.Groups['body'].Value
+        $get = {
+            param($k)
+            $m = [regex]::Match($body, ('(?m)^\s*' + [regex]::Escape($k) + ':\s*(?<rest>[^\r\n]*)$'))
+            if ($m.Success) { return (Get-V4YamlScalar $m.Groups['rest'].Value) }
+            return $null
+        }
+        if ((& $get 'type') -ne 'socks5') { continue }
+        $cands += [pscustomobject]@{
+            name = $b.Groups['name'].Value.Trim()
+            host = (& $get 'server')
+            port = (& $get 'port')
+            user = (& $get 'username')
+            pass = (& $get 'password')
+        }
+    }
+    return $cands
+}
+
+function Invoke-V4Init {
+    param(
+        [object]$Paths,
+        [hashtable]$Explicit,
+        [scriptblock]$Save,
+        [scriptblock]$Log
+    )
+    $host_ = $null; $port = 0; $user = $null; $pass = $null
+    $hopHost = '127.0.0.1'; $hopPort = 11119; $mixedPort = 7897
+    $hasExplicit = $false
+    if ($Explicit) {
+        foreach ($k in @('host','port','user','pass','hopHost','hopPort','mixedPort')) {
+            if ($Explicit.ContainsKey($k) -and $Explicit[$k]) { $hasExplicit = $true }
+        }
+        if ($Explicit.ContainsKey('hopHost') -and $Explicit['hopHost']) { $hopHost = [string]$Explicit['hopHost'] }
+        if ($Explicit.ContainsKey('hopPort') -and $Explicit['hopPort']) { $hopPort = [int]$Explicit['hopPort'] }
+        if ($Explicit.ContainsKey('mixedPort') -and $Explicit['mixedPort']) { $mixedPort = [int]$Explicit['mixedPort'] }
+    }
+    $source = ''
+    if ($hasExplicit) {
+        $host_ = [string]$Explicit['host']; $port = [int]$Explicit['port']
+        $user = [string]$Explicit['user']; $pass = [string]$Explicit['pass']
+        if (-not $host_ -or -not $user -or -not $pass) { throw (New-V4Fault 11 'explicit init requires -StaticHost, -StaticUser and -StaticPass') }
+        if ($port -eq 0) { $port = 9506 }
+        $source = 'explicit parameters'
+    }
+    else {
+        if (-not $Paths -or -not $Paths.RuntimeFile -or -not (Test-Path -LiteralPath $Paths.RuntimeFile)) { throw (New-V4Fault 11 'no clash runtime config to migrate from') }
+        $t = Read-V4File $Paths.RuntimeFile
+        $cands = @(Get-V4Socks5Candidates -Text $t)
+        if ($cands.Count -ne 1) { throw (New-V4Fault 11 ('expected exactly 1 socks5 node, found {0}; pass -StaticHost/-StaticUser/-StaticPass explicitly' -f $cands.Count)) }
+        $c = $cands[0]
+        $host_ = $c.host; $port = if ($c.port) { [int]$c.port } else { 0 }
+        $user = $c.user; $pass = $c.pass
+        $source = 'runtime profile migration'
+    }
+    Assert-V4SettingsInput -Host_ $host_ -Port $port -Username $user -Password $pass -HopHost $hopHost -HopPort $hopPort -MixedPort $mixedPort
+    if (-not $Save) { throw (New-V4Fault 11 'init has no settings writer') }
+    & $Save $host_ $port $user $pass $hopHost $hopPort $mixedPort
+    if ($Log) { try { & $Log ('settings created from ' + $source + ' (credential length-verified only)') 'OK' } catch { } }
+    return [pscustomobject]@{ source = $source; host = $host_; port = $port }
 }
 
 # ------------------------------------------------------------------------ ACL --
+function Get-V4AllowedSidSet {
+    $me = [System.Security.Principal.WindowsIdentity]::GetCurrent().User
+    $list = New-Object System.Collections.ArrayList
+    if ($me) { [void]$list.Add($me.Value) }
+    [void]$list.Add('S-1-5-18')
+    [void]$list.Add('S-1-5-32-544')
+    return $list
+}
+
+function Test-V4AclHardened {
+    param([string]$Path, $Allowed)
+    try {
+        $acl = Get-Acl -LiteralPath $Path
+        if (-not $acl.AreAccessRulesProtected) { return $false }
+        $me = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+        $hasMe = $false
+        foreach ($r in @($acl.Access)) {
+            if ($r.AccessControlType -ne [System.Security.AccessControl.AccessControlType]::Allow) { return $false }
+            $sid = $null
+            try { $sid = $r.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value } catch { return $false }
+            if ($Allowed -notcontains $sid) { return $false }
+            $full = [System.Security.AccessControl.FileSystemRights]::FullControl
+            if (($r.FileSystemRights -band $full) -ne $full) { return $false }
+            if ($sid -eq $me) { $hasMe = $true }
+        }
+        return $hasMe
+    }
+    catch { return $false }
+}
+
 function Protect-V4Acl {
     param([string]$Path)
     try {
-        $me = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+        if (-not (Test-Path -LiteralPath $Path)) { return $false }
+        $allowed = Get-V4AllowedSidSet
+        if (Test-V4AclHardened -Path $Path -Allowed $allowed) { return $true }   # idempotent AND verified
+        $me = [System.Security.Principal.WindowsIdentity]::GetCurrent().User
+        if (-not $me) { return $false }
         $isDir = Test-Path -LiteralPath $Path -PathType Container
-        $inherit = if ($isDir) { [System.Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit' } else { [System.Security.AccessControl.InheritanceFlags]'None' }
+        $inherit = if ($isDir) { [System.Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit' } else { [System.Security.AccessControl.InheritanceFlags]::None }
         $acl = Get-Acl -LiteralPath $Path
-        $hasMe = $acl.Access | Where-Object { $_.IdentityReference.Value -eq $me }
-        if ($acl.AreAccessRulesProtected -and $hasMe) { return $true }   # idempotent
         $acl.SetAccessRuleProtection($true, $false)
         foreach ($r in @($acl.Access)) { [void]$acl.RemoveAccessRule($r) }
-        $ownerAdded = $false
-        foreach ($id in @($me, 'NT AUTHORITY\SYSTEM', 'BUILTIN\Administrators')) {
+        foreach ($sid in $allowed) {
             try {
-                $rule = New-Object System.Security.AccessControl.FileSystemAccessRule($id, 'FullControl', $inherit, 'None', 'Allow')
+                $id = New-Object System.Security.Principal.SecurityIdentifier($sid)
+                $rule = New-Object System.Security.AccessControl.FileSystemAccessRule($id, [System.Security.AccessControl.FileSystemRights]::FullControl, $inherit, [System.Security.AccessControl.PropagationFlags]::None, [System.Security.AccessControl.AccessControlType]::Allow)
                 [void]$acl.AddAccessRule($rule)
-                if ($id -eq $me) { $ownerAdded = $true }
             } catch { }
         }
-        if (-not $ownerAdded) { return $false }     # never persist a DACL that locks us out
-        Set-Acl -LiteralPath $Path -AclObject $acl -ErrorAction Stop
-        return $true
+        if ($isDir) { [System.IO.Directory]::SetAccessControl($Path, $acl) }
+        else { [System.IO.File]::SetAccessControl($Path, $acl) }
+        return (Test-V4AclHardened -Path $Path -Allowed $allowed)
     }
     catch { return $false }
 }
 
 # ----------------------------------------------------------------------- lock --
+function Get-V4ProcessStartToken {
+    param([int]$ProcessId)
+    try { return (Get-Process -Id $ProcessId -ErrorAction Stop).StartTime.ToUniversalTime().ToString('o') }
+    catch { return $null }
+}
+
 function Enter-V4Lock {
     param([int]$TimeoutSec = 20)
+    Ensure-V4Dir $script:ConfigDir
     $deadline = (Get-Date).AddSeconds($TimeoutSec)
+    $token = [guid]::NewGuid().ToString('N')
+    $startToken = Get-V4ProcessStartToken -ProcessId $PID
+    $payload = [ordered]@{
+        pid = $PID
+        token = $token
+        processStart = $startToken
+        created = (Get-Date).ToString('o')
+    } | ConvertTo-Json -Compress
     while ((Get-Date) -lt $deadline) {
         try {
             $fs = [System.IO.File]::Open($script:LockPath, 'CreateNew', 'Write', 'None')
-            $w = New-Object System.IO.StreamWriter($fs)
-            $w.WriteLine(('pid={0};ts={1}' -f $PID, (Get-Date).ToString('s')))
-            $w.Close()
-            return $true
+            try {
+                $bytes = [System.Text.Encoding]::UTF8.GetBytes($payload)
+                $fs.Write($bytes, 0, $bytes.Length)
+                $fs.Flush($true)
+            }
+            finally { $fs.Close() }
+            return [pscustomobject]@{ token = $token; path = $script:LockPath; pid = $PID }
         }
         catch {
             $txt = Read-V4File $script:LockPath
-            if ($txt -and $txt -match 'pid=(\d+)') {
-                $opid = [int]$Matches[1]
-                if (-not (Get-Process -Id $opid -ErrorAction SilentlyContinue)) {
-                    Remove-Item $script:LockPath -Force -ErrorAction SilentlyContinue
-                    continue
+            $stale = $false
+            if (-not $txt -or -not $txt.Trim()) {
+                try {
+                    $age = (Get-Date) - (Get-Item -LiteralPath $script:LockPath -ErrorAction Stop).LastWriteTime
+                    if ($age.TotalSeconds -gt 2) { $stale = $true }
+                } catch { }
+            }
+            elseif ($txt) {
+                try {
+                    $j = $txt | ConvertFrom-Json
+                    if ($j.pid -and $j.token) {
+                        $proc = Get-Process -Id ([int]$j.pid) -ErrorAction SilentlyContinue
+                        if (-not $proc) { $stale = $true }
+                        elseif ($j.processStart -and (Get-V4ProcessStartToken -ProcessId ([int]$j.pid)) -ne $j.processStart) { $stale = $true }
+                    }
+                    else { $stale = $true }
                 }
+                catch {
+                    if ($txt -match 'pid=(\d+)') {
+                        if (-not (Get-Process -Id ([int]$Matches[1]) -ErrorAction SilentlyContinue)) { $stale = $true }
+                    }
+                    else {
+                        try {
+                            $age = (Get-Date) - (Get-Item -LiteralPath $script:LockPath -ErrorAction Stop).LastWriteTime
+                            if ($age.TotalMinutes -gt 10) { $stale = $true }
+                        } catch { }
+                    }
+                }
+            }
+            if ($stale) {
+                $again = Read-V4File $script:LockPath
+                if ($again -eq $txt) { Remove-Item -LiteralPath $script:LockPath -Force -ErrorAction SilentlyContinue }
+                if (-not (Test-Path -LiteralPath $script:LockPath)) { continue }
             }
             Start-Sleep -Milliseconds 400
         }
     }
-    return $false
+    return $null
 }
 
-function Exit-V4Lock { Remove-Item $script:LockPath -Force -ErrorAction SilentlyContinue }
+function Exit-V4Lock {
+    param([object]$Token)
+    if (-not $Token) { return $false }   # V6: never delete a lock we do not own
+    $want = $null
+    if ($Token -is [string]) { $want = $Token }
+    elseif ($Token.token) { $want = [string]$Token.token }
+    if (-not $want) { return $false }
+    try {
+        $txt = Read-V4File $script:LockPath
+        if (-not $txt) { return $false }
+        $j = $txt | ConvertFrom-Json
+        if ([string]$j.token -ne $want) { return $false }
+        $again = Read-V4File $script:LockPath
+        if ($again -ne $txt) { return $false }
+        Remove-Item -LiteralPath $script:LockPath -Force -ErrorAction Stop
+        return (-not (Test-Path -LiteralPath $script:LockPath))
+    }
+    catch { return $false }
+}
 
 # ------------------------------------------------------------- process control --
-function Get-V4AppPids { @(Get-Process -Name 'clash-verge','verge-mihomo' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Id) }
-
-function Stop-V4Clash {
-    param([int]$TimeoutSec = 25, [int]$Port = 7897)
-    $pids = Get-V4AppPids
-    if ($pids.Count -eq 0 -and -not (Test-Path 'HKLM:\')) { }
-    if ($pids.Count -gt 0) {
-        Write-V4Log ("stopping clash processes: " + ($pids -join ','))
-        foreach ($p in $pids) { Stop-Process -Id $p -Force -ErrorAction SilentlyContinue }
-        $deadline = (Get-Date).AddSeconds($TimeoutSec)
-        while ((Get-Date) -lt $deadline) {
-            if ((Get-V4AppPids).Count -eq 0) { break }
-            Start-Sleep -Milliseconds 300
-        }
-    }
-    # M10: verify absence, do not assume
-    $left = Get-V4AppPids
-    if ($left.Count -gt 0) { throw ("processes still alive after {0}s: {1}" -f $TimeoutSec, ($left -join ',')) }
-    $deadline = (Get-Date).AddSeconds(10)
-    while ((Get-Date) -lt $deadline) {
-        if (-not (Test-V4Port -Port $Port)) { return $true }
-        Start-Sleep -Milliseconds 250
-    }
-    if (Test-V4Port -Port $Port) { throw "port $Port still listening after stopping the app" }
-    return $true
+function Get-V4AppPids {
+    if ($script:TestMode) { return @() }
+    @(Get-Process -Name 'clash-verge','verge-mihomo' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Id)
 }
 
 function Test-V4Port {
@@ -213,98 +680,262 @@ function Test-V4Port {
     finally { $c.Close() }
 }
 
-function Start-V4Clash {
-    param([int]$TimeoutSec = 45, [int]$Port = 7897)
-    $p = Get-V4Paths
-    if (-not $p.Exe) { throw 'clash-verge.exe not found' }
-    Start-Process -FilePath $p.Exe | Out-Null
+function Stop-V4Clash {
+    param([int]$TimeoutSec = 25, [int]$Port = 7897)
+    Assert-V4ProductionOperation 'Stop-V4Clash'
+    $pids = Get-V4AppPids
+    if ($pids.Count -gt 0) {
+        Write-V4Log ('stopping clash processes: ' + ($pids -join ','))
+        foreach ($p in $pids) { Stop-Process -Id $p -Force -ErrorAction SilentlyContinue }
+        $deadline = (Get-Date).AddSeconds($TimeoutSec)
+        while ((Get-Date) -lt $deadline) {
+            if ((Get-V4AppPids).Count -eq 0) { break }
+            Start-Sleep -Milliseconds 300
+        }
+    }
+    $left = Get-V4AppPids
+    if ($left.Count -gt 0) { throw ('processes still alive after {0}s: {1}' -f $TimeoutSec, ($left -join ',')) }
+    $deadline = (Get-Date).AddSeconds(10)
+    while ((Get-Date) -lt $deadline) {
+        if (-not (Test-V4Port -Port $Port)) { return $true }
+        Start-Sleep -Milliseconds 250
+    }
+    if (Test-V4Port -Port $Port) { throw ('port {0} still listening after stopping the app' -f $Port) }
+    return $true
+}
+
+function Start-V4ClashCore {
+    param(
+        [int]$TimeoutSec = 45,
+        [int]$Port = 7897,
+        [scriptblock]$IsListening,
+        [scriptblock]$IsRunning,
+        [scriptblock]$Launch,
+        [scriptblock]$Sleep
+    )
+    if (& $IsListening) { return $true }
+    $alreadyRunning = $false
+    if ($IsRunning) { $alreadyRunning = [bool](& $IsRunning) }
+    if (-not $alreadyRunning) { & $Launch }
+    # S09: never spawn a duplicate instance; if the app is already up, only wait.
     $deadline = (Get-Date).AddSeconds($TimeoutSec)
     while ((Get-Date) -lt $deadline) {
-        Start-Sleep -Milliseconds 600
-        if (Test-V4Port -Port $Port) { Start-Sleep -Seconds 2; return $true }
+        & $Sleep 600
+        if (& $IsListening) { & $Sleep 2000; return $true }
     }
     return $false
 }
 
+function Start-V4Clash {
+    param([int]$TimeoutSec = 45, [int]$Port = 7897)
+    Assert-V4ProductionOperation 'Start-V4Clash'
+    $p = Get-V4Paths
+    if (-not $p.Exe) { throw 'clash-verge.exe not found' }
+    $exe = $p.Exe
+    return Start-V4ClashCore -TimeoutSec $TimeoutSec -Port $Port -IsListening { Test-V4Port -Port $Port } -IsRunning { (Get-V4AppPids).Count -gt 0 } -Launch { Start-Process -FilePath $exe | Out-Null } -Sleep { param($ms) Start-Sleep -Milliseconds $ms }
+}
+
 # ------------------------------------------------------------------- snapshot --
+$script:V4RootConfigFiles = @('clash-verge.yaml','config.yaml','verge.yaml','profiles.yaml')
+$script:V4ManagedProfile = 'v4-managed.yaml'
+$script:V4ManagedProfileRel = 'profiles\v4-managed.yaml'
+
+function New-V4SnapshotFiles {
+    param(
+        [string]$AppData,
+        [string]$ProfilesDir,
+        [string]$Dir,
+        [object]$SystemProxy,
+        [object]$ClashRunningBefore,
+        [string]$Reason = 'apply'
+    )
+    if (-not $AppData) { throw 'clash appdata not found' }
+    Ensure-V4Dir $Dir
+    $profSnap = Join-Path $Dir 'profiles'
+    Ensure-V4Dir $profSnap
+    # C-01: harden the directory BEFORE plaintext credential-bearing files are copied in.
+    if (-not (Protect-V4Acl -Path $Dir)) { throw 'cannot harden snapshot directory ACL before copy' }
+    $files = @()
+    $absent = @()
+    foreach ($f in $script:V4RootConfigFiles) {
+        $src = Join-Path $AppData $f
+        if (Test-Path -LiteralPath $src) {
+            $dst = Join-Path $Dir $f
+            $srcHash = (Get-FileHash -LiteralPath $src -Algorithm SHA256).Hash
+            Copy-Item -LiteralPath $src -Destination $dst -Force
+            $dstHash = (Get-FileHash -LiteralPath $dst -Algorithm SHA256).Hash
+            if ($srcHash -ne $dstHash) { throw ('snapshot copy mismatch: ' + $f) }
+            $files += [pscustomobject]@{ name = $f; sha256 = $dstHash; bytes = (Get-Item -LiteralPath $dst).Length }
+        }
+        else { $absent += $f }
+    }
+    $managedSeen = $false
+    if (Test-Path -LiteralPath $ProfilesDir) {
+        foreach ($fi in @(Get-ChildItem -LiteralPath $ProfilesDir -File -Filter '*.yaml' -ErrorAction SilentlyContinue)) {
+            if ($fi.Name -eq $script:V4ManagedProfile) { $managedSeen = $true }
+            $rel = Join-Path 'profiles' $fi.Name
+            $dst = Join-Path $profSnap $fi.Name
+            $srcHash = (Get-FileHash -LiteralPath $fi.FullName -Algorithm SHA256).Hash
+            Copy-Item -LiteralPath $fi.FullName -Destination $dst -Force
+            $dstHash = (Get-FileHash -LiteralPath $dst -Algorithm SHA256).Hash
+            if ($srcHash -ne $dstHash) { throw ('snapshot copy mismatch: ' + $rel) }
+            $files += [pscustomobject]@{ name = $rel; sha256 = $dstHash; bytes = (Get-Item -LiteralPath $dst).Length }
+        }
+    }
+    if (-not $managedSeen) { $absent += $script:V4ManagedProfileRel }
+    $manifest = [ordered]@{
+        schema = 2
+        createdAt = (Get-Date).ToString('s')
+        reason = $Reason
+        systemProxy = $SystemProxy
+        clashRunningBefore = $ClashRunningBefore
+        files = $files
+        absent = $absent
+    }
+    $mp = Join-Path $Dir 'manifest.json'
+    Write-V4File -Path $mp -Content ($manifest | ConvertTo-Json -Depth 7)
+    return [pscustomobject]@{ dir = $Dir; manifest = $manifest; files = $files; absent = $absent }
+}
+
 function New-V4Snapshot {
-    param([string]$Reason = 'apply')
+    param([string]$Reason = 'apply', [int]$Port = 7897)
     $p = Get-V4Paths
     if (-not $p.AppData) { throw 'clash appdata not found' }
-    # M3: consistency first - the app must be stopped before copying
-    if ((Get-V4AppPids).Count -gt 0) { Stop-V4Clash | Out-Null }
-    $stamp = Get-Date -Format 'yyyyMMdd-HHmmss-fff'
+    Ensure-V4Dir $script:BackupDir
+    if (-not (Protect-V4Acl -Path $script:BackupDir)) { throw 'cannot harden backup root ACL' }
+    $beforeProxy = Get-V4SystemProxy
+    $wasRunning = ((Get-V4AppPids).Count -gt 0)
+    if ($wasRunning) { Stop-V4Clash -Port $Port | Out-Null }
+    $stamp = (Get-Date -Format 'yyyyMMdd-HHmmss-fff') + '-' + [guid]::NewGuid().ToString('N').Substring(0, 6)
     $dir = Join-Path $script:BackupDir $stamp
-    New-Item -ItemType Directory -Path (Join-Path $dir 'profiles') -Force | Out-Null
-    $files = @()
-    foreach ($f in @('clash-verge.yaml','config.yaml','verge.yaml','profiles.yaml')) {
-        $src = Join-Path $p.AppData $f
-        if (Test-Path $src) {
-            $dst = Join-Path $dir $f
-            Copy-Item $src $dst -Force
-            $files += [pscustomobject]@{ name=$f; sha256=(Get-FileHash $dst -Algorithm SHA256).Hash; bytes=(Get-Item $dst).Length }
+    try {
+        $r = New-V4SnapshotFiles -AppData $p.AppData -ProfilesDir $p.ProfilesDir -Dir $dir -SystemProxy $beforeProxy -ClashRunningBefore $wasRunning -Reason $Reason
+        return $r.dir
+    }
+    catch {
+        Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue
+        throw
+    }
+}
+
+function Test-V4SnapshotManifest {
+    param([string]$SnapshotDir)
+    if (-not $SnapshotDir) { throw 'snapshot directory is empty' }
+    $mp = Join-Path $SnapshotDir 'manifest.json'
+    if (-not (Test-Path -LiteralPath $mp)) { throw ('snapshot manifest missing: ' + $SnapshotDir) }
+    try { $m = Get-Content -LiteralPath $mp -Raw -Encoding UTF8 | ConvertFrom-Json }
+    catch { throw 'snapshot manifest is not valid JSON' }
+    $entries = @()
+    $names = @()
+    foreach ($e in @($m.files)) {
+        if (-not $e -or -not $e.name -or -not $e.sha256) { throw 'snapshot manifest has an incomplete file entry' }
+        $name = ([string]$e.name).Replace('/', '\')
+        $parts = $name.Split([char[]]@('\','/'), [System.StringSplitOptions]::RemoveEmptyEntries)
+        $okRoot = ($script:V4RootConfigFiles -contains $name)
+        $okProfile = ($parts.Length -eq 2 -and $parts[0] -eq 'profiles' -and $parts[1].EndsWith('.yaml'))
+        if (-not ($okRoot -or $okProfile)) { throw ('snapshot manifest has an unsafe path: ' + $name) }
+        if ($names -contains $name) { throw ('snapshot manifest has a duplicate entry: ' + $name) }
+        $src = Join-Path $SnapshotDir $name
+        if (-not (Test-Path -LiteralPath $src)) { throw ('snapshot incomplete: missing ' + $name) }
+        $hash = (Get-FileHash -LiteralPath $src -Algorithm SHA256).Hash
+        if ($hash.ToLowerInvariant() -ne ([string]$e.sha256).ToLowerInvariant()) { throw ('snapshot hash mismatch: ' + $name) }
+        $names += $name
+        $entries += [pscustomobject]@{ name = $name; sha256 = $hash }
+    }
+    $absent = @()
+    foreach ($a in @($m.absent)) {
+        if (-not $a) { continue }
+        $name = ([string]$a).Replace('/', '\')
+        $parts = $name.Split([char[]]@('\','/'), [System.StringSplitOptions]::RemoveEmptyEntries)
+        $okRoot = ($script:V4RootConfigFiles -contains $name)
+        $okProfile = ($parts.Length -eq 2 -and $parts[0] -eq 'profiles' -and $parts[1].EndsWith('.yaml'))
+        if (-not ($okRoot -or $okProfile)) { throw ('snapshot manifest has an unsafe absent path: ' + $name) }
+        if ($names -contains $name) { throw ('snapshot manifest lists a file as both present and absent: ' + $name) }
+        if ($absent -contains $name) { throw ('snapshot manifest has a duplicate absent entry: ' + $name) }
+        $absent += $name
+    }
+    return [pscustomobject]@{ manifest = $m; entries = $entries; absent = $absent }
+}
+
+function Get-V4SnapshotTarget {
+    param([string]$Name, [string]$AppData, [string]$ProfilesDir)
+    $name = $Name.Replace('/', '\')
+    $parts = $name.Split([char[]]@('\','/'), [System.StringSplitOptions]::RemoveEmptyEntries)
+    if ($parts.Length -eq 2 -and $parts[0] -eq 'profiles') { return (Join-Path $ProfilesDir $parts[1]) }
+    return (Join-Path $AppData $name)
+}
+
+function Restore-V4Files {
+    param([string]$SnapshotDir, [string]$AppData, [string]$ProfilesDir)
+    $v = Test-V4SnapshotManifest -SnapshotDir $SnapshotDir
+    $restored = @()
+    $failures = @()
+    foreach ($e in $v.entries) {
+        $target = Get-V4SnapshotTarget -Name $e.name -AppData $AppData -ProfilesDir $ProfilesDir
+        try {
+            $content = [System.IO.File]::ReadAllText((Join-Path $SnapshotDir $e.name), [System.Text.Encoding]::UTF8)
+            $expected = $e.sha256
+            $validator = ({ param($f) if ((Get-FileHash -LiteralPath $f -Algorithm SHA256).Hash.ToLowerInvariant() -ne $expected.ToLowerInvariant()) { throw 'restored hash mismatch' } }).GetNewClosure()
+            Set-V4Atomic -TargetPath $target -Content $content -Validator $validator | Out-Null
+            $restored += $e.name
         }
+        catch { $failures += [pscustomobject]@{ name = $e.name; error = $_.Exception.Message } }
     }
-    $profDir = Join-Path $p.AppData 'profiles'
-    if (Test-Path $profDir) {
-        Get-ChildItem $profDir -File -Filter *.yaml | ForEach-Object {
-            $dst = Join-Path $dir ('profiles\' + $_.Name)
-            Copy-Item $_.FullName $dst -Force
-            $files += [pscustomobject]@{ name=('profiles\' + $_.Name); sha256=(Get-FileHash $dst -Algorithm SHA256).Hash; bytes=(Get-Item $dst).Length }
+    foreach ($name in $v.absent) {
+        $target = Get-V4SnapshotTarget -Name $name -AppData $AppData -ProfilesDir $ProfilesDir
+        try {
+            if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Force -ErrorAction Stop }
+            $restored += ('absent:' + $name)
         }
+        catch { $failures += [pscustomobject]@{ name = $name; error = $_.Exception.Message } }
     }
-    $manifest = [ordered]@{
-        createdAt = (Get-Date).ToString('s'); reason = $reason
-        systemProxy = (Get-V4SystemProxy); clashRunning = $false
-        files = $files
-    }
-    Write-V4File -Path (Join-Path $dir 'manifest.json') -Content ($manifest | ConvertTo-Json -Depth 5)
-    Protect-V4Acl -Path $dir | Out-Null
-    return $dir
+    return [pscustomobject]@{ ok = ($failures.Count -eq 0); manifest = $v.manifest; restored = $restored; failures = $failures }
 }
 
 function Restore-V4Snapshot {
-    param([string]$SnapshotDir)
+    param([string]$SnapshotDir, [int]$Port = 7897, [switch]$NoProcessControl)
     $p = Get-V4Paths
-    $mp = Join-Path $SnapshotDir 'manifest.json'
-    if (-not (Test-Path $mp)) { throw "snapshot manifest missing: $SnapshotDir" }
-    $m = Get-Content $mp -Raw -Encoding UTF8 | ConvertFrom-Json
-    # verify EVERYTHING before touching the live tree
-    foreach ($e in @($m.files)) {
-        $src = Join-Path $SnapshotDir $e.name
-        if (-not (Test-Path $src)) { throw "snapshot incomplete: missing $($e.name)" }
-        if ((Get-FileHash $src -Algorithm SHA256).Hash -ne $e.sha256) { throw "snapshot hash mismatch: $($e.name)" }
+    if (-not $p.AppData) { throw 'clash appdata not found' }
+    Test-V4SnapshotManifest -SnapshotDir $SnapshotDir | Out-Null   # refuse before touching anything
+    if (-not $NoProcessControl -and (Get-V4AppPids).Count -gt 0) { Stop-V4Clash -Port $Port | Out-Null }
+    $r = Restore-V4Files -SnapshotDir $SnapshotDir -AppData $p.AppData -ProfilesDir $p.ProfilesDir
+    if (-not $r.ok) {
+        $detail = ($r.failures | ForEach-Object { $_.name + ': ' + $_.error }) -join '; '
+        throw ('snapshot restore incomplete: ' + $detail)
     }
-    if ((Get-V4AppPids).Count -gt 0) { Stop-V4Clash | Out-Null }
-    foreach ($f in @('clash-verge.yaml','config.yaml','verge.yaml','profiles.yaml')) {
-        $src = Join-Path $SnapshotDir $f
-        if (Test-Path $src) { Copy-Item $src (Join-Path $p.AppData $f) -Force }
-    }
-    $pd = Join-Path $SnapshotDir 'profiles'
-    if (Test-Path $pd) { Get-ChildItem $pd -File | ForEach-Object { Copy-Item $_.FullName (Join-Path $p.ProfilesDir $_.Name) -Force } }
-    return $m
+    return $r.manifest
 }
 
 # ---------------------------------------------------------------- atomic write --
 function Set-V4Atomic {
     param([string]$TargetPath, [string]$Content, [scriptblock]$Validator)
     $dir = Split-Path -Parent $TargetPath
-    $tmp = Join-Path $dir ('.v4stage-' + [guid]::NewGuid().ToString('N').Substring(0,8) + '.yaml')
-    $bak = '{0}.{1}.bak' -f $TargetPath, [guid]::NewGuid().ToString('N').Substring(0,8)
-    $madeBak = $false
-    Write-V4File -Path $tmp -Content $Content
+    Ensure-V4Dir $dir
+    $tmp = Join-Path $dir ('.v4stage-' + [guid]::NewGuid().ToString('N').Substring(0,10) + '.tmp')
+    $bak = '{0}.{1}.bak' -f $TargetPath, [guid]::NewGuid().ToString('N').Substring(0,10)
     try {
+        Write-V4File -Path $tmp -Content $Content
         if ($Validator) { & $Validator $tmp }
-        if (Test-Path $TargetPath) { Copy-Item $TargetPath $bak -Force; $madeBak = $true }
-        Move-Item -LiteralPath $tmp -Destination $TargetPath -Force
-        if ($madeBak -and (Test-Path $bak)) { Remove-Item $bak -Force -ErrorAction SilentlyContinue }
+        if (Test-Path -LiteralPath $TargetPath) {
+            [System.IO.File]::Replace($tmp, $TargetPath, $bak, $true)
+        }
+        else {
+            [System.IO.File]::Move($tmp, $TargetPath)
+        }
+        if (Test-Path -LiteralPath $bak) { Remove-Item -LiteralPath $bak -Force -ErrorAction SilentlyContinue }
         return $true
     }
     catch {
-        if (Test-Path $tmp) { Remove-Item $tmp -Force -ErrorAction SilentlyContinue }
-        if ($madeBak -and (Test-Path $bak)) {
-            Copy-Item $bak $TargetPath -Force -ErrorAction SilentlyContinue
-            Remove-Item $bak -Force -ErrorAction SilentlyContinue
+        $original = $_.Exception.Message
+        if (Test-Path -LiteralPath $tmp) { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }
+        if (Test-Path -LiteralPath $bak) {
+            try {
+                if (Test-Path -LiteralPath $TargetPath) { [System.IO.File]::Replace($bak, $TargetPath, $null, $true) }
+                else { [System.IO.File]::Move($bak, $TargetPath) }
+            }
+            catch {
+                throw ('atomic write failed: ' + $original + '; backup restore failed: ' + $_.Exception.Message)
+            }
         }
         throw
     }
@@ -318,12 +949,16 @@ function Test-V4MihomoConfig {
     $ErrorActionPreference = 'Continue'
     try { $out = & $p.Core -t -f $ConfigPath -d $WorkDir 2>&1; $code = $LASTEXITCODE }
     finally { $ErrorActionPreference = $prev }
-    if ($code -ne 0) { throw ("mihomo -t failed (exit {0})" -f $code) }
+    if ($code -ne 0) { throw ('mihomo -t failed (exit {0})' -f $code) }
     return $true
 }
 
 # -------------------------------------------------------------------- proxies --
 function Get-V4SystemProxy {
+    if ($script:TestMode) {
+        $enabled = $env:V4_TEST_PROXY_ENABLE -eq '1'
+        return [pscustomobject]@{ enabled = $enabled; server = $env:V4_TEST_PROXY_SERVER }
+    }
     $k = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings'
     $v = Get-ItemProperty $k -ErrorAction SilentlyContinue
     return [pscustomobject]@{ enabled = [bool]$v.ProxyEnable; server = $v.ProxyServer }
@@ -331,13 +966,18 @@ function Get-V4SystemProxy {
 
 function Set-V4SystemProxy {
     param([string]$Server)
+    Assert-V4ProductionOperation 'Set-V4SystemProxy'
     $k = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings'
     Set-ItemProperty $k -Name ProxyServer -Value $Server
     Set-ItemProperty $k -Name ProxyEnable -Value 1
     Update-V4WinInet
 }
 
-function Clear-V4SystemProxy { Set-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings' -Name ProxyEnable -Value 0; Update-V4WinInet }
+function Clear-V4SystemProxy {
+    Assert-V4ProductionOperation 'Clear-V4SystemProxy'
+    Set-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings' -Name ProxyEnable -Value 0
+    Update-V4WinInet
+}
 
 function Update-V4WinInet {
     if (-not ('V4Inet.Refresh' -as [type])) {
@@ -388,15 +1028,163 @@ function Get-V4Owner {
     try { return (Get-Content $script:OwnerPath -Raw -Encoding UTF8 | ConvertFrom-Json) } catch { return $null }
 }
 
+function Get-V4OwnerText {
+    if (Test-Path -LiteralPath $script:OwnerPath) { return (Read-V4File $script:OwnerPath) }
+    return $null
+}
+
+function Restore-V4OwnerText {
+    param([object]$Text)
+    if ($null -eq $Text) {
+        Remove-Item -LiteralPath $script:OwnerPath -Force -ErrorAction SilentlyContinue
+        return
+    }
+    Ensure-V4Dir $script:ConfigDir
+    Set-V4Atomic -TargetPath $script:OwnerPath -Content ([string]$Text) | Out-Null
+}
+
 function Set-V4Owner {
     param([string]$Owner, [string]$SystemProxy, [string]$Note = '')
     $o = [ordered]@{ owner = $Owner; systemProxy = $SystemProxy; note = $Note; pid = $PID; updatedAt = (Get-Date).ToString('s') }
-    Write-V4File -Path $script:OwnerPath -Content ($o | ConvertTo-Json -Depth 4)
+    Ensure-V4Dir $script:ConfigDir
+    Set-V4Atomic -TargetPath $script:OwnerPath -Content ($o | ConvertTo-Json -Depth 4) | Out-Null
+}
+
+# ------------------------------------------------------- profile registry text --
+# F08: parse the registry as top-level list items. The old IndexOf+global-regex
+# approach could edit the NEXT profile when our own block had no updated field,
+# and could select a similar UID (V4Mngd00010) by prefix.
+function Get-V4ProfileLines {
+    param([string]$Text)
+    $cr = [string][char]13
+    $lf = [string][char]10
+    $crlf = $cr + $lf
+    $nl = if ($Text.Contains($crlf)) { $crlf } else { $lf }
+    $norm = $Text.Replace($crlf, $lf).Replace($cr, $lf)
+    $lines = New-Object System.Collections.ArrayList
+    foreach ($l in $norm.Split([char]10)) { [void]$lines.Add($l) }
+    return [pscustomobject]@{ lines = $lines; nl = $nl }
+}
+
+function Get-V4ProfileBlock {
+    param([object]$Lines, [string]$Uid)
+    $esc = [regex]::Escape($Uid)
+    $rxStart = '^-[ \t]+uid:[ \t]*"?' + $esc + '"?[ \t]*$'
+    $starts = @()
+    for ($i = 0; $i -lt $Lines.Count; $i++) { if ($Lines[$i] -match $rxStart) { $starts += $i } }
+    if ($starts.Count -gt 1) { throw ('duplicate profile uid in profiles.yaml: ' + $Uid) }
+    if ($starts.Count -eq 0) { return $null }
+    $s = $starts[0]
+    $e = $Lines.Count
+    for ($i = $s + 1; $i -lt $Lines.Count; $i++) {
+        if ($Lines[$i] -match '^[^\s]') { $e = $i; break }
+    }
+    return [pscustomobject]@{ start = $s; end = $e }
+}
+
+function Update-V4ProfileText {
+    param([string]$Text, [string]$Uid, [int]$Epoch)
+    if (-not $Text) { throw 'profiles.yaml unreadable' }
+    if (-not $Uid -or $Uid -notmatch '^[A-Za-z0-9._-]+$') { throw 'invalid profile uid' }
+    $parsed = Get-V4ProfileLines -Text $Text
+    $lines = $parsed.lines
+    $nl = $parsed.nl
+    $esc = [regex]::Escape($Uid)
+
+    $currentCount = 0
+    $currentIndex = -1
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ($lines[$i] -match '^current:[ \t]*\S') { $currentCount++; $currentIndex = $i }
+    }
+    if ($currentCount -ne 1) { throw ('profiles.yaml must contain exactly one current entry (found ' + $currentCount + ')') }
+
+    $block = Get-V4ProfileBlock -Lines $lines -Uid $Uid
+    if (-not $block) {
+        # Refuse to append when the uid appears in a non-list-item position: that is
+        # an ambiguous/invalid structure, not a missing profile.
+        if ($lines -match ('^[ \t]*uid:[ \t]*"?' + $esc + '"?[ \t]*$')) { throw ('uid ' + $Uid + ' exists but is not a top-level profile list item') }
+        while ($lines.Count -gt 0 -and $lines[$lines.Count - 1] -eq '') { $lines.RemoveAt($lines.Count - 1) }
+        [void]$lines.Add('- uid: ' + $Uid)
+        [void]$lines.Add('  type: local')
+        [void]$lines.Add('  name: V4-Managed')
+        [void]$lines.Add('  file: v4-managed.yaml')
+        [void]$lines.Add('  updated: ' + $Epoch)
+        $block = Get-V4ProfileBlock -Lines $lines -Uid $Uid
+        if (-not $block) { throw 'failed to append managed profile block' }
+    }
+
+    $updIndex = -1
+    $indent = '  '
+    for ($i = $block.start + 1; $i -lt $block.end; $i++) {
+        $line = $lines[$i]
+        $mIndent = [regex]::Match($line, '^(?<indent>[ \t]+)\S')
+        if ($mIndent.Success -and $indent -eq '  ') { $indent = $mIndent.Groups['indent'].Value }
+        if ($line -match '^[ \t]+updated:[ \t]*') {
+            if ($updIndex -ge 0) { throw ('profile ' + $Uid + ' has multiple updated fields') }
+            $updIndex = $i
+        }
+    }
+    if ($updIndex -ge 0) {
+        $line = $lines[$updIndex]
+        $m = [regex]::Match($line, '^(?<prefix>[ \t]+updated:[ \t]*)(?<rest>.*)$')
+        $rest = $m.Groups['rest'].Value
+        $hash = $rest.IndexOf('#')
+        $comment = ''
+        if ($hash -ge 0) { $comment = ' ' + $rest.Substring($hash).TrimStart() }
+        $lines[$updIndex] = $m.Groups['prefix'].Value + $Epoch + $comment
+    }
+    else {
+        $insertAt = $block.end
+        while ($insertAt -gt $block.start + 1 -and $lines[$insertAt - 1] -eq '') { $insertAt-- }
+        $lines.Insert($insertAt, ($indent + 'updated: ' + $Epoch))
+    }
+
+    $curAfter = -1
+    for ($i = 0; $i -lt $lines.Count; $i++) { if ($lines[$i] -match '^current:[ \t]*\S') { $curAfter = $i } }
+    if ($curAfter -lt 0) { throw 'profiles.yaml lost its current entry during update' }
+    $lines[$curAfter] = 'current: ' + $Uid
+    $out = ($lines -join $nl)
+    if (-not $out.EndsWith($nl)) { $out += $nl }
+    return $out
+}
+
+function Test-V4ProfileText {
+    param([string]$Text, [string]$Uid)
+    if (-not $Text) { throw 'profiles.yaml is empty' }
+    $parsed = Get-V4ProfileLines -Text $Text
+    $lines = $parsed.lines
+    $cur = @()
+    for ($i = 0; $i -lt $lines.Count; $i++) { if ($lines[$i] -match '^(current:[ \t]*)(\S+)') { $cur += [pscustomobject]@{ index = $i; value = $Matches[2] } } }
+    if ($cur.Count -ne 1) { throw 'profiles.yaml must contain exactly one current entry' }
+    if ($cur[0].value -ne $Uid) { throw ('profiles.yaml current is ' + $cur[0].value + ', expected ' + $Uid) }
+    $block = Get-V4ProfileBlock -Lines $lines -Uid $Uid
+    if (-not $block) { throw ('managed profile uid missing: ' + $Uid) }
+    $updated = @()
+    for ($i = $block.start + 1; $i -lt $block.end; $i++) {
+        if ($lines[$i] -match '^[ \t]+updated:[ \t]*(\d+)([ \t]*#.*)?$') { $updated += $Matches[1] }
+    }
+    if ($updated.Count -ne 1) { throw ('managed profile must have exactly one numeric updated field (found ' + $updated.Count + ')') }
+    return $true
 }
 
 # ------------------------------------------------------------------ generation --
+function ConvertTo-V4YamlDoubleQuoted {
+    param([string]$Value)
+    if ($null -eq $Value) { $Value = '' }
+    $bs = [string][char]92
+    $v = $Value.Replace($bs, ($bs + $bs))
+    $v = $v.Replace('"', ('\' + '"'))
+    $v = $v.Replace([string][char]13, '\r')
+    $v = $v.Replace([string][char]10, '\n')
+    $v = $v.Replace([string][char]9, '\t')
+    return ('"' + $v + '"')
+}
+
 function Build-V4Profile {
     param([object]$S, [string]$Mode = 'strict')
+    $hopYaml = ConvertTo-V4YamlDoubleQuoted ([string]$S.hopHost)
+    $userYaml = ConvertTo-V4YamlDoubleQuoted ([string]$S.username)
+    $passYaml = ConvertTo-V4YamlDoubleQuoted ([string]$S.password)
     $group = if ($Mode -eq 'resilient') {
 @"
 proxy-groups:
@@ -434,14 +1222,14 @@ tcp-concurrent: true
 proxies:
   - name: "STAR-FIRSTHOP"
     type: http
-    server: $($S.hopHost)
+    server: $hopYaml
     port: $($S.hopPort)
   - name: "US-WA-SOCKS5"
     type: socks5
     server: $($S.host)
     port: $($S.port)
-    username: "$($S.username)"
-    password: "$($S.password)"
+    username: $userYaml
+    password: $passYaml
     udp: false
     dialer-proxy: "STAR-FIRSTHOP"
 
@@ -453,6 +1241,8 @@ rules:
 
 function Build-V4Runtime {
     param([object]$S, [string]$Mode = 'strict', [string]$Pipe, [string]$Secret)
+    $pipeYaml = ConvertTo-V4YamlDoubleQuoted ([string]$Pipe)
+    $secretYaml = ConvertTo-V4YamlDoubleQuoted ([string]$Secret)
     $profile = Build-V4Profile -S $S -Mode $Mode
     # keep everything from `proxies:` onward (proxies + groups + rules); the runtime
     # header below replaces the profile-only preamble
@@ -469,10 +1259,10 @@ ipv6: false
 unified-delay: true
 find-process-mode: "off"
 tcp-concurrent: true
-secret: $Secret
+secret: $secretYaml
 profile:
   store-selected: true
-external-controller-pipe: $Pipe
+external-controller-pipe: $pipeYaml
 tun:
   enable: false
   stack: mips
@@ -488,8 +1278,10 @@ $groupPart
 function Get-V4Controller {
     $p = Get-V4Paths
     $pipe = $null; $secret = $null
-    $mih = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object { $_.Name -in @('verge-mihomo.exe','mihomo.exe') } | Select-Object -First 1
-    if ($mih -and $mih.CommandLine -match '-ext-ctl-pipe\s+"?([^"]+)"?') { $pipe = $Matches[1].Trim() }
+    if (-not $script:TestMode) {
+        $mih = Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object { $_.Name -in @('verge-mihomo.exe','mihomo.exe') } | Select-Object -First 1
+        if ($mih -and $mih.CommandLine -match '-ext-ctl-pipe\s+"?([^"]+)"?') { $pipe = $Matches[1].Trim() }
+    }
     if ($p.RuntimeFile) {
         $t = Read-V4File $p.RuntimeFile
         if ($t) {
@@ -503,40 +1295,100 @@ function Get-V4Controller {
 }
 
 # -------------------------------------------------------------------- state ----
-function Get-V4State {
-    $p = Get-V4Paths
-    $s = Get-V4Settings -ErrorAction SilentlyContinue
-    $owner = Get-V4Owner
-    $px = Get-V4SystemProxy
+function Get-V4StateCore {
+    param(
+        [object]$Settings,
+        [object]$Owner,
+        [object]$SystemProxy,
+        [object]$AppPids,
+        [bool]$MixedPortOpen,
+        [object]$FirstHop,
+        [scriptblock]$GetExitIp,
+        [string]$SettingsError = ''
+    )
     $out = [ordered]@{
         ts = (Get-Date).ToString('s')
         state = 'UNKNOWN'; mode = 'UNKNOWN'; reasons = @()
-        clashRunning = ((Get-V4AppPids).Count -gt 0)
-        mixedPort = (Test-V4Port -Port $(if ($s) { $s.mixedPort } else { 7897 }))
-        systemProxy = $(if ($px.enabled) { $px.server } else { 'off' })
-        owner = $(if ($owner) { $owner.owner } else { 'none' })
+        clashRunning = (@($AppPids).Count -gt 0)
+        mixedPort = [bool]$MixedPortOpen
+        systemProxy = $(if ($SystemProxy -and $SystemProxy.enabled) { $SystemProxy.server } else { 'off' })
+        owner = $(if ($Owner) { $Owner.owner } else { 'none' })
         firstHopOk = $false
         exitViaChain = $null
     }
-    if (-not $s) { $out.reasons += 'settings.json missing'; return $out }
-    $hop = Test-V4FirstHop -Port $s.hopPort
-    $out.firstHopOk = $hop.ok
-    if (-not $out.firstHopOk) { $out.reasons += ('first hop down: ' + $hop.detail) }
-
+    if ($SettingsError) {
+        $out.state = 'FAILED'; $out.mode = 'UNKNOWN'
+        $out.reasons += ('settings invalid: ' + $SettingsError)
+        return $out
+    }
+    if (-not $Settings) {
+        $out.state = 'FAILED'; $out.mode = 'UNKNOWN'
+        $out.reasons += 'settings.json missing'
+        return $out
+    }
+    if ($FirstHop) {
+        $out.firstHopOk = [bool]$FirstHop.ok
+        if (-not $out.firstHopOk) { $out.reasons += ('first hop down: ' + $FirstHop.detail) }
+    }
+    else { $out.reasons += 'first hop probe unavailable' }
     if (-not $out.clashRunning) { $out.mode = 'RAW'; $out.state = 'FAILED'; $out.reasons += 'clash not running' }
     elseif (-not $out.mixedPort) { $out.mode = 'NEXIP'; $out.state = 'FAILED'; $out.reasons += 'core not listening' }
     else {
         $out.mode = 'NEXIP'
-        if ($out.systemProxy -ne ('127.0.0.1:' + $s.mixedPort)) {
+        if ($out.systemProxy -ne ('127.0.0.1:' + $Settings.mixedPort)) {
             $out.state = 'DEGRADED'; $out.reasons += ('system proxy owned by ' + $out.systemProxy)
         }
         elseif (-not $out.firstHopOk) { $out.state = 'DEGRADED' }
         else {
-            $out.exitViaChain = Get-V4ExitIp -Proxy ('socks5h://127.0.0.1:' + $s.mixedPort)
-            if ($out.exitViaChain -eq $s.host) { $out.state = 'HEALTHY' }
-            elseif ($out.exitViaChain) { $out.state = 'DEGRADED'; $out.reasons += ('exit ' + $out.exitViaChain + ' != ' + $s.host) }
+            if ($GetExitIp) { $out.exitViaChain = & $GetExitIp ('socks5h://127.0.0.1:' + $Settings.mixedPort) }
+            if ($out.exitViaChain -eq $Settings.host) { $out.state = 'HEALTHY' }
+            elseif ($out.exitViaChain) { $out.state = 'DEGRADED'; $out.reasons += ('exit ' + $out.exitViaChain + ' != ' + $Settings.host) }
             else { $out.state = 'FAILED'; $out.reasons += 'no exit ip' }
         }
     }
     return $out
+}
+
+function Get-V4State {
+    $p = Get-V4Paths
+    $s = $null
+    $settingsError = ''
+    try { $s = Get-V4Settings }
+    catch { $settingsError = Get-V4FaultMessage $_ }
+    $owner = Get-V4Owner
+    try { $px = Get-V4SystemProxy }
+    catch { $px = [pscustomobject]@{ enabled = $false; server = '(registry unreadable)' } }
+    $pids = Get-V4AppPids
+    $mixed = $false
+    $hop = $null
+    if ($s) {
+        $mixed = Test-V4Port -Port $s.mixedPort
+        $hop = Test-V4FirstHop -Port $s.hopPort
+    }
+    $exitProbe = { param($proxy) Get-V4ExitIp -Proxy $proxy }
+    return Get-V4StateCore -Settings $s -Owner $owner -SystemProxy $px -AppPids $pids -MixedPortOpen $mixed -FirstHop $hop -GetExitIp $exitProbe -SettingsError $settingsError
+}
+
+function Get-V4Integrity {
+    param([object]$Paths)
+    $r = [ordered]@{ profileExists = $false; markerOk = $false; runtimeMarkerOk = $false; profileHash = $null; ownerRecord = 'none' }
+    try {
+        if ($Paths -and $Paths.ProfilesDir) {
+            $prof = Join-Path $Paths.ProfilesDir 'v4-managed.yaml'
+            if (Test-Path -LiteralPath $prof) {
+                $r.profileExists = $true
+                $r.profileHash = (Get-FileHash -LiteralPath $prof -Algorithm SHA256).Hash.Substring(0, 16)
+                $t = Read-V4File $prof
+                if ($t -and $t.StartsWith($script:Marker)) { $r.markerOk = $true }
+            }
+        }
+        if ($Paths -and $Paths.RuntimeFile -and (Test-Path -LiteralPath $Paths.RuntimeFile)) {
+            $t = Read-V4File $Paths.RuntimeFile
+            if ($t -and $t -match 'dialer-proxy:\s*"?STAR-FIRSTHOP"?') { $r.runtimeMarkerOk = $true }
+        }
+        $o = Get-V4Owner
+        if ($o) { $r.ownerRecord = ('{0} @ {1}' -f $o.owner, $o.updatedAt) }
+    }
+    catch { }
+    return $r
 }

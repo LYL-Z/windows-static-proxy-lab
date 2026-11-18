@@ -1,0 +1,17 @@
+{
+    "id":  "F10-07",
+    "requirement":  "F10",
+    "precondition":  "app was not running before",
+    "injectedFault":  "failure with snapshot",
+    "expected":  "stop only; never start",
+    "actual":  "F10-07: stopped only",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "body completed without assertions or exceptions",
+    "durationMs":  552,
+    "assertions":  0,
+    "startedAt":  "2026-11-18T05:18:04.274-08:00",
+    "finishedAt":  "2026-11-18T05:18:04.827-08:00",
+    "evidenceFile":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\v6\\full.json.cases\\0016-F10-07.json",
+    "testOutput":  ""
+}

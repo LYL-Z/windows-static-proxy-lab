@@ -1,0 +1,13 @@
+
+== V6 TEST HARNESS 6.0.0 ==
+Run ID: 5038adc6f2404180acb1535b5ad6823d
+Git HEAD: 36222c92c829a2ef08b71af2a3a3ff9a3c44b396
+Git branch: v5/short-run-hardening
+Filter: *
+--------------------------------------------------------------
+[PASS] PROBE-CLOSURE-01 (INT) 10ms
+--------------------------------------------------------------
+Counts: registered=1 executed=1 passed=1 failed=0 skipped=0 available=1
+Evidence: C:\Users\Lenovo\AppData\Local\Temp\v6-closure-20a8fc110a8845f38825498c3682860f\evidence.json
+RESULT: PASS EXIT 0
+

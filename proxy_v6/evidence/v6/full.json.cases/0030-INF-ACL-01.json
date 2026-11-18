@@ -1,0 +1,17 @@
+{
+    "id":  "INF-ACL-01",
+    "requirement":  "SEC-02",
+    "precondition":  "protected temp directory + injected Everyone ACE",
+    "injectedFault":  "weak ACE added after hardening",
+    "expected":  "second hardening removes Everyone and returns true",
+    "actual":  "Everyone ACE removed; second pass returned true",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "body completed without assertions or exceptions",
+    "durationMs":  638,
+    "assertions":  0,
+    "startedAt":  "2026-11-18T05:18:13.189-08:00",
+    "finishedAt":  "2026-11-18T05:18:13.828-08:00",
+    "evidenceFile":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\v6\\full.json.cases\\0030-INF-ACL-01.json",
+    "testOutput":  ""
+}

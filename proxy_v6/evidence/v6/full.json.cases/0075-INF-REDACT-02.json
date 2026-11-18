@@ -1,0 +1,17 @@
+{
+    "id":  "INF-REDACT-02",
+    "requirement":  "SEC-03",
+    "precondition":  "non-registered secret forms",
+    "injectedFault":  "pass/secret/Bearer/short Basic/URL/user",
+    "expected":  "all redacted",
+    "actual":  "quoted/pass/secret/Bearer/short-Basic/URL/user fields redacted",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "body completed without assertions or exceptions",
+    "durationMs":  515,
+    "assertions":  0,
+    "startedAt":  "2026-11-18T05:26:28.173-08:00",
+    "finishedAt":  "2026-11-18T05:26:28.688-08:00",
+    "evidenceFile":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\v6\\full.json.cases\\0075-INF-REDACT-02.json",
+    "testOutput":  ""
+}

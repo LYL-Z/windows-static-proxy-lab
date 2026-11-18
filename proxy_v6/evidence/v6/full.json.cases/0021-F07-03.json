@@ -1,0 +1,17 @@
+{
+    "id":  "F07-03",
+    "requirement":  "F07",
+    "precondition":  "first write ok",
+    "injectedFault":  "second write fails",
+    "expected":  "first write rolled back",
+    "actual":  "F07-03: second write failure rolled back",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "body completed without assertions or exceptions",
+    "durationMs":  698,
+    "assertions":  0,
+    "startedAt":  "2026-11-18T05:18:07.313-08:00",
+    "finishedAt":  "2026-11-18T05:18:08.011-08:00",
+    "evidenceFile":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\v6\\full.json.cases\\0021-F07-03.json",
+    "testOutput":  ""
+}

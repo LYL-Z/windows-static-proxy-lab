@@ -1,0 +1,78 @@
+{
+    "schemaVersion":  1,
+    "tool":  "proxy_v6/tests/Harness.ps1",
+    "harnessVersion":  "6.0.0",
+    "runId":  "b98c12e1971640c0898558837977098b",
+    "host":  {
+                 "psVersion":  "5.1.26100.9818",
+                 "psEdition":  "Desktop",
+                 "os":  "Microsoft Windows NT 10.0.26300.0",
+                 "clr":  "4.0.30319.42000",
+                 "is64BitProcess":  true,
+                 "pid":  56368
+             },
+    "git":  {
+                "available":  true,
+                "head":  "36222c92c829a2ef08b71af2a3a3ff9a3c44b396",
+                "branch":  "v5/short-run-hardening",
+                "dirty":  true,
+                "error":  null
+            },
+    "repoRoot":  "D:\\claude防封\\publish",
+    "filter":  "*",
+    "startedAt":  "2026-11-18T05:06:29.670-08:00",
+    "finishedAt":  "2026-11-18T05:06:29.979-08:00",
+    "durationMs":  104,
+    "counts":  {
+                   "registered":  2,
+                   "executed":  2,
+                   "passed":  0,
+                   "failed":  2,
+                   "skipped":  0,
+                   "available":  2
+               },
+    "exitCode":  1,
+    "outcome":  "FAIL",
+    "harnessErrors":  [
+
+                      ],
+    "evidenceErrors":  [
+
+                       ],
+    "cases":  [
+                  {
+                      "id":  "FIX-FAIL-01",
+                      "requirement":  "META-02",
+                      "precondition":  "isolated child process",
+                      "injectedFault":  "failing assertion",
+                      "expected":  "Assert-Equal 1 2 fails",
+                      "actual":  "assertion failed: intentional failure one (expected: 1; actual: 2)",
+                      "status":  "fail",
+                      "passed":  false,
+                      "detail":  "assertion failed: intentional failure one (expected: 1; actual: 2)",
+                      "durationMs":  23,
+                      "assertions":  1,
+                      "startedAt":  "2026-11-18T05:06:29.706-08:00",
+                      "finishedAt":  "2026-11-18T05:06:29.737-08:00",
+                      "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-050628-121-6078b2a5\\META-02\\cases\\0001-FIX-FAIL-01.json",
+                      "testOutput":  ""
+                  },
+                  {
+                      "id":  "FIX-FAIL-02",
+                      "requirement":  "META-02",
+                      "precondition":  "isolated child process",
+                      "injectedFault":  "unexpected exception",
+                      "expected":  "test body throws",
+                      "actual":  "unexpected exception",
+                      "status":  "fail",
+                      "passed":  false,
+                      "detail":  "unexpected exception: intentional unexpected exception | stack: 在 \u003cScriptBlock\u003e、D:\\claude防封\\publish\\proxy_v6\\tests\\self\\fixtures\\fail.ps1 中: 第 18 行 | 在 Invoke-HarnessCase、D:\\claude防封\\publish\\proxy_v6\\tests\\Harness.ps1 中: 第 434 行 | 在 Invoke-TestRun、D:\\claude防封\\publish\\proxy_v6\\tests\\Harness.ps1 中: 第 618 行 | 在 \u003cScriptBlock\u003e、D:\\claude防封\\publish\\proxy_v6\\tests\\self\\fixtures\\fail.ps1 中: 第 21 行 | at: 所在位置 D:\\claude防封\\publish\\proxy_v6\\tests\\self\\fixtures\\fail.ps1:18 字符: 3 | +   throw \u0027intentional unexpected exception\u0027 | +   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+                      "durationMs":  8,
+                      "assertions":  0,
+                      "startedAt":  "2026-11-18T05:06:29.764-08:00",
+                      "finishedAt":  "2026-11-18T05:06:29.772-08:00",
+                      "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-050628-121-6078b2a5\\META-02\\cases\\0002-FIX-FAIL-02.json",
+                      "testOutput":  ""
+                  }
+              ]
+}

@@ -1,0 +1,17 @@
+{
+    "id":  "INF-SNAP-02",
+    "requirement":  "DATA-04",
+    "precondition":  "tampered snapshot file",
+    "injectedFault":  "hash mismatch",
+    "expected":  "refused before live write",
+    "actual":  "hash mismatch refused before any live write",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "body completed without assertions or exceptions",
+    "durationMs":  721,
+    "assertions":  0,
+    "startedAt":  "2026-11-18T05:20:20.824-08:00",
+    "finishedAt":  "2026-11-18T05:20:21.546-08:00",
+    "evidenceFile":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\v6\\full.json.cases\\0054-INF-SNAP-02.json",
+    "testOutput":  ""
+}

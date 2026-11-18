@@ -1,0 +1,17 @@
+{
+    "id":  "INF-STATE-SCRIPT-01",
+    "requirement":  "LIFE-04",
+    "precondition":  "corrupt settings",
+    "injectedFault":  "state probe",
+    "expected":  "FAILED JSON and exit 3",
+    "actual":  "state script emitted FAILED JSON and exit 3 for corrupt settings",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "body completed without assertions or exceptions",
+    "durationMs":  1046,
+    "assertions":  0,
+    "startedAt":  "2026-11-18T05:26:24.017-08:00",
+    "finishedAt":  "2026-11-18T05:26:25.063-08:00",
+    "evidenceFile":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\v6\\full.json.cases\\0070-INF-STATE-SCRIPT-01.json",
+    "testOutput":  ""
+}

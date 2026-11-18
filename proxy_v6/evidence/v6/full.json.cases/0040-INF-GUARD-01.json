@@ -1,0 +1,17 @@
+{
+    "id":  "INF-GUARD-01",
+    "requirement":  "P4",
+    "precondition":  "V4_TEST_MODE=1",
+    "injectedFault":  "attempt real HKCU/process operations",
+    "expected":  "4/4 blocked; Get-V4Paths does not fall back",
+    "actual":  "4/4 production operations blocked; paths did not fall back",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "body completed without assertions or exceptions",
+    "durationMs":  585,
+    "assertions":  0,
+    "startedAt":  "2026-11-18T05:22:24.194-08:00",
+    "finishedAt":  "2026-11-18T05:22:24.779-08:00",
+    "evidenceFile":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\v6\\full.json.cases\\0040-INF-GUARD-01.json",
+    "testOutput":  ""
+}

@@ -1,0 +1,17 @@
+{
+    "id":  "INF-LOCK-02",
+    "requirement":  "LOCK-02",
+    "precondition":  "winner holds lock",
+    "injectedFault":  "wrong token exit",
+    "expected":  "lock survives",
+    "actual":  "wrong token did not delete the winner lock",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "body completed without assertions or exceptions",
+    "durationMs":  588,
+    "assertions":  0,
+    "startedAt":  "2026-11-18T05:22:30.857-08:00",
+    "finishedAt":  "2026-11-18T05:22:31.444-08:00",
+    "evidenceFile":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\v6\\full.json.cases\\0051-INF-LOCK-02.json",
+    "testOutput":  ""
+}

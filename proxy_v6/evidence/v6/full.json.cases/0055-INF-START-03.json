@@ -1,0 +1,17 @@
+{
+    "id":  "INF-START-03",
+    "requirement":  "LIFE-01",
+    "precondition":  "nothing listening",
+    "injectedFault":  "timeout",
+    "expected":  "false after one launch",
+    "actual":  "timeout returned false after one launch",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "body completed without assertions or exceptions",
+    "durationMs":  1554,
+    "assertions":  0,
+    "startedAt":  "2026-11-18T05:22:33.188-08:00",
+    "finishedAt":  "2026-11-18T05:22:34.742-08:00",
+    "evidenceFile":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\v6\\full.json.cases\\0055-INF-START-03.json",
+    "testOutput":  ""
+}

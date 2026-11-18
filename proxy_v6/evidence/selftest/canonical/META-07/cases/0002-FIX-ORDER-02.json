@@ -1,0 +1,17 @@
+{
+    "id":  "FIX-ORDER-02",
+    "requirement":  "META-07",
+    "precondition":  "isolated child process",
+    "injectedFault":  "none",
+    "expected":  "later test passes",
+    "actual":  "all assertions passed",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  2,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T05:08:45.971-08:00",
+    "finishedAt":  "2026-11-18T05:08:45.974-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-050837-302-09b36eb4\\META-07\\cases\\0002-FIX-ORDER-02.json",
+    "testOutput":  ""
+}

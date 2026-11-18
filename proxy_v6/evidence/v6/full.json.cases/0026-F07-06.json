@@ -1,0 +1,17 @@
+{
+    "id":  "F07-06",
+    "requirement":  "F07",
+    "precondition":  "second write fails",
+    "injectedFault":  "restore and log fail",
+    "expected":  "exit 40 without throw",
+    "actual":  "F07-06: reported 40 without throwing",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "body completed without assertions or exceptions",
+    "durationMs":  644,
+    "assertions":  0,
+    "startedAt":  "2026-11-18T05:22:14.990-08:00",
+    "finishedAt":  "2026-11-18T05:22:15.633-08:00",
+    "evidenceFile":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\v6\\full.json.cases\\0026-F07-06.json",
+    "testOutput":  ""
+}

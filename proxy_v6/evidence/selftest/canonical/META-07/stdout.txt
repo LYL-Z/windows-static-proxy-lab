@@ -1,0 +1,14 @@
+
+== V6 TEST HARNESS 6.0.0 ==
+Run ID: b1ad4a7fa35b46b5a2cf18941038732e
+Git HEAD: 36222c92c829a2ef08b71af2a3a3ff9a3c44b396
+Git branch: v5/short-run-hardening
+Filter: *
+--------------------------------------------------------------
+[FAIL] FIX-ORDER-01 (META-07) 21ms
+       assertion failed: earlier failure must persist (actual: False)
+[PASS] FIX-ORDER-02 (META-07) 2ms
+--------------------------------------------------------------
+Counts: registered=2 executed=2 passed=1 failed=1 skipped=0 available=2
+Evidence: C:\Users\Lenovo\AppData\Local\Temp\v6-tests\v6-selftest-20261118-050837-302-09b36eb4\META-07\evidence.json
+RESULT: FAIL EXIT 1

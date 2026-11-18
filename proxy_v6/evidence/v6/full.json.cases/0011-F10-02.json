@@ -1,0 +1,17 @@
+{
+    "id":  "F10-02",
+    "requirement":  "F10",
+    "precondition":  "restore ok; start and log fail",
+    "injectedFault":  "start throws; log throws",
+    "expected":  "returns 40 without throwing",
+    "actual":  "F10-02: returned 40",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "body completed without assertions or exceptions",
+    "durationMs":  570,
+    "assertions":  0,
+    "startedAt":  "2026-11-18T05:18:01.475-08:00",
+    "finishedAt":  "2026-11-18T05:18:02.046-08:00",
+    "evidenceFile":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\v6\\full.json.cases\\0011-F10-02.json",
+    "testOutput":  ""
+}

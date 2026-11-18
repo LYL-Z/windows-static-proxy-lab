@@ -1,0 +1,17 @@
+{
+    "id":  "INF-DPAPI-01",
+    "requirement":  "SEC-01",
+    "precondition":  "plaintext fixture",
+    "injectedFault":  "none",
+    "expected":  "DPAPI roundtrip; ciphertext has no plaintext",
+    "actual":  "DPAPI roundtrip ok; ciphertext does not contain plaintext",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "body completed without assertions or exceptions",
+    "durationMs":  582,
+    "assertions":  0,
+    "startedAt":  "2026-11-18T05:18:16.857-08:00",
+    "finishedAt":  "2026-11-18T05:18:17.439-08:00",
+    "evidenceFile":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\v6\\full.json.cases\\0036-INF-DPAPI-01.json",
+    "testOutput":  ""
+}

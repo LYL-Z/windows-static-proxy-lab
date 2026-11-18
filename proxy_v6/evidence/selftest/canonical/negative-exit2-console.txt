@@ -1,0 +1,13 @@
+
+== V6 TEST HARNESS SELF-TEST ==
+Repo: D:\claude防封\publish
+Filter: META-99; selected: 0 of 7 META checks
+Work root: C:\Users\Lenovo\AppData\Local\Temp\v6-tests\v6-selftest-20261118-050627-304-afdba0fe
+Output: D:\claude防封\publish\proxy_v6\evidence\selftest\negative-exit2
+--------------------------------------------------------------
+--------------------------------------------------------------
+SELFTEST COUNTS: selected=0 checks=0 passed=0 failed=0
+[NO-TESTS] no META check executed; a green result is not permitted (exit 2).
+SELFTEST EVIDENCE: D:\claude防封\publish\proxy_v6\evidence\selftest\negative-exit2\selftest.json
+SELFTEST RESULT: NO_TESTS_EXECUTED EXIT 2
+

@@ -1,0 +1,61 @@
+{
+    "schemaVersion":  1,
+    "tool":  "proxy_v6/tests/Harness.ps1",
+    "harnessVersion":  "6.0.0",
+    "runId":  "30d48b21a12546928d72ae274fef8d7c",
+    "host":  {
+                 "psVersion":  "5.1.26100.9818",
+                 "psEdition":  "Desktop",
+                 "os":  "Microsoft Windows NT 10.0.26300.0",
+                 "clr":  "4.0.30319.42000",
+                 "is64BitProcess":  true,
+                 "pid":  53676
+             },
+    "git":  {
+                "available":  true,
+                "head":  "36222c92c829a2ef08b71af2a3a3ff9a3c44b396",
+                "branch":  "v5/short-run-hardening",
+                "dirty":  true,
+                "error":  null
+            },
+    "repoRoot":  "D:\\claude防封\\publish",
+    "filter":  "*",
+    "startedAt":  "2026-11-18T05:06:22.605-08:00",
+    "finishedAt":  "2026-11-18T05:06:22.893-08:00",
+    "durationMs":  78,
+    "counts":  {
+                   "registered":  1,
+                   "executed":  0,
+                   "passed":  0,
+                   "failed":  0,
+                   "skipped":  1,
+                   "available":  1
+               },
+    "exitCode":  2,
+    "outcome":  "NO_TESTS_EXECUTED",
+    "harnessErrors":  [
+
+                      ],
+    "evidenceErrors":  [
+
+                       ],
+    "cases":  [
+                  {
+                      "id":  "FIX-SKIP-ONLY",
+                      "requirement":  "META-05",
+                      "precondition":  "dependency intentionally absent",
+                      "injectedFault":  "registration skip",
+                      "expected":  "all-skipped run must be exit 2",
+                      "actual":  "skipped",
+                      "status":  "skip",
+                      "passed":  false,
+                      "detail":  "skipped at registration: fixture registration skip: only test skipped",
+                      "durationMs":  2,
+                      "assertions":  0,
+                      "startedAt":  "2026-11-18T05:06:22.640-08:00",
+                      "finishedAt":  "2026-11-18T05:06:22.651-08:00",
+                      "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-050616-730-164fbd46\\META-05-all\\cases\\0001-FIX-SKIP-ONLY.json",
+                      "testOutput":  ""
+                  }
+              ]
+}

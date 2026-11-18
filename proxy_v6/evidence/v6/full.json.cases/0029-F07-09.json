@@ -1,0 +1,17 @@
+{
+    "id":  "F07-09",
+    "requirement":  "F07",
+    "precondition":  "app was not running before",
+    "injectedFault":  "second write fails",
+    "expected":  "app remains stopped",
+    "actual":  "F07-09: pre-existing stopped state preserved",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "body completed without assertions or exceptions",
+    "durationMs":  641,
+    "assertions":  0,
+    "startedAt":  "2026-11-18T05:22:16.934-08:00",
+    "finishedAt":  "2026-11-18T05:22:17.575-08:00",
+    "evidenceFile":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\v6\\full.json.cases\\0029-F07-09.json",
+    "testOutput":  ""
+}

@@ -1,0 +1,17 @@
+{
+    "id":  "F07-15",
+    "requirement":  "F07",
+    "precondition":  "journal writer fails",
+    "injectedFault":  "journal disk full",
+    "expected":  "exit 34 before the first live write",
+    "actual":  "F07-15: exit 34 before first write",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "body completed without assertions or exceptions",
+    "durationMs":  656,
+    "assertions":  0,
+    "startedAt":  "2026-11-18T05:22:20.923-08:00",
+    "finishedAt":  "2026-11-18T05:22:21.579-08:00",
+    "evidenceFile":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\v6\\full.json.cases\\0035-F07-15.json",
+    "testOutput":  ""
+}

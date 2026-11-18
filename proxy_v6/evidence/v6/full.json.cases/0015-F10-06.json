@@ -1,0 +1,17 @@
+{
+    "id":  "F10-06",
+    "requirement":  "F10",
+    "precondition":  "all recovery steps succeed",
+    "injectedFault":  "none",
+    "expected":  "original code preserved",
+    "actual":  "F10-06: returned 32",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "body completed without assertions or exceptions",
+    "durationMs":  557,
+    "assertions":  0,
+    "startedAt":  "2026-11-18T05:18:03.715-08:00",
+    "finishedAt":  "2026-11-18T05:18:04.272-08:00",
+    "evidenceFile":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\v6\\full.json.cases\\0015-F10-06.json",
+    "testOutput":  ""
+}

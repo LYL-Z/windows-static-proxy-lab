@@ -1,0 +1,17 @@
+{
+    "id":  "INF-SETTINGS-02",
+    "requirement":  "PARAM-05",
+    "precondition":  "invalid settings JSON",
+    "injectedFault":  "corrupt settings",
+    "expected":  "code 11",
+    "actual":  "invalid settings rejected with code 11",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "body completed without assertions or exceptions",
+    "durationMs":  585,
+    "assertions":  0,
+    "startedAt":  "2026-11-18T05:20:11.545-08:00",
+    "finishedAt":  "2026-11-18T05:20:12.131-08:00",
+    "evidenceFile":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\v6\\full.json.cases\\0040-INF-SETTINGS-02.json",
+    "testOutput":  ""
+}

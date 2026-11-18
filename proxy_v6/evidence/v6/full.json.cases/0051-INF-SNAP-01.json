@@ -1,0 +1,17 @@
+{
+    "id":  "INF-SNAP-01",
+    "requirement":  "TX-11",
+    "precondition":  "snapshot without managed profile",
+    "injectedFault":  "file created after snapshot",
+    "expected":  "restore deletes it",
+    "actual":  "absent managed profile deleted; profiles.yaml hash restored",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "body completed without assertions or exceptions",
+    "durationMs":  760,
+    "assertions":  0,
+    "startedAt":  "2026-11-18T05:18:26.700-08:00",
+    "finishedAt":  "2026-11-18T05:18:27.460-08:00",
+    "evidenceFile":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\v6\\full.json.cases\\0051-INF-SNAP-01.json",
+    "testOutput":  ""
+}

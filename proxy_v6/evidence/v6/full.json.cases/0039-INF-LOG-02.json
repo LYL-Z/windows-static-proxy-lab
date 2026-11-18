@@ -1,0 +1,17 @@
+{
+    "id":  "INF-LOG-02",
+    "requirement":  "LOG-02",
+    "precondition":  "log file path is invalid",
+    "injectedFault":  "Add-Content target missing",
+    "expected":  "Write-V4Log never throws",
+    "actual":  "unwritable log file did not interrupt Write-V4Log; evidence ACL restricted",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "body completed without assertions or exceptions",
+    "durationMs":  650,
+    "assertions":  0,
+    "startedAt":  "2026-11-18T05:26:00.397-08:00",
+    "finishedAt":  "2026-11-18T05:26:01.048-08:00",
+    "evidenceFile":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\v6\\full.json.cases\\0039-INF-LOG-02.json",
+    "testOutput":  ""
+}

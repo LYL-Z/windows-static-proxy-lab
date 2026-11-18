@@ -1,0 +1,17 @@
+{
+    "id":  "INF-LOCK-01",
+    "requirement":  "LOCK-04",
+    "precondition":  "lock file with dead pid",
+    "injectedFault":  "stale lock",
+    "expected":  "reclaimed and released",
+    "actual":  "dead-holder lock reclaimed and released",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "body completed without assertions or exceptions",
+    "durationMs":  622,
+    "assertions":  0,
+    "startedAt":  "2026-11-18T05:20:14.426-08:00",
+    "finishedAt":  "2026-11-18T05:20:15.049-08:00",
+    "evidenceFile":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\v6\\full.json.cases\\0045-INF-LOCK-01.json",
+    "testOutput":  ""
+}

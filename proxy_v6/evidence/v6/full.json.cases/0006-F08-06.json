@@ -1,0 +1,17 @@
+{
+    "id":  "F08-06",
+    "requirement":  "F08",
+    "precondition":  "target is the last block and has no updated",
+    "injectedFault":  "last block without updated",
+    "expected":  "target gains updated",
+    "actual":  "F08-06: last target gained updated",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "body completed without assertions or exceptions",
+    "durationMs":  575,
+    "assertions":  0,
+    "startedAt":  "2026-11-18T05:25:18.855-08:00",
+    "finishedAt":  "2026-11-18T05:25:19.430-08:00",
+    "evidenceFile":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\v6\\full.json.cases\\0006-F08-06.json",
+    "testOutput":  ""
+}

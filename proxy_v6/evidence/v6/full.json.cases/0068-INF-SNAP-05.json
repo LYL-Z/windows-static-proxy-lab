@@ -1,0 +1,17 @@
+{
+    "id":  "INF-SNAP-05",
+    "requirement":  "TX-11",
+    "precondition":  "existing profiles/*.yaml",
+    "injectedFault":  "snapshot path separator",
+    "expected":  "recorded as profiles\\name and restored",
+    "actual":  "existing profiles/*.yaml recorded with a separator and restored",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "body completed without assertions or exceptions",
+    "durationMs":  786,
+    "assertions":  0,
+    "startedAt":  "2026-11-18T05:20:34.742-08:00",
+    "finishedAt":  "2026-11-18T05:20:35.528-08:00",
+    "evidenceFile":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\v6\\full.json.cases\\0068-INF-SNAP-05.json",
+    "testOutput":  ""
+}

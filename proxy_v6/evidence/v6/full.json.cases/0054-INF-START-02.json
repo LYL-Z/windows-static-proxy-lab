@@ -1,0 +1,17 @@
+{
+    "id":  "INF-START-02",
+    "requirement":  "LIFE-02",
+    "precondition":  "process running, port not listening",
+    "injectedFault":  "delayed start",
+    "expected":  "waits without duplicate launch",
+    "actual":  "running-but-not-yet-listening path waited without duplicate launch",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "body completed without assertions or exceptions",
+    "durationMs":  556,
+    "assertions":  0,
+    "startedAt":  "2026-11-18T05:22:32.630-08:00",
+    "finishedAt":  "2026-11-18T05:22:33.187-08:00",
+    "evidenceFile":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\v6\\full.json.cases\\0054-INF-START-02.json",
+    "testOutput":  ""
+}

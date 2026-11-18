@@ -1,0 +1,17 @@
+{
+    "id":  "INF-SETTINGS-03",
+    "requirement":  "PARAM-04",
+    "precondition":  "no settings",
+    "injectedFault":  "missing settings",
+    "expected":  "code 11",
+    "actual":  "missing settings rejected with code 11",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "body completed without assertions or exceptions",
+    "durationMs":  557,
+    "assertions":  0,
+    "startedAt":  "2026-11-18T05:18:18.713-08:00",
+    "finishedAt":  "2026-11-18T05:18:19.269-08:00",
+    "evidenceFile":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\v6\\full.json.cases\\0039-INF-SETTINGS-03.json",
+    "testOutput":  ""
+}

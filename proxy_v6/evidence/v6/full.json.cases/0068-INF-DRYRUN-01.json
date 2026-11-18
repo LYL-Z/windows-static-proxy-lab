@@ -1,0 +1,17 @@
+{
+    "id":  "INF-DRYRUN-01",
+    "requirement":  "PARAM-07",
+    "precondition":  "fake appdata/hop/core + real apply script",
+    "injectedFault":  "none",
+    "expected":  "exit 0; no config/settings/appdata changes; no snapshot",
+    "actual":  "real apply -DryRun reached validation and changed no config/settings/appdata",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "body completed without assertions or exceptions",
+    "durationMs":  2663,
+    "assertions":  0,
+    "startedAt":  "2026-11-18T05:22:44.579-08:00",
+    "finishedAt":  "2026-11-18T05:22:47.242-08:00",
+    "evidenceFile":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\v6\\full.json.cases\\0068-INF-DRYRUN-01.json",
+    "testOutput":  ""
+}

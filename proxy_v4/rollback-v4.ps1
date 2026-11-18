@@ -10,8 +10,9 @@
 param([string]$SnapshotDir, [switch]$List, [switch]$KeepSystemProxy)
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'lib\V4.ps1')
-Start-V4Log 'rollback'
+$null = Start-V4Log 'rollback'
 $exit = 0
+$lock = $null
 
 try {
     $all = @()
@@ -30,11 +31,13 @@ try {
         if (-not $all) { throw 'no snapshot available' }
         $SnapshotDir = $all[0].FullName
     }
-    if (-not (Enter-V4Lock)) { throw 'another operation holds the lock' }
+    $lock = Enter-V4Lock
+    if (-not $lock) { throw 'another operation holds the lock' }
     try {
         Write-V4Log ("rollback -> {0}" -f (Split-Path $SnapshotDir -Leaf)) -Level STEP
         $m = Restore-V4Snapshot -SnapshotDir $SnapshotDir
         Write-V4Log 'files restored and hash-verified' -Level OK
+        if (-not (Clear-V4Journal)) { Write-V4Log 'files restored but config\transaction.json could not be cleared' -Level WARN }
 
         if (-not $KeepSystemProxy) {
             $want = if ($m.systemProxy.enabled) { $m.systemProxy.server } else { 'off' }
@@ -56,10 +59,16 @@ try {
         }
         Set-V4Owner -Owner 'rollback' -SystemProxy ((Get-V4SystemProxy).server) -Note ('snapshot=' + (Split-Path $SnapshotDir -Leaf))
     }
-    finally { Exit-V4Lock }
+    finally { if ($lock) { $null = Exit-V4Lock $lock } }
 }
 catch {
     Write-V4Log ('rollback failed: ' + (Get-V4Redacted $_.Exception.Message)) -Level ERROR
+    # A-12: Restore-V4Snapshot may have stopped the app before failing. Do not leave it down.
+    try {
+        if (Start-V4Clash -TimeoutSec 40) { Write-V4Log 'clash restarted after failed restore' -Level WARN }
+        else { Write-V4Log 'clash did not come back after failed restore' -Level ERROR }
+    }
+    catch { Write-V4Log ('clash restart after failed restore also failed: ' + (Get-V4Redacted $_.Exception.Message)) -Level ERROR }
     $exit = 40
 }
 finally { exit $exit }

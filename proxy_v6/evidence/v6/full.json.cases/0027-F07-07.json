@@ -1,0 +1,17 @@
+{
+    "id":  "F07-07",
+    "requirement":  "F07",
+    "precondition":  "second write fails",
+    "injectedFault":  "restore fails",
+    "expected":  "app reconciliation still attempted",
+    "actual":  "F07-07: start attempted",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "body completed without assertions or exceptions",
+    "durationMs":  651,
+    "assertions":  0,
+    "startedAt":  "2026-11-18T05:22:15.635-08:00",
+    "finishedAt":  "2026-11-18T05:22:16.286-08:00",
+    "evidenceFile":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\v6\\full.json.cases\\0027-F07-07.json",
+    "testOutput":  ""
+}

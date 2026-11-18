@@ -1,0 +1,17 @@
+{
+    "id":  "F07-11",
+    "requirement":  "F07",
+    "precondition":  "chain verification fails",
+    "injectedFault":  "wrong exit ip",
+    "expected":  "exit code 31 preserved",
+    "actual":  "F07-11: 31 preserved",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "body completed without assertions or exceptions",
+    "durationMs":  661,
+    "assertions":  0,
+    "startedAt":  "2026-11-18T05:25:55.828-08:00",
+    "finishedAt":  "2026-11-18T05:25:56.489-08:00",
+    "evidenceFile":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\v6\\full.json.cases\\0032-F07-11.json",
+    "testOutput":  ""
+}
