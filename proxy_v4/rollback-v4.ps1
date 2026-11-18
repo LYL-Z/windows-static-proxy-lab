@@ -53,6 +53,8 @@ try {
         Write-V4Log ("rollback -> {0}" -f (Split-Path $SnapshotDir -Leaf)) -Level STEP
         $restoreAttempted = $false
         try {
+            # Verify the manifest before considering the app "possibly stopped".
+            Test-V4SnapshotManifest -SnapshotDir $SnapshotDir | Out-Null
             $restoreAttempted = $true
             $m = Restore-V4Snapshot -SnapshotDir $SnapshotDir -Port $mixedPort
             Write-V4Log 'files restored and hash-verified' -Level OK
