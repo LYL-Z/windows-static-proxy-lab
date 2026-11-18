@@ -2,27 +2,27 @@
     "schemaVersion":  1,
     "tool":  "proxy_v6/tests/Harness.ps1",
     "harnessVersion":  "6.0.0",
-    "runId":  "317f7ce0e7a54cd091f7581389870fb3",
+    "runId":  "09e3ff4f0cff484792acb95dc7dab7bc",
     "host":  {
                  "psVersion":  "5.1.26100.9818",
                  "psEdition":  "Desktop",
                  "os":  "Microsoft Windows NT 10.0.26300.0",
                  "clr":  "4.0.30319.42000",
                  "is64BitProcess":  true,
-                 "pid":  372
+                 "pid":  49812
              },
     "git":  {
                 "available":  true,
-                "head":  "0268e173a47641c042301e27230e94502022d221",
+                "head":  "79198fd1046f08e17ca9ca819a464ca7a7a19921",
                 "branch":  "HEAD",
                 "dirty":  false,
                 "error":  null
             },
     "repoRoot":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-selftest-wt",
     "filter":  "*",
-    "startedAt":  "2026-11-18T06:18:15.837-08:00",
-    "finishedAt":  "2026-11-18T06:18:17.300-08:00",
-    "durationMs":  91,
+    "startedAt":  "2026-11-18T06:33:34.442-08:00",
+    "finishedAt":  "2026-11-18T06:33:36.053-08:00",
+    "durationMs":  85,
     "counts":  {
                    "registered":  2,
                    "executed":  2,
@@ -52,9 +52,9 @@
                       "detail":  "assertions passed: 1",
                       "durationMs":  10,
                       "assertions":  1,
-                      "startedAt":  "2026-11-18T06:18:15.874-08:00",
-                      "finishedAt":  "2026-11-18T06:18:15.889-08:00",
-                      "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-061815-266-45a93602\\META-01\\cases\\0001-FIX-PASS-01.json",
+                      "startedAt":  "2026-11-18T06:33:34.473-08:00",
+                      "finishedAt":  "2026-11-18T06:33:34.491-08:00",
+                      "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-063333-906-8e782058\\META-01\\cases\\0001-FIX-PASS-01.json",
                       "testOutput":  ""
                   },
                   {
@@ -67,11 +67,11 @@
                       "status":  "pass",
                       "passed":  true,
                       "detail":  "assertions passed: 2",
-                      "durationMs":  6,
+                      "durationMs":  5,
                       "assertions":  2,
-                      "startedAt":  "2026-11-18T06:18:15.921-08:00",
-                      "finishedAt":  "2026-11-18T06:18:15.927-08:00",
-                      "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-061815-266-45a93602\\META-01\\cases\\0002-FIX-PASS-02.json",
+                      "startedAt":  "2026-11-18T06:33:34.519-08:00",
+                      "finishedAt":  "2026-11-18T06:33:34.524-08:00",
+                      "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-063333-906-8e782058\\META-01\\cases\\0002-FIX-PASS-02.json",
                       "testOutput":  ""
                   }
               ]

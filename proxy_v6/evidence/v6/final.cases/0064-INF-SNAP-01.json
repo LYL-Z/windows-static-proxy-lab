@@ -1,0 +1,17 @@
+{
+    "id":  "INF-SNAP-01",
+    "requirement":  "TX-11",
+    "precondition":  "snapshot without managed profile",
+    "injectedFault":  "file created after snapshot",
+    "expected":  "restore deletes it",
+    "actual":  "absent managed profile deleted; profiles.yaml hash restored; snapshot ACL restricted",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  746,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T06:32:34.246-08:00",
+    "finishedAt":  "2026-11-18T06:32:34.992-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-final-7919\\final.cases\\0064-INF-SNAP-01.json",
+    "testOutput":  ""
+}

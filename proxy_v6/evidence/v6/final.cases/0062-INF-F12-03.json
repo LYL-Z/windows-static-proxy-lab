@@ -1,0 +1,17 @@
+{
+    "id":  "INF-F12-03",
+    "requirement":  "F12",
+    "precondition":  "verge.yaml variations",
+    "injectedFault":  "UI parser",
+    "expected":  "true/false/missing key/missing file handled",
+    "actual":  "verge.yaml enable_system_proxy true/false/missing parsed correctly",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  546,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T06:32:33.113-08:00",
+    "finishedAt":  "2026-11-18T06:32:33.659-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-final-7919\\final.cases\\0062-INF-F12-03.json",
+    "testOutput":  ""
+}

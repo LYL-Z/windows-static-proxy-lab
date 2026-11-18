@@ -1,0 +1,17 @@
+{
+    "id":  "INF-LOCK-05",
+    "requirement":  "LOCK-04",
+    "precondition":  "zero-byte lock older than grace",
+    "injectedFault":  "empty lock file",
+    "expected":  "reclaimed, not stuck forever",
+    "actual":  "zero-byte stale lock reclaimed after the grace period",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  595,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T06:33:13.809-08:00",
+    "finishedAt":  "2026-11-18T06:33:14.403-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-final-7919\\final.cases\\0083-INF-LOCK-05.json",
+    "testOutput":  ""
+}

@@ -1,12 +1,12 @@
 
 == V6 TEST HARNESS 6.0.0 ==
-Run ID: f82c0b00c95d4ff29a04bc2293a7c77a
-Git HEAD: 0268e173a47641c042301e27230e94502022d221
+Run ID: 87bcabb651ae4643b6adaac5765bc5b1
+Git HEAD: 79198fd1046f08e17ca9ca819a464ca7a7a19921
 Git branch: HEAD
 Filter: *
 --------------------------------------------------------------
-[PASS] FIX-EVIDENCE-01 (META-06) 7ms
-[EVIDENCE-ERROR] final-evidence: failed to write final evidence: path is a file, not a directory: C:\Users\Lenovo\AppData\Local\Temp\v6-tests\v6-selftest-20261118-061815-266-45a93602\META-06\blocked
+[PASS] FIX-EVIDENCE-01 (META-06) 9ms
+[EVIDENCE-ERROR] final-evidence: failed to write final evidence: path is a file, not a directory: C:\Users\Lenovo\AppData\Local\Temp\v6-tests\v6-selftest-20261118-063333-906-8e782058\META-06\blocked
 --------------------------------------------------------------
 Counts: registered=1 executed=1 passed=1 failed=0 skipped=0 available=1
 Evidence: NOT WRITTEN

@@ -2,27 +2,27 @@
     "schemaVersion":  1,
     "tool":  "proxy_v6/tests/Harness.ps1",
     "harnessVersion":  "6.0.0",
-    "runId":  "08c794bb06cb41f3997d27e9e7ad7ee0",
+    "runId":  "31265fe35e0146c88250f010d75ab0b1",
     "host":  {
                  "psVersion":  "5.1.26100.9818",
                  "psEdition":  "Desktop",
                  "os":  "Microsoft Windows NT 10.0.26300.0",
                  "clr":  "4.0.30319.42000",
                  "is64BitProcess":  true,
-                 "pid":  51536
+                 "pid":  46940
              },
     "git":  {
                 "available":  true,
-                "head":  "0268e173a47641c042301e27230e94502022d221",
+                "head":  "79198fd1046f08e17ca9ca819a464ca7a7a19921",
                 "branch":  "HEAD",
                 "dirty":  false,
                 "error":  null
             },
     "repoRoot":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-selftest-wt",
     "filter":  "*",
-    "startedAt":  "2026-11-18T06:18:18.820-08:00",
-    "finishedAt":  "2026-11-18T06:18:19.120-08:00",
-    "durationMs":  93,
+    "startedAt":  "2026-11-18T06:33:37.575-08:00",
+    "finishedAt":  "2026-11-18T06:33:37.874-08:00",
+    "durationMs":  98,
     "counts":  {
                    "registered":  2,
                    "executed":  2,
@@ -38,7 +38,7 @@
                               "stage":  "framework",
                               "message":  "unhandled framework exception: injected harness fault at stage: before-summary",
                               "detail":  "在 Invoke-HarnessFaultStage、C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-selftest-wt\\proxy_v6\\tests\\Harness.ps1 中: 第 410 行\r\n在 Invoke-TestRun、C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-selftest-wt\\proxy_v6\\tests\\Harness.ps1 中: 第 622 行\r\n在 \u003cScriptBlock\u003e、C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-selftest-wt\\proxy_v6\\tests\\self\\fixtures\\harness-error.ps1 中: 第 21 行",
-                              "at":  "2026-11-18T06:18:18.914-08:00"
+                              "at":  "2026-11-18T06:33:37.673-08:00"
                           }
                       ],
     "evidenceErrors":  [
@@ -55,11 +55,11 @@
                       "status":  "pass",
                       "passed":  true,
                       "detail":  "assertions passed: 1",
-                      "durationMs":  7,
+                      "durationMs":  9,
                       "assertions":  1,
-                      "startedAt":  "2026-11-18T06:18:18.856-08:00",
-                      "finishedAt":  "2026-11-18T06:18:18.869-08:00",
-                      "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-061815-266-45a93602\\META-03\\cases\\0001-FIX-META03-01.json",
+                      "startedAt":  "2026-11-18T06:33:37.611-08:00",
+                      "finishedAt":  "2026-11-18T06:33:37.628-08:00",
+                      "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-063333-906-8e782058\\META-03\\cases\\0001-FIX-META03-01.json",
                       "testOutput":  ""
                   },
                   {
@@ -74,9 +74,9 @@
                       "detail":  "assertions passed: 1",
                       "durationMs":  5,
                       "assertions":  1,
-                      "startedAt":  "2026-11-18T06:18:18.898-08:00",
-                      "finishedAt":  "2026-11-18T06:18:18.903-08:00",
-                      "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-061815-266-45a93602\\META-03\\cases\\0002-FIX-META03-02.json",
+                      "startedAt":  "2026-11-18T06:33:37.657-08:00",
+                      "finishedAt":  "2026-11-18T06:33:37.663-08:00",
+                      "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-063333-906-8e782058\\META-03\\cases\\0002-FIX-META03-02.json",
                       "testOutput":  ""
                   }
               ]

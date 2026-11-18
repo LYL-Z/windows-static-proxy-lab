@@ -2,27 +2,27 @@
     "schemaVersion":  1,
     "tool":  "proxy_v6/tests/Harness.ps1",
     "harnessVersion":  "6.0.0",
-    "runId":  "b4352f8fc7f846fab42d9a68e75c2272",
+    "runId":  "1d7b2143772a42198bd2e74fb6f4b4bd",
     "host":  {
                  "psVersion":  "5.1.26100.9818",
                  "psEdition":  "Desktop",
                  "os":  "Microsoft Windows NT 10.0.26300.0",
                  "clr":  "4.0.30319.42000",
                  "is64BitProcess":  true,
-                 "pid":  24764
+                 "pid":  8376
              },
     "git":  {
                 "available":  true,
-                "head":  "0268e173a47641c042301e27230e94502022d221",
+                "head":  "79198fd1046f08e17ca9ca819a464ca7a7a19921",
                 "branch":  "HEAD",
                 "dirty":  false,
                 "error":  null
             },
     "repoRoot":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-selftest-wt",
     "filter":  "*",
-    "startedAt":  "2026-11-18T06:18:25.532-08:00",
-    "finishedAt":  "2026-11-18T06:18:25.812-08:00",
-    "durationMs":  87,
+    "startedAt":  "2026-11-18T06:33:44.253-08:00",
+    "finishedAt":  "2026-11-18T06:33:44.554-08:00",
+    "durationMs":  94,
     "counts":  {
                    "registered":  2,
                    "executed":  2,
@@ -50,11 +50,11 @@
                       "status":  "fail",
                       "passed":  false,
                       "detail":  "assertion failed: earlier failure must persist (actual: False)",
-                      "durationMs":  19,
+                      "durationMs":  21,
                       "assertions":  1,
-                      "startedAt":  "2026-11-18T06:18:25.563-08:00",
-                      "finishedAt":  "2026-11-18T06:18:25.589-08:00",
-                      "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-061815-266-45a93602\\META-07\\cases\\0001-FIX-ORDER-01.json",
+                      "startedAt":  "2026-11-18T06:33:44.289-08:00",
+                      "finishedAt":  "2026-11-18T06:33:44.317-08:00",
+                      "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-063333-906-8e782058\\META-07\\cases\\0001-FIX-ORDER-01.json",
                       "testOutput":  ""
                   },
                   {
@@ -69,9 +69,9 @@
                       "detail":  "assertions passed: 1",
                       "durationMs":  2,
                       "assertions":  1,
-                      "startedAt":  "2026-11-18T06:18:25.614-08:00",
-                      "finishedAt":  "2026-11-18T06:18:25.617-08:00",
-                      "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-061815-266-45a93602\\META-07\\cases\\0002-FIX-ORDER-02.json",
+                      "startedAt":  "2026-11-18T06:33:44.343-08:00",
+                      "finishedAt":  "2026-11-18T06:33:44.345-08:00",
+                      "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-063333-906-8e782058\\META-07\\cases\\0002-FIX-ORDER-02.json",
                       "testOutput":  ""
                   }
               ]

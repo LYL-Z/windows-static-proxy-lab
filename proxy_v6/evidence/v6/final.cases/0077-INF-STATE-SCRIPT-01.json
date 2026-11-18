@@ -1,0 +1,17 @@
+{
+    "id":  "INF-STATE-SCRIPT-01",
+    "requirement":  "LIFE-04",
+    "precondition":  "corrupt settings",
+    "injectedFault":  "state probe",
+    "expected":  "FAILED JSON and exit 3",
+    "actual":  "state script emitted FAILED JSON and exit 3 for corrupt settings",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  1044,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T06:32:46.661-08:00",
+    "finishedAt":  "2026-11-18T06:32:47.705-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-final-7919\\final.cases\\0077-INF-STATE-SCRIPT-01.json",
+    "testOutput":  ""
+}

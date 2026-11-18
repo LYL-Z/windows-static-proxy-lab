@@ -1,0 +1,17 @@
+{
+    "id":  "INF-ATOMIC-01",
+    "requirement":  "TX-02",
+    "precondition":  "existing target",
+    "injectedFault":  "none",
+    "expected":  "replace committed; staging cleaned",
+    "actual":  "replace committed; staging and backup cleaned",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  530,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T06:32:37.098-08:00",
+    "finishedAt":  "2026-11-18T06:32:37.629-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-final-7919\\final.cases\\0068-INF-ATOMIC-01.json",
+    "testOutput":  ""
+}

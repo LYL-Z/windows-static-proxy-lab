@@ -1,0 +1,17 @@
+{
+    "id":  "INF-F12-02",
+    "requirement":  "F12",
+    "precondition":  "settings missing + UI on/HKCU off",
+    "injectedFault":  "state early return",
+    "expected":  "FAILED but still includes UI mismatch reason",
+    "actual":  "missing settings reports FAILED and still includes the UI/HKCU mismatch reason",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  540,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T06:32:32.570-08:00",
+    "finishedAt":  "2026-11-18T06:32:33.110-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-final-7919\\final.cases\\0061-INF-F12-02.json",
+    "testOutput":  ""
+}

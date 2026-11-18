@@ -1,0 +1,17 @@
+{
+    "id":  "INF-APPLY-INIT-01",
+    "requirement":  "F09",
+    "precondition":  "no appdata; explicit credentials file",
+    "injectedFault":  "Init reaches missing paths",
+    "expected":  "settings written under lock; exit 10; lock released",
+    "actual":  "Init wrote DPAPI settings under the lock, then failed closed at missing paths (exit 10)",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  1315,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T06:32:41.153-08:00",
+    "finishedAt":  "2026-11-18T06:32:42.469-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-final-7919\\final.cases\\0073-INF-APPLY-INIT-01.json",
+    "testOutput":  ""
+}

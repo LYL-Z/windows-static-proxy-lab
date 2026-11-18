@@ -1,0 +1,17 @@
+{
+    "id":  "INF-APPLY-INIT-02",
+    "requirement":  "C-02",
+    "precondition":  "legacy -StaticPass parameter",
+    "injectedFault":  "command-line password",
+    "expected":  "exit 11 removal message; no settings",
+    "actual":  "legacy -StaticPass is rejected with a removal message",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  1046,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T06:32:42.472-08:00",
+    "finishedAt":  "2026-11-18T06:32:43.519-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-final-7919\\final.cases\\0074-INF-APPLY-INIT-02.json",
+    "testOutput":  ""
+}

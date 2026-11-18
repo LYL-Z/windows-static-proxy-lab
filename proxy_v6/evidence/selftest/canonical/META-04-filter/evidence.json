@@ -2,27 +2,27 @@
     "schemaVersion":  1,
     "tool":  "proxy_v6/tests/Harness.ps1",
     "harnessVersion":  "6.0.0",
-    "runId":  "8da59b87a8354bc49162153b89b4c207",
+    "runId":  "090fdfa05bdb48f8b5853545711b3174",
     "host":  {
                  "psVersion":  "5.1.26100.9818",
                  "psEdition":  "Desktop",
                  "os":  "Microsoft Windows NT 10.0.26300.0",
                  "clr":  "4.0.30319.42000",
                  "is64BitProcess":  true,
-                 "pid":  51592
+                 "pid":  48888
              },
     "git":  {
                 "available":  true,
-                "head":  "0268e173a47641c042301e27230e94502022d221",
+                "head":  "79198fd1046f08e17ca9ca819a464ca7a7a19921",
                 "branch":  "HEAD",
                 "dirty":  false,
                 "error":  null
             },
     "repoRoot":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-selftest-wt",
     "filter":  "NO-SUCH-TEST-*",
-    "startedAt":  "2026-11-18T06:18:20.494-08:00",
-    "finishedAt":  "2026-11-18T06:18:20.731-08:00",
-    "durationMs":  26,
+    "startedAt":  "2026-11-18T06:33:39.216-08:00",
+    "finishedAt":  "2026-11-18T06:33:39.449-08:00",
+    "durationMs":  27,
     "counts":  {
                    "registered":  0,
                    "executed":  0,

@@ -8,10 +8,10 @@
     "status":  "fail",
     "passed":  false,
     "detail":  "unexpected exception: intentional unexpected exception | stack: 在 \u003cScriptBlock\u003e、C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-selftest-wt\\proxy_v6\\tests\\self\\fixtures\\fail.ps1 中: 第 18 行 | 在 Invoke-HarnessCase、C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-selftest-wt\\proxy_v6\\tests\\Harness.ps1 中: 第 434 行 | 在 Invoke-TestRun、C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-selftest-wt\\proxy_v6\\tests\\Harness.ps1 中: 第 619 行 | 在 \u003cScriptBlock\u003e、C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-selftest-wt\\proxy_v6\\tests\\self\\fixtures\\fail.ps1 中: 第 21 行 | at: 所在位置 C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-selftest-wt\\proxy_v6\\tests\\self\\fixtures\\fail.ps1:18 字符: 3 | +   throw \u0027intentional unexpected exception\u0027 | +   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
-    "durationMs":  7,
+    "durationMs":  8,
     "assertions":  0,
-    "startedAt":  "2026-11-18T06:18:18.040-08:00",
-    "finishedAt":  "2026-11-18T06:18:18.048-08:00",
-    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-061815-266-45a93602\\META-02\\cases\\0002-FIX-FAIL-02.json",
+    "startedAt":  "2026-11-18T06:33:36.790-08:00",
+    "finishedAt":  "2026-11-18T06:33:36.798-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-063333-906-8e782058\\META-02\\cases\\0002-FIX-FAIL-02.json",
     "testOutput":  ""
 }

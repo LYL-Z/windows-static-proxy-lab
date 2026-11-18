@@ -1,14 +1,14 @@
 
 == V6 TEST HARNESS 6.0.0 ==
-Run ID: 60808def823f42b288feff73fef669a9
-Git HEAD: 0268e173a47641c042301e27230e94502022d221
+Run ID: 427998db854c4ccfa921960098b7f45d
+Git HEAD: 79198fd1046f08e17ca9ca819a464ca7a7a19921
 Git branch: HEAD
 Filter: *
 --------------------------------------------------------------
-[PASS] FIX-EVIDENCE-01 (META-06) 7ms
-[EVIDENCE-ERROR] evidence-dir: cannot create evidence directory: path is a file, not a directory: C:\Users\Lenovo\AppData\Local\Temp\v6-tests\v6-selftest-20261118-061815-266-45a93602\META-06-case-evidence\cases-blocked
+[PASS] FIX-EVIDENCE-01 (META-06) 8ms
+[EVIDENCE-ERROR] evidence-dir: cannot create evidence directory: path is a file, not a directory: C:\Users\Lenovo\AppData\Local\Temp\v6-tests\v6-selftest-20261118-063333-906-8e782058\META-06-case-evidence\cases-blocked
 [EVIDENCE-ERROR] case-evidence: no evidence directory available for test FIX-EVIDENCE-01
 --------------------------------------------------------------
 Counts: registered=1 executed=1 passed=1 failed=0 skipped=0 available=1
-Evidence: C:\Users\Lenovo\AppData\Local\Temp\v6-tests\v6-selftest-20261118-061815-266-45a93602\META-06-case-evidence\evidence.json
+Evidence: C:\Users\Lenovo\AppData\Local\Temp\v6-tests\v6-selftest-20261118-063333-906-8e782058\META-06-case-evidence\evidence.json
 RESULT: EVIDENCE_ERROR EXIT 4

@@ -1,14 +1,14 @@
 
 == V6 TEST HARNESS 6.0.0 ==
-Run ID: 74fc8118683245f3bfe1555f2c9c8ae5
-Git HEAD: 0268e173a47641c042301e27230e94502022d221
+Run ID: fd0004bc31a7495ab178b6059e3cac3f
+Git HEAD: 79198fd1046f08e17ca9ca819a464ca7a7a19921
 Git branch: HEAD
 Filter: *
 --------------------------------------------------------------
-[SKIP] FIX-SKIP-RUNTIME (META-05) 13ms
+[SKIP] FIX-SKIP-RUNTIME (META-05) 15ms
        skipped at runtime: fixture runtime skip: simulated missing dependency
 --------------------------------------------------------------
 Counts: registered=1 executed=0 passed=0 failed=0 skipped=1 available=1
 [NO-TESTS] no test executed; a green result is not permitted (exit 2).
-Evidence: C:\Users\Lenovo\AppData\Local\Temp\v6-tests\v6-selftest-20261118-061815-266-45a93602\META-05-runtime\evidence.json
+Evidence: C:\Users\Lenovo\AppData\Local\Temp\v6-tests\v6-selftest-20261118-063333-906-8e782058\META-05-runtime\evidence.json
 RESULT: NO_TESTS_EXECUTED EXIT 2

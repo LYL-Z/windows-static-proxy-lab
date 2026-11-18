@@ -1,7 +1,7 @@
 
 == V6 TEST HARNESS 6.0.0 ==
-Run ID: d56e2dc53a844138a1fbd2f799dbe3ad
-Git HEAD: 0268e173a47641c042301e27230e94502022d221
+Run ID: 83d1bcb15ce44941852a6754cadf39ee
+Git HEAD: 79198fd1046f08e17ca9ca819a464ca7a7a19921
 Git branch: HEAD
 Filter: *
 --------------------------------------------------------------
@@ -10,5 +10,5 @@ Filter: *
 --------------------------------------------------------------
 Counts: registered=1 executed=0 passed=0 failed=0 skipped=1 available=1
 [NO-TESTS] no test executed; a green result is not permitted (exit 2).
-Evidence: C:\Users\Lenovo\AppData\Local\Temp\v6-tests\v6-selftest-20261118-061815-266-45a93602\META-05-all\evidence.json
+Evidence: C:\Users\Lenovo\AppData\Local\Temp\v6-tests\v6-selftest-20261118-063333-906-8e782058\META-05-all\evidence.json
 RESULT: NO_TESTS_EXECUTED EXIT 2
