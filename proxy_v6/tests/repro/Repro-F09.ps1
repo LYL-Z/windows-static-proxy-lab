@@ -27,9 +27,11 @@ if (-not $lock) { throw 'could not acquire test lock' }
 $settings = Join-Path $bench 'config\settings.json'
 $lockFile = Join-Path $bench 'config\.lock'
 $apply = Join-Path $repo 'proxy_v4\apply-v4.ps1'
+$passFile = Join-Path $bench 'fixture.pass'
+[System.IO.File]::WriteAllText($passFile, 'fixture-pass', (New-Object System.Text.UTF8Encoding($false)))
 
 Check 'F09-01' 'Init must not write settings while another process holds the lock' {
-    $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $apply -Init -StaticHost '203.0.113.10' -StaticPort 1080 -StaticUser 'fixture-user' -StaticPass 'fixture-pass' -HopPort 65531 -MixedPort 65532 2>&1
+    $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $apply -Init -StaticHost '203.0.113.10' -StaticPort 1080 -StaticUser 'fixture-user' -StaticPassFile $passFile -HopPort 65531 -MixedPort 65532 2>&1
     $code = $LASTEXITCODE
     AssertTrue ($code -eq 33) ('child exit=' + $code + ' out=' + (($out | Select-Object -Last 4) -join ' | '))
     AssertTrue (-not (Test-Path $settings)) 'settings.json was written before the lock was acquired'

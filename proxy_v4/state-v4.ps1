@@ -20,7 +20,7 @@ if (-not $st) {
     $st = [ordered]@{
         state = 'FAILED'; mode = 'UNKNOWN'; reasons = @(('state probe failed: ' + $stateError))
         clashRunning = $false; mixedPort = $false; systemProxy = 'unknown'
-        owner = 'unknown'; firstHopOk = $false; exitViaChain = $null
+        owner = 'unknown'; firstHopOk = $false; exitViaChain = $null; uiSystemProxy = 'unknown'
     }
 }
 $p = Get-V4Paths
@@ -30,6 +30,7 @@ $result = [ordered]@{
     state = $st.state; mode = $st.mode; reasons = @($st.reasons)
     clashRunning = $st.clashRunning; mixedPort = $st.mixedPort
     systemProxy = $st.systemProxy; ownerRecorded = $st.owner
+    uiSystemProxy = $st.uiSystemProxy
     firstHopOk = $st.firstHopOk; exitViaChain = $st.exitViaChain
     integrity = $integrity
 }
@@ -47,6 +48,7 @@ else {
     'clashRunning   {0}' -f $result.clashRunning
     'mixedPort      {0}' -f $result.mixedPort
     'systemProxy    {0}   (owner record: {1})' -f $result.systemProxy, $result.ownerRecorded
+    'uiSystemProxy  {0}' -f $result.uiSystemProxy
     'firstHopOk     {0}' -f $result.firstHopOk
     'exitViaChain   {0}' -f $result.exitViaChain
     'profile marker {0}   runtime marker {1}' -f $integrity.markerOk, $integrity.runtimeMarkerOk

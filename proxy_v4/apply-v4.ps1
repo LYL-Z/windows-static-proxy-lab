@@ -16,7 +16,7 @@ param(
     [ValidateSet('resilient','strict')][string]$Mode = 'strict',
     [switch]$DryRun,
     [switch]$Repair,
-    [string]$StaticHost, [int]$StaticPort = 0, [string]$StaticUser, [string]$StaticPass,
+    [string]$StaticHost, [int]$StaticPort = 0, [string]$StaticUser, [string]$StaticPassFile,
     [string]$HopHost = '127.0.0.1', [int]$HopPort = 11119, [int]$MixedPort = 7897
 )
 $ErrorActionPreference = 'Stop'
@@ -48,8 +48,14 @@ try {
     }
 
     if ($Init) {
+        $staticPass = $null
+        if ($StaticPassFile) {
+            if (-not (Test-Path -LiteralPath $StaticPassFile)) { Fail 11 'credential file not found' }
+            $staticPass = Read-V4File $StaticPassFile
+            if ($null -ne $staticPass) { $staticPass = $staticPass.TrimEnd([char[]]@([char]13, [char]10)) }
+        }
         $explicit = @{
-            host = $StaticHost; port = $StaticPort; user = $StaticUser; pass = $StaticPass
+            host = $StaticHost; port = $StaticPort; user = $StaticUser; pass = $staticPass
             hopHost = $HopHost; hopPort = $HopPort; mixedPort = $MixedPort
         }
         $initPaths = Get-V4Paths

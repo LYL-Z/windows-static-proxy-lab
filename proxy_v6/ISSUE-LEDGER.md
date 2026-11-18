@@ -18,6 +18,18 @@
 | 回归测试 | FT16 mock x；FT17 mock 失败；FT18 异常终止；FT19 并行；FT20 异常状态不误报 HEALTHY；FT21 HKCU/WinHTTP 前后一致 |
 | 状态 | **FIXED-PENDING-INDEPENDENT-REVIEW**；在独立复审确认前不得关闭 |
 
+## A2. F12 — 运行时状态不一致（只读诊断）
+
+| 项 | 内容 |
+|---|---|
+| ID | **F12 — RUNTIME_STATE_MISMATCH** |
+| 等级 | 中（状态报告/UI 一致性；非新事故） |
+| 现象 | UI 显示系统代理开启；HKCU ProxyEnable=0；Clash 无流量；IP 信息显示 StarSky 出口 |
+| 诊断 | HKCU=0/127.0.0.1:7897，WinHTTP Direct；Clash/StarSky/7897/11119 均正常；直连 54.202.22.253，经 Clash 72.245.197.103 |
+| 定性 | **A + C**：F11 应急恢复保留 ProxyEnable=0（预期）+ Clash UI 配置 enable_system_proxy=true 未同步；非 E（无新测试污染） |
+| 处理 | 状态脚本新增 uiSystemProxy 与 UI/HKCU 不一致 reason（INF-F12-01）；不自动改生产网络；B 方案需用户确认 |
+| 状态 | **EXPECTED-STATE / UI-MISMATCH（待用户决定是否重新开启 Clash 链路）** |
+
 ## B. 任务书 F01–F10
 
 | 编号 | 裁定 | 证据 |
@@ -50,6 +62,7 @@
 
 | 编号 | 严重度 | 问题 | 状态 |
 |---|---|---|---|
+| C-02 | HIGH | `-StaticPass` 命令行李历史暴露 | **VERIFIED-CLOSED**：移除参数，改 `-StaticPassFile`；测试/文档更新 |
 | R2C-01 | HIGH | 安装/脚本树可被 Authenticated Users 改写 | **MITIGATED**：repo/proxy_v4/proxy_v6/.git 384+ 对象 ACL 已加固；repo-acl.json |
 | R2C-03 | MED | settings/state 读取不复核 ACL | **FIXED**：Get-V4Settings 校验 config/settings ACL；INF-SETTINGS-04 |
 | R2C-04 | MED | 恢复路径不重新加固凭据文件 | **FIXED**：INF-SNAP-08 |

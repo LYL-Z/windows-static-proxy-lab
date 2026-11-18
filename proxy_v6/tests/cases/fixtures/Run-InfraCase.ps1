@@ -278,6 +278,23 @@ try {
             Assert-Infra ($global:LaunchCount -eq 1) 'timeout path did not launch exactly once'
             $script:Actual = 'timeout returned false after one launch'
         }
+        'INF-F12-01' {
+            $settings = [pscustomobject]@{ host='203.0.113.10'; mixedPort=7897; hopPort=11119 }
+            $off = [pscustomobject]@{ enabled=$false; server='127.0.0.1:7897' }
+            $on = [pscustomobject]@{ enabled=$true; server='127.0.0.1:7897' }
+            $hopOk = [pscustomobject]@{ ok=$true; detail='200' }
+            $hopBad = [pscustomobject]@{ ok=$false; detail='down' }
+            $exitOk = { param($p) '203.0.113.10' }
+            $a = Get-V4StateCore -Settings $settings -Owner $null -SystemProxy $off -AppPids @(1) -MixedPortOpen $true -FirstHop $hopOk -GetExitIp $exitOk -SettingsError '' -UiSystemProxy $true
+            Assert-Infra ($a.state -eq 'DEGRADED') ('UI on / HKCU off reported ' + $a.state)
+            Assert-Infra (($a.reasons -join ' ') -match 'UI reports system proxy enabled') 'UI-on/HKCU-off mismatch not reported'
+            $b = Get-V4StateCore -Settings $settings -Owner $null -SystemProxy $on -AppPids @(1) -MixedPortOpen $true -FirstHop $hopOk -GetExitIp $exitOk -SettingsError '' -UiSystemProxy $false
+            Assert-Infra ($b.state -eq 'DEGRADED') ('UI off / HKCU on reported ' + $b.state)
+            Assert-Infra (($b.reasons -join ' ') -match 'UI reports system proxy disabled') 'UI-off/HKCU-on mismatch not reported'
+            $c = Get-V4StateCore -Settings $settings -Owner $null -SystemProxy $on -AppPids @(1) -MixedPortOpen $true -FirstHop $hopBad -GetExitIp $exitOk -SettingsError '' -UiSystemProxy $true
+            Assert-Infra ($c.state -eq 'DEGRADED') ('UI on + first hop down reported ' + $c.state)
+            $script:Actual = 'UI/actual proxy mismatch and first-hop failure are DEGRADED with reasons'
+        }
         'INF-STATE-CORE-01' {
             $settings = [pscustomobject]@{ host='203.0.113.10'; mixedPort=7897; hopPort=11119 }
             $proxyOk = [pscustomobject]@{ enabled=$true; server='127.0.0.1:7897' }
@@ -447,7 +464,9 @@ try {
         }
         'INF-APPLY-INIT-01' {
             $apply = Join-Path $repo 'proxy_v4\apply-v4.ps1'
-            $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $apply -Init -StaticHost '203.0.113.10' -StaticPort 1080 -StaticUser 'fixture-user' -StaticPass 'fixture-pass' -HopPort 11119 -MixedPort 7897 2>&1
+            $passFile = Join-Path $root 'fixture.pass'
+            Put-Text $passFile 'fixture-pass'
+            $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $apply -Init -StaticHost '203.0.113.10' -StaticPort 1080 -StaticUser 'fixture-user' -StaticPassFile $passFile -HopPort 11119 -MixedPort 7897 2>&1
             $c = $LASTEXITCODE
             Assert-Infra ($c -eq 10) ('Init with no appdata should stop at paths, exit=' + $c)
             $settingsPath = Join-Path $root 'config\settings.json'
@@ -494,6 +513,17 @@ try {
                 Remove-Item Env:V4_TEST_APPDATA -ErrorAction SilentlyContinue
                 Remove-Item Env:V4_TEST_CORE -ErrorAction SilentlyContinue
             }
+        }
+        'INF-APPLY-INIT-02' {
+            $apply = Join-Path $repo 'proxy_v4\apply-v4.ps1'
+            $prevEap = $ErrorActionPreference
+            $ErrorActionPreference = 'Continue'
+            try { $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $apply -Init -StaticHost '203.0.113.10' -StaticPort 1080 -StaticUser 'fixture-user' -StaticPass 'fixture-pass' -HopPort 11119 -MixedPort 7897 2>&1 }
+            finally { $ErrorActionPreference = $prevEap }
+            $c = $LASTEXITCODE
+            Assert-Infra ($c -ne 0) 'removed -StaticPass parameter was accepted'
+            Assert-Infra (-not (Test-Path -LiteralPath (Join-Path $root 'config\settings.json'))) 'removed -StaticPass wrote settings'
+            $script:Actual = 'legacy -StaticPass parameter is rejected'
         }
         'INF-STATE-SCRIPT-01' {
             New-Item -ItemType Directory -Path (Join-Path $root 'config') -Force | Out-Null
@@ -710,7 +740,8 @@ try {
                 @{ text='{"password":"json-secret","user":"json-user"}'; forbidden='json-secret' },
                 @{ text='{"token":"tok-123"}'; forbidden='tok-123' },
                 @{ text='user: a b'; forbidden='a b' },
-                @{ text='socks5://user:pass@203.0.113.10:1080'; forbidden='user:pass' },
+                @{ text='socks5://user:pass@203.0.113.10:1080'; forbidden='user' },
+                @{ text='X-Api-Key: abcdef123456'; forbidden='abcdef123456' },
                 @{ text='Cookie: session=abc'; forbidden='session=abc' }
             )
             foreach ($c in $checks) {

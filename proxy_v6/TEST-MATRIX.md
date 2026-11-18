@@ -1,7 +1,7 @@
 # TEST-MATRIX — V6.0
 
 最后更新：2026-11-18T05:52-08:00
-当前全量：**92 用例 / 92 通过 / 0 失败 / 0 跳过**（隔离运行；真实生产 apply/rollback/boot 未执行）
+当前全量：**94 用例 / 94 通过 / 0 失败 / 0 跳过**（隔离运行；真实生产 apply/rollback/boot 未执行）
 
 ## 1. F07 事务（16/16 PASS）
 
@@ -47,19 +47,26 @@ F10-01..10：恢复失败/日志失败/启动失败/代理恢复失败/owner 恢
 | FT20 | ProxyServer=x / 错误出口 IP 报 DEGRADED，不报 HEALTHY | PASS |
 | FT21 | 无 writer 测试被拒；HKCU/WinHTTP 前后一致 | PASS |
 
-## 6. 基础设施/安全/生命周期（49/49 PASS）
+## 6. 基础设施/安全/生命周期/状态一致性（51/51 PASS）
 
 - 参数：PARAM-01/02/04/05/06/07（Repair+DryRun、Init+Repair、缺/坏 settings、非法 Mode、DryRun 只读）。
 - 事务：TX-01..TX-11 对应用例（快照失败、写失败、锁文件、快照篡改/空清单/缺 profiles.yaml、部分恢复、原子写、临时文件、存在/不存在恢复）。
 - 并发/锁：LOCK-01..05（双事务、loser、陈旧锁、PID 复用、零字节锁；锁忙 rollback 33）。
 - 日志：LOG-01/02（目录不可写、日志路径不可写）。
 - 数据完整性：DATA-02/04、无关配置/ACL、YAML 转义、恢复 ACL。
-- 状态/生命周期：LIFE-01..09（依赖未启动/延迟/退出、配置损坏、重复启动、首跳不可用、配置/运行不一致）。
+- 状态/生命周期：LIFE-01..09（依赖未启动/延迟/退出、配置损坏、重复启动、首跳不可用、配置/运行不一致）；F12-01（UI 与 HKCU 不一致报 DEGRADED）。
+- C-02：INF-APPLY-INIT-01（凭据文件）+ INF-APPLY-INIT-02（旧 -StaticPass 被拒）。
 - 安全：SEC-01..03（DPAPI、ACL、脱敏）；R2C-03 settings ACL 拒绝；C-01 快照 ACL。
 - 回滚：TX-ROLLBACK 01..04（真实 rollback 脚本恢复/journal/锁；损坏快照 40；锁忙 33；mixedPort 65532）。
 - Harness 自验：META-01..07 7/7 PASS；exit 0/1/2/3/4 负控全部符合；零断言当前判失败。
 
-## 7. 未覆盖/披露
+## 7. F12 状态一致性
+
+| ID | 场景 | 结果 |
+|---|---|---|
+| F12-01 | UI=on/HKCU=off、UI=off/HKCU=on、首跳失败 | PASS（DEGRADED + 明确 reason） |
+
+## 8. 未覆盖/披露
 
 | 项 | 状态 |
 |---|---|

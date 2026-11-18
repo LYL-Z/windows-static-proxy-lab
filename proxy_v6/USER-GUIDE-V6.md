@@ -9,7 +9,7 @@
 ## 2. 安全使用
 1. 本仓库脚本只用于用户自己的 Windows 主机；不要在生产网络未备份时运行 apply。
 2. **不要直接运行测试**来验证生产网络；V6 测试全部使用 `V4_TEST_MODE=1` + TEMP，且生产写门闩默认关闭。
-3. `-StaticPass` 会进入命令行/Shell 历史；优先用 `-Init` 从当前 Clash profile 迁移。若必须显式传参，事后清理历史。
+3. `-Init` 不接受命令行密码；显式迁移使用 `-StaticPassFile <受保护文件>`。优先从当前 Clash profile 迁移；不要用 argv/Shell 历史传密码。
 4. 快照（backup）含明文代理凭据；ACL 已加固但未加密；不要把 backup 上传网盘/工单。
 5. 配置 `settings.json` 含 DPAPI 密文和明文 username；只允许当前用户读取。
 6. 任何真实 apply 前先运行 `apply-v4.ps1 -DryRun`；失败时看 `config\transaction.json`，不要手工删除。

@@ -14,7 +14,9 @@
 - R2A-05：profiles.yaml 在停应用后重读（ProfileTextBuilder）。
 - R2A-07：零断言测试判失败；父用例执行断言。
 - R2C-03：Get-V4Settings 校验 config/settings ACL。
-- R2C-08：脱敏覆盖 JSON key、URL userinfo、空格值、Bearer/Basic/Cookie。
+- R2C-08：脱敏覆盖 JSON key、URL userinfo、空格值、Bearer/Basic/Cookie/API key。
+- F12：状态输出 uiSystemProxy；UI 与 HKCU 不一致时 DEGRADED + 明确 reason（INF-F12-01）；不自动改生产网络。
+- C-02：移除 `-StaticPass`，改为 `-StaticPassFile`；命令行不再含密码。
 - 旧 faultinject-v4.ps1 退役为安全转发器（原 FT12 会改真实 hosts ACL）。
 
 ### F11 — 生产状态污染（CRITICAL）

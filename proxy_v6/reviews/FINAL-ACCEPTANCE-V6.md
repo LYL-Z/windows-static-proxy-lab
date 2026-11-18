@@ -1,5 +1,7 @@
 # FINAL-ACCEPTANCE-V6 — 独立最终验收（Agent E）
 
+> **历史报告（针对 `abe0eaa`）**。最终代码/证据的裁定见 `FINAL-ACCEPTANCE-V6-ROUND2.md`（审查代码 `d5f2134` / 证据树 `b9bb9a0`）。本文件保留为第一轮记录，不覆盖旧结论。
+
 审查人：final-acceptance（Agent E，独立闸门；未参与实现）
 审查时点：2026-11-18T05:36:16-08:00（America/Los_Angeles）
 目标：`abe0eaa4b29f9d40b8157420d96fa09013d165da`（branch `v5/short-run-hardening`，local HEAD；commit time 2026-11-18T05:27:12-08:00）

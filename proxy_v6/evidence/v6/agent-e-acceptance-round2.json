@@ -1,0 +1,191 @@
+{
+  "schema": "agent-e-final-acceptance-round2/v1",
+  "generatedAt": "2026-11-18T14:07:09.382Z",
+  "reviewer": "final-acceptance (Agent E)",
+  "exactTarget": {
+    "codeCommit": "d5f21342da45ee4a1f245de84ed15e05d2a1b47a",
+    "evidenceTreeCommit": "b9bb9a063b1538889cd52c3a455a070ca3e74e16",
+    "frozenWorktree": "detached b9bb9a0 in %TEMP%, clean",
+    "laterCommits": [
+      "6e3cd09 (docs only)",
+      "01baaf5 (repo/.git ACL evidence only)"
+    ],
+    "repoHeadAtReport": "01baaf52b2507a0270843837276653c06937a4f5",
+    "originAtReport": "01baaf52b2507a0270843837276653c06937a4f5",
+    "round3Reports": [
+      "ROUND3-TRANSACTION-REVIEW.md",
+      "ROUND3-SECURITY-REVIEW.md"
+    ],
+    "round3ReportsTracked": false,
+    "note": "round3 reports existed in working tree but were untracked at report time; they must be committed"
+  },
+  "independentFullRun": {
+    "runId": "2c0c1266c58c444282203dddc80d069f",
+    "head": "b9bb9a063b1538889cd52c3a455a070ca3e74e16",
+    "dirty": false,
+    "startedAt": "2026-11-18T06:01:06.925-08:00",
+    "finishedAt": "2026-11-18T06:03:07.063-08:00",
+    "durationMs": 119843,
+    "exitCode": 0,
+    "outcome": "PASS",
+    "counts": {
+      "registered": 92,
+      "executed": 92,
+      "passed": 92,
+      "failed": 0,
+      "skipped": 0,
+      "available": 92
+    },
+    "harnessErrors": 0,
+    "evidenceErrors": 0,
+    "zeroAssertions": 0,
+    "minAssertions": 1,
+    "sumAssertions": 128,
+    "skipped": 0,
+    "failed": 0,
+    "requirements": {
+      "F08": 10,
+      "F09": 6,
+      "F10": 10,
+      "F07": 16,
+      "SEC-02": 3,
+      "LOG-01": 1,
+      "LOG-02": 1,
+      "S07": 1,
+      "P4": 1,
+      "SEC-03": 3,
+      "SEC-01": 1,
+      "PARAM-05": 1,
+      "PARAM-04": 1,
+      "R2C-03": 1,
+      "LOCK-04": 2,
+      "LOCK-02": 1,
+      "LOCK-05": 1,
+      "LIFE-05": 1,
+      "LIFE-02": 1,
+      "LIFE-01": 1,
+      "LIFE-03": 1,
+      "LIFE-08": 1,
+      "TX-11": 2,
+      "DATA-04": 2,
+      "TX-08": 1,
+      "TX-02": 2,
+      "TX-06": 1,
+      "PARAM-01": 1,
+      "PARAM-06": 1,
+      "PARAM-07": 1,
+      "LIFE-04": 1,
+      "F06": 1,
+      "TX-ROLLBACK": 4,
+      "TX-05": 1,
+      "DATA-02": 1,
+      "TX-07": 2,
+      "F11": 6
+    }
+  },
+  "independentSelfTest": {
+    "head": "b9bb9a063b1538889cd52c3a455a070ca3e74e16",
+    "dirty": false,
+    "exitCode": 0,
+    "outcome": "SELFTEST_PASS",
+    "counts": {
+      "selected": 7,
+      "checks": 7,
+      "passed": 7,
+      "failed": 0
+    },
+    "checks": [
+      {
+        "id": "META-01",
+        "passed": true,
+        "childExitCode": 0,
+        "expectedExit": "0"
+      },
+      {
+        "id": "META-02",
+        "passed": true,
+        "childExitCode": 1,
+        "expectedExit": "1"
+      },
+      {
+        "id": "META-03",
+        "passed": true,
+        "childExitCode": 3,
+        "expectedExit": "3"
+      },
+      {
+        "id": "META-04",
+        "passed": true,
+        "childExitCode": 2,
+        "expectedExit": "2"
+      },
+      {
+        "id": "META-05",
+        "passed": true,
+        "childExitCode": 0,
+        "expectedExit": "0 mixed / 2 all-skip / 2 runtime"
+      },
+      {
+        "id": "META-06",
+        "passed": true,
+        "childExitCode": 4,
+        "expectedExit": "4"
+      },
+      {
+        "id": "META-07",
+        "passed": true,
+        "childExitCode": 1,
+        "expectedExit": "1"
+      }
+    ]
+  },
+  "committedFinalEvidence": {
+    "file": "proxy_v6/evidence/v6/final.json",
+    "head": "d5f21342da45ee4a1f245de84ed15e05d2a1b47a",
+    "dirty": false,
+    "cases": 92,
+    "passed": 92,
+    "skipped": 0,
+    "zeroAssertions": 0,
+    "perCaseFiles": 92,
+    "missingEvidenceFiles": 0
+  },
+  "committedSelfTestEvidence": {
+    "file": "proxy_v6/evidence/selftest/canonical/selftest.json",
+    "head": "c562c1899488d07b67d2e1fd804e3656e1db7a27",
+    "dirty": true,
+    "gap": "stale/dirty; not bound to d5f2134; independent clean run used instead (R3-04)"
+  },
+  "secretScan": {
+    "tool": "gitleaks 8.30.1",
+    "worktreeFindings": 0,
+    "historyFindings": 0
+  },
+  "round3Findings": {
+    "noNewHighInD5f2134": true,
+    "f11OriginalPathClosed": true,
+    "newMedium": [
+      "R3-01 legacy proxy_diag/proxy_v2/proxy_v3 direct HKCU writes",
+      "R3-02 non-atomic registry write"
+    ],
+    "c02": "OPEN HIGH (documented; user acceptance or removal required)",
+    "c01": "PARTIAL/ACCEPTED-RISK (user acceptance required)",
+    "c12": "WAITING-USER"
+  },
+  "gate": {
+    "pass": 11,
+    "partial": 1,
+    "fail": 0,
+    "gate10": "PASS substantively; round3 reports untracked"
+  },
+  "verdict": "NOT_READY",
+  "blockers": [
+    "B1 commit round3 reports and update Gate/ISSUE-LEDGER F11 status",
+    "B2 C-02 HIGH user acceptance or removal; C-01 plaintext snapshots and C-12 PII user decision",
+    "B3 committed canonical self-test evidence is c562c18/dirty=true; refresh at final tree",
+    "B4 INCIDENT doc contradictory 'source unknown' line",
+    "B5 R3-01/R3-02 MED and R2A-06/LOW residuals remain OPEN/ACCEPTED",
+    "B6 real production apply/rollback/boot/24h/72h remain DEFERRED"
+  ],
+  "boundary": "No real apply/rollback/state; no HKCU/system proxy/Clash/appdata/registry/network/task/credential modifications by Agent E; no module install."
+}

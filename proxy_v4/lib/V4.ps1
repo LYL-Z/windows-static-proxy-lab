@@ -67,8 +67,10 @@ function Get-V4Redacted {
     param([string]$Text)
     if (-not $Text) { return $Text }
     foreach ($s in $script:Secrets) { if ($s -and $s.Length -ge 3) { $Text = $Text.Replace($s, '***') } }
+    # URL userinfo first, otherwise "user:pass@" can be mistaken for a key/value pair.
+    $Text = [regex]::Replace($Text, '(?i)([a-z][a-z0-9+.-]*://)[^/@\s]+@', '$1***@')
     # Covers quoted JSON keys, quoted values with spaces, and unquoted key: value lines.
-    $Text = [regex]::Replace($Text, '(?i)("?(?:password|passwd|pwd|pass|secret|token|username|user|authorization|cookie)"?\s*[:=]\s*)("[^"]*"|''[^'']*''|[^\r\n]+)', '$1"***"')
+    $Text = [regex]::Replace($Text, '(?i)("?(?:password|passwd|pwd|pass|secret|token|username|user|authorization|cookie|x-api-key|api[_-]?key|apikey)"?\s*[:=]\s*)("[^"]*"|''[^'']*''|[^\r\n]+)', '$1"***"')
     $Text = [regex]::Replace($Text, '(?i)(Basic\s+)([A-Za-z0-9+/=]{4,})', '$1***')
     $Text = [regex]::Replace($Text, '(?i)(Bearer\s+)([A-Za-z0-9._~+/=-]{4,})', '$1***')
     $Text = [regex]::Replace($Text, '(?i)([a-z][a-z0-9+.-]*://)[^/@\s]+@', '$1***@')
@@ -515,7 +517,7 @@ function Invoke-V4Init {
     if ($hasExplicit) {
         $host_ = [string]$Explicit['host']; $port = [int]$Explicit['port']
         $user = [string]$Explicit['user']; $pass = [string]$Explicit['pass']
-        if (-not $host_ -or -not $user -or -not $pass) { throw (New-V4Fault 11 'explicit init requires -StaticHost, -StaticUser and -StaticPass') }
+        if (-not $host_ -or -not $user -or -not $pass) { throw (New-V4Fault 11 'explicit init requires -StaticHost, -StaticUser and -StaticPassFile') }
         if ($port -eq 0) { $port = 9506 }
         $source = 'explicit parameters'
     }
@@ -523,7 +525,7 @@ function Invoke-V4Init {
         if (-not $Paths -or -not $Paths.RuntimeFile -or -not (Test-Path -LiteralPath $Paths.RuntimeFile)) { throw (New-V4Fault 11 'no clash runtime config to migrate from') }
         $t = Read-V4File $Paths.RuntimeFile
         $cands = @(Get-V4Socks5Candidates -Text $t)
-        if ($cands.Count -ne 1) { throw (New-V4Fault 11 ('expected exactly 1 socks5 node, found {0}; pass -StaticHost/-StaticUser/-StaticPass explicitly' -f $cands.Count)) }
+        if ($cands.Count -ne 1) { throw (New-V4Fault 11 ('expected exactly 1 socks5 node, found {0}; pass -StaticHost/-StaticUser/-StaticPassFile explicitly' -f $cands.Count)) }
         $c = $cands[0]
         $host_ = $c.host; $port = if ($c.port) { [int]$c.port } else { 0 }
         $user = $c.user; $pass = $c.pass
@@ -551,6 +553,10 @@ function Test-V4AclHardened {
     try {
         $acl = Get-Acl -LiteralPath $Path
         if (-not $acl.AreAccessRulesProtected) { return $false }
+        try {
+            $ownerSid = (New-Object System.Security.Principal.NTAccount([string]$acl.Owner)).Translate([System.Security.Principal.SecurityIdentifier]).Value
+            if ($Allowed -notcontains $ownerSid) { return $false }
+        } catch { return $false }
         $me = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
         $hasMe = $false
         foreach ($r in @($acl.Access)) {
@@ -1003,9 +1009,22 @@ function Write-V4SystemProxyRegistry {
     }
     Assert-V4ProductionOperation 'system proxy registry write'
     $k = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings'
-    Set-ItemProperty $k -Name ProxyServer -Value $Server
-    Set-ItemProperty $k -Name ProxyEnable -Value $(if ($Enabled) { 1 } else { 0 })
-    Update-V4WinInet
+    $old = Get-ItemProperty $k -ErrorAction SilentlyContinue
+    $oldServer = $old.ProxyServer
+    $oldEnable = $old.ProxyEnable
+    try {
+        Set-ItemProperty $k -Name ProxyServer -Value $Server
+        Set-ItemProperty $k -Name ProxyEnable -Value $(if ($Enabled) { 1 } else { 0 })
+        Update-V4WinInet
+    }
+    catch {
+        try {
+            Set-ItemProperty $k -Name ProxyServer -Value $oldServer
+            Set-ItemProperty $k -Name ProxyEnable -Value $oldEnable
+            Update-V4WinInet
+        } catch { }
+        throw
+    }
 }
 
 function Set-V4SystemProxy {
@@ -1333,6 +1352,21 @@ function Get-V4Controller {
 }
 
 # -------------------------------------------------------------------- state ----
+function Get-V4UiSystemProxy {
+    if ($script:TestMode) {
+        if ($env:V4_TEST_UI_SYSTEM_PROXY -eq '1') { return $true }
+        if ($env:V4_TEST_UI_SYSTEM_PROXY -eq '0') { return $false }
+        return $null
+    }
+    try {
+        $f = Join-Path (Join-Path $env:APPDATA 'io.github.clash-verge-rev.clash-verge-rev') 'verge.yaml'
+        if (-not (Test-Path -LiteralPath $f)) { return $null }
+        $t = Read-V4File $f
+        if ($t -and $t -match '(?m)^enable_system_proxy:\s*(true|false)') { return ($Matches[1] -eq 'true') }
+    } catch { }
+    return $null
+}
+
 function Get-V4StateCore {
     param(
         [object]$Settings,
@@ -1342,7 +1376,8 @@ function Get-V4StateCore {
         [bool]$MixedPortOpen,
         [object]$FirstHop,
         [scriptblock]$GetExitIp,
-        [string]$SettingsError = ''
+        [string]$SettingsError = '',
+        [object]$UiSystemProxy = $null
     )
     $out = [ordered]@{
         ts = (Get-Date).ToString('s')
@@ -1353,6 +1388,7 @@ function Get-V4StateCore {
         owner = $(if ($Owner) { $Owner.owner } else { 'none' })
         firstHopOk = $false
         exitViaChain = $null
+        uiSystemProxy = $(if ($null -eq $UiSystemProxy) { 'unknown' } elseif ($UiSystemProxy) { 'enabled' } else { 'disabled' })
     }
     if ($SettingsError) {
         $out.state = 'FAILED'; $out.mode = 'UNKNOWN'
@@ -1384,6 +1420,13 @@ function Get-V4StateCore {
             else { $out.state = 'FAILED'; $out.reasons += 'no exit ip' }
         }
     }
+    if ($null -ne $UiSystemProxy) {
+        $actualEnabled = [bool]($SystemProxy -and $SystemProxy.enabled)
+        if ([bool]$UiSystemProxy -ne $actualEnabled) {
+            if ($out.state -ne 'FAILED') { $out.state = 'DEGRADED' }
+            $out.reasons += ('UI reports system proxy ' + $(if ($UiSystemProxy) { 'enabled' } else { 'disabled' }) + ', actual HKCU is ' + $(if ($actualEnabled) { 'enabled' } else { 'disabled' }))
+        }
+    }
     return $out
 }
 
@@ -1404,7 +1447,8 @@ function Get-V4State {
         $hop = Test-V4FirstHop -Port $s.hopPort
     }
     $exitProbe = { param($proxy) Get-V4ExitIp -Proxy $proxy }
-    return Get-V4StateCore -Settings $s -Owner $owner -SystemProxy $px -AppPids $pids -MixedPortOpen $mixed -FirstHop $hop -GetExitIp $exitProbe -SettingsError $settingsError
+    $uiProxy = Get-V4UiSystemProxy
+    return Get-V4StateCore -Settings $s -Owner $owner -SystemProxy $px -AppPids $pids -MixedPortOpen $mixed -FirstHop $hop -GetExitIp $exitProbe -SettingsError $settingsError -UiSystemProxy $uiProxy
 }
 
 function Get-V4Integrity {

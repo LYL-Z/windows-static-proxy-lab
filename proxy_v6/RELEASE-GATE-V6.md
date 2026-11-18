@@ -1,11 +1,11 @@
 # RELEASE-GATE-V6
 
 最后更新：2026-11-18T06:01-08:00
-结论：**NOT_READY**（原因：F11/第三轮复审进行中；C-01/C-12 需用户确认；真实生产测试/长稳 DEFERRED）
+结论：**NOT_READY / SHORT_RUN_ACCEPTED WITH CONDITIONS**（C-01/C-12 需用户书面接受；真实生产测试/长稳 DEFERRED）
 
 | # | Gate 条件 | 状态 | 证据 |
 |---|---|---|---|
-| 1 | 全部已确认 HIGH 软件安全缺陷关闭 | **PARTIAL** | R2A-01 修复待复审；C-01 残余；F11 待独立确认 |
+| 1 | 全部已确认 HIGH 软件安全缺陷关闭 | **PARTIAL** | C-02 已关闭；F11/R2A-01 第三轮复审确认；C-01 快照明文凭据与 C-12 PII 待用户接受/决定 |
 | 2 | F01–F10 全部重新核验 | **PASS** | 92 用例；F07 16、F08 10、F09 套件、F10 10 |
 | 3 | F08/F09/F10 残余路径验证 | **PASS** | F08-09/10、F09-SUITE、F10-10、INF-APPLY-INIT-01 |
 | 4 | 多文件事务负向测试全部通过 | **PASS** | F07-01..16 |
@@ -17,7 +17,8 @@
 | 10 | 连续两轮独立复审无新增 HIGH | **FAIL** | round1+round2 已做；round2 发现 R2A-01 已修，但最终提交尚未复审 |
 | 11 | 公开发布秘密扫描通过 | **PASS** | gitleaks 8.30.1 工作树/历史 0 findings |
 | — | 最终证据绑定 | **PASS** | b9bb9a0: final.json head=d5f2134, dirty=false, 92/92, 0 skipped, 0 zero-assertion |
-| 12 | 延期/阻塞项目明确披露 | **PASS** | 本文、ISSUE-LEDGER、TASK-STATE、TEST-MATRIX |
+| 12 | 延期/阻塞项目明确披露 | **PASS** | 本文、ISSUE-LEDGER、TASK-STATE、TEST-MATRIX；F12 见专文 |
+| 13 | F12 UI/实际状态一致性 | **PASS** | INF-F12-01；state 输出 uiSystemProxy；F12-RUNTIME-STATE-MISMATCH.md |
 
 ## 独立闸门
 
