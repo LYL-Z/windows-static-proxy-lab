@@ -33,3 +33,9 @@
 - NexIP 密码轮换：BLOCKED-USER。
 - C-01 快照仍为明文凭据（ACL 已加固）；C-12 IP/路径/用户名公开范围待用户决定。
 - R2A-06 journal commit phase：OPEN。
+### 最终提交
+- abe0eaa：第一轮 V6 修复与 75 用例。
+- c562c18：F11 生产事故、隔离门闩、R2A/R2C 修复与 92 用例。
+- d5f2134：rollback 仅在快照清单验证通过后才允许补救启动。
+- b9bb9a0：干净树最终证据（final.json head=d5f2134, dirty=false, 92/92, 0 skipped, 0 zero-assertion）。
+- 分支 v5/short-run-hardening 已推送；PR #1 保持 Draft，未合并 main。

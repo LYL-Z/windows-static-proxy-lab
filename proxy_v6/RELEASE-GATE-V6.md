@@ -1,7 +1,7 @@
 # RELEASE-GATE-V6
 
-最后更新：2026-11-18T05:53-08:00
-结论：**NOT_READY**（原因：F11 独立复审未完成；最终干净树证据/推送未完成；C-01/C-12 需用户确认）
+最后更新：2026-11-18T06:01-08:00
+结论：**NOT_READY**（原因：F11/第三轮复审进行中；C-01/C-12 需用户确认；真实生产测试/长稳 DEFERRED）
 
 | # | Gate 条件 | 状态 | 证据 |
 |---|---|---|---|
@@ -16,6 +16,7 @@
 | 9 | 无虚假通过/未声明跳过 | **PASS** | 零断言判失败；92 executed/0 skipped；assertions>0 |
 | 10 | 连续两轮独立复审无新增 HIGH | **FAIL** | round1+round2 已做；round2 发现 R2A-01 已修，但最终提交尚未复审 |
 | 11 | 公开发布秘密扫描通过 | **PASS** | gitleaks 8.30.1 工作树/历史 0 findings |
+| — | 最终证据绑定 | **PASS** | b9bb9a0: final.json head=d5f2134, dirty=false, 92/92, 0 skipped, 0 zero-assertion |
 | 12 | 延期/阻塞项目明确披露 | **PASS** | 本文、ISSUE-LEDGER、TASK-STATE、TEST-MATRIX |
 
 ## 独立闸门
