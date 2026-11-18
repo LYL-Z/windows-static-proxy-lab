@@ -273,3 +273,64 @@
 - 若要把 C-02 的关闭做成"可审计"的，最低条件：墓碑参数 + `INF-APPLY-INIT-02` 断言显式拒绝文案 + 文档改写 + （可选）pass file ACL 校验。
 
 **本轮新增计数：0×HIGH，1×MED（R3D-01），4×LOW（R3D-02…05）。**
+
+---
+
+# DELTA2 — 定向验证 code `79198fd`（证据 `32d8abc`，自验同靶，HEAD `dbbd259`）
+
+> **复审对象（精确提交）**：**代码 `79198fd`**（2026-11-18 06:31:29）；**证据 `32d8abc`** 的 `proxy_v6/evidence/v6/final.json` + `final.cases/0001..0097`；canonical selftest `head=79198fd, dirty=false, 7/7`；文档 `103f707`；HEAD `dbbd259`（仅新增 `.gitleaks.toml` 允许名单 + 文档；`79198fd..HEAD` 在 `proxy_v4/**`、`proxy_v6/tests/**` 上 `git diff` 为空）。工作树干净。
+> 与上一靶标 `0268e17` 的 delta：7 文件、+81/−28（apply/V4 + 2 文档 + 3 测试）。
+
+## E1. 证据独立复现
+
+| 项 | 提交证据 | 我的独立复跑（`git archive 79198fd`） |
+|---|---|---|
+| 计数 | 97/97，skipped=0，exit 0 | **97/97，skipped=0，exit 0** |
+| 断言 | zeroAssert=0，min=1，sum=**133** | zeroAssert=0，min=1，sum=**133** |
+| 锚定 | `head=79198fd`、`dirty=false`；06:31:35 开始（提交后 +6s） | git-archive 树（无 .git），代码与 `79198fd` 一致 |
+| 定向用例 | `INF-APPLY-INIT-01/02/03`、`INF-F12-01/02/03` 全 pass（各 1 断言） | 同六项全 pass |
+
+结论：97/97 与断言总和 133 可独立复现 → 可信。
+
+## E2. C-02：前缀假阳性**确实消失**，关闭可审计
+
+**代码机制**：`apply-v4.ps1:19-20` 把 `-StaticPass` 与 `-StaticPassFile` 声明为**墓碑参数**；`:38-40` 在**取锁与任何写之前**用 `$PSBoundParameters.ContainsKey(...)` 判定并 `Fail 11 '-X was removed; use -CredentialFile <protected file>'`。旧拼写现在是**精确匹配**（不再落为 `-StaticPassFile` 的前缀），而 `-StaticPas` 之类前缀在绑定阶段即被判为歧义。
+
+**实测**（`%TEMP%`，`V4_TEST_MODE=1`，不触 HKCU/网络；7/7）：
+- **T1（复刻上一轮假阳性场景）**：在 CWD 放入一个**与旧口令同名**的文件，再执行 `-Init … -StaticPass <同名值>` → exit **11**、输出含 `was removed` 与 `-CredentialFile` 提示、**settings 未写**、输出不含该文件内容（同名文件被忽略）。
+- T2 `-StaticPassFile <路径>` → exit 11 移除提示，无 settings。
+- T3 `-StaticPas x`（歧义前缀）→ exit 1（PowerShell 绑定拒绝），无 settings。
+- T4 `-CredentialFile` 指向**未加固**文件 → exit 11 `credential file ACL is not hardened`，无 settings。
+- T5 `-CredentialFile` 指向**已加固**文件 → exit 10（无 appdata），settings 已写 → 预期路径可用。
+- T6 墓碑 + 有效 `-CredentialFile` 同时给 → exit 11（墓碑优先），无 settings。
+- T7 `-CredentialFile` 指向目录 → exit 11（ACL 门禁拒绝）。
+
+**用例对口**：`INF-APPLY-INIT-02` 现在断言 exit 11 + `was removed` + 无 settings；`INF-APPLY-INIT-03` 覆盖 `-StaticPassFile`。上一轮的假阳性（靠"文件不存在"偶然通过）**不再成立**。
+
+**裁定**：**C-02 = VERIFIED-CLOSED（可审计）**。**R3D-01 关闭**；**R3D-02 关闭**（`-CredentialFile` 现在做 ACL + owner 校验，T4/T5 证实）。
+
+## E3. F12：当前生产态报告正确（FAILED + UI 原因，不是 DEGRADED）
+
+**真实输入（只读，无写）**：HKCU `ProxyEnable=0`、`ProxyServer=127.0.0.1:7897`；`verge.yaml` 的 `enable_system_proxy: true`；`proxy_v4\config\settings.json` **不存在** → 与 lead 描述一致（HKCU=0 / UI=on / settings missing）。
+
+**用真实 `state-v4.ps1`**（test mode，等价注入上述三输入；3/3）：
+- **S1** settings missing + UI on + HKCU off → exit **3**、`state=FAILED`、reasons 含 settings 原因 **与** `UI reports system proxy enabled, actual HKCU is disabled`，`uiSystemProxy=enabled` → **FAILED + UI 原因，而不是 DEGRADED**。
+- **S2** settings missing + UI off + HKCU off → FAILED，**无** UI 原因（不误报）。
+- **S3** UI 未知 → `uiSystemProxy=unknown`，**无** UI 原因（不臆造 mismatch）。
+
+**代码依据**：`Get-V4StateCore` 现在在 settings 分支**之前**计算 `$uiMismatch` 并 append reason（FAILED 也保留），末尾仅在 `state -ne FAILED` 时降为 DEGRADED（`V4.ps1:1399-1404, 1434`）。分类正确：settings 缺失时"无法判定链路"优先记 FAILED，UI 不一致作为附加诊断，不再被实现细节吞掉。
+
+**裁定**：**F12 分类与报告正确**；**R3D-03（解析器无用例）关闭**（`INF-F12-03` 用 `V4_TEST_UI_CONFIG` 覆盖 true/false/缺键/缺文件）。残余（LOW，不误报）：带引号值或键改名 → `unknown`。
+
+## E4. 新 HIGH 与残余
+
+- **新 HIGH：无。** delta 未新增生产写路径；墓碑在锁前失败；`-CredentialFile` 在读取前做 ACL/owner 校验；F12 仅影响报告内容。
+- **新发现 1×LOW（R5D-01）**：`-CredentialFile` 要求文件 ACL 已加固（受保护 DACL + owner ∈ 允许集），但 `USER-GUIDE-V4.md:47`、`USER-GUIDE-V6.md:12`、`SECURITY-NOTES.md:29` 只写"<受保护文件>/ACL-hardened"，**未给出可执行的加固命令或工具开关**；普通用户用记事本新建的文件会被 exit 11 拒绝且不知如何修复。建议在指南给出 `icacls <file> /inheritance:r /grant:r ...` 一行示例，或提供 `Protect-V4Acl` 的小工具入口。
+- **仍开放（与上一轮一致）**：R2A-06（MED，journal 无提交阶段）、R3-01（MED，门闩只覆盖注册表/进程入口；本 delta 未触及）、R3D-04（C-04 owner 检查无专门负向用例）、R3D-05（系统代理写补偿只覆盖进程内异常，两次写之间硬杀仍半写）。
+- **已关闭**：R3D-01（C-02 证据假阳性）、R3D-02（口令文件 ACL 未校验）、R3D-03（F12 解析器无用例）。
+
+## E5. 结论
+
+- **计数：本轮 delta 0×HIGH、0×MED、1×LOW（R5D-01），并关闭 3 项旧残余。**
+- 事务/并发维度裁定不变：**SHORT_RUN 可接受**；C-02 可记 **VERIFIED-CLOSED**；F12 可记"分类正确、当前生产态报告准确（FAILED + UI 原因）"。
+- 发布文本仍需披露：R2A-06、R3-01、R3D-04、R3D-05、R5D-01，以及"真实生产 apply/rollback/state 未执行（本报告全部结论基于隔离测试与只读观测）"。

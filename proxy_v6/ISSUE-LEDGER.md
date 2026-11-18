@@ -16,7 +16,7 @@
 | 恢复 | 05:34 将 ProxyServer 改为 127.0.0.1:7897；因百度经 Clash 502，05:35 将 ProxyEnable=0；当前关闭系统代理，Baidu/Google/ipify 均 200 |
 | 代码修复 | 测试模式注册表写默认抛错；test writer 才可 mock；生产脚本必须 `Enable-V4ProductionWrites`；Start/Stop 测试模式安全 no-op |
 | 回归测试 | FT16 mock x；FT17 mock 失败；FT18 异常终止；FT19 并行；FT20 异常状态不误报 HEALTHY；FT21 HKCU/WinHTTP 前后一致 |
-| 状态 | **FIXED-PENDING-INDEPENDENT-REVIEW**；在独立复审确认前不得关闭 |
+| 状态 | **VERIFIED-CLOSED（代码层）**：round3 transaction/security + final acceptance delta2 独立确认；生产目录仍是 baseline，未部署 |
 
 ## A2. F12 — 运行时状态不一致（只读诊断）
 
@@ -78,12 +78,12 @@
 | V5-01 上游 2.5.10 缺 150bfae | OPEN（上游事实） |
 | V5-02 #8593 系统代理回退 | OPEN（上游/设计风险） |
 | V5-03 NexIP 密码轮换 | **BLOCKED-USER** |
-| V5-05 真实 V4 回滚往返 | **DEFERRED-BY-USER**（隔离回滚已测） |
+| V5-05 真实 V4 回滚往返 | **WAITING-USER**（隔离回滚已测；需生产授权） |
 | V5-07 13/13 仍 exit 1 | **VERIFIED-CLOSED**（旧套件废弃；新 harness 退出码自验） |
 | V5-08 FT11/FT14 | **VERIFIED-CLOSED**（注入覆盖；见 TEST-MATRIX） |
 
 ## E. 关闭规则
 
 只有“独立失败测试先证明缺陷 → 修复 → 同一测试转绿 + 独立复审确认”才可标 VERIFIED-CLOSED。
-F11 在独立复审确认前保持 FIXED-PENDING-INDEPENDENT-REVIEW。
+F11 代码层已独立确认关闭；生产部署仍未完成。
 不得以源码存在某行、静态阅读或主代理自评作为关闭依据。

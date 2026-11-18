@@ -21,5 +21,5 @@
 - C-12 公开 IP/路径/用户名范围：WAITING-USER。
 - C-01 快照明文凭据长期留存：需用户接受或后续加密/保留策略。
 - NexIP 密码轮换：BLOCKED-USER。
-- 真实 apply/rollback/boot/睡眠/Wi-Fi/24h/72h：DEFERRED-BY-USER。
+- 真实 apply/rollback/boot/睡眠/Wi-Fi：**WAITING-USER**（需生产授权）；24h/72h：DEFERRED-BY-USER。
 - Clash 国内直连规则（可选 B）：WAITING-USER；当前系统代理关闭，先不修改。

@@ -70,8 +70,8 @@ F10-01..10：恢复失败/日志失败/启动失败/代理恢复失败/owner 恢
 
 | 项 | 状态 |
 |---|---|
-| 真实生产 apply/rollback/state | 未执行（DEFERRED-BY-USER） |
-| 真实重启/睡眠/Wi-Fi/断网 | 未执行（DEFERRED-BY-USER） |
+| 真实生产 apply/rollback/state | 未执行（WAITING-USER） |
+| 真实重启/睡眠/Wi-Fi/断网 | 未执行（WAITING-USER） |
 | 24h/72h | DEFERRED-BY-USER |
 | 跨用户/跨机器 DPAPI | 未执行 |
 | 真实 Clash 进程停止/启动 | 仅 test-mode no-op 与隔离 fake；未真实执行 |

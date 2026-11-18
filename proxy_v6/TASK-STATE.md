@@ -29,7 +29,7 @@
 - P7 安全：C-03/C-10/C-11 关闭；C-01/C-02/C-12 残余披露
 - P8 生命周期隔离：**通过**（LIFE 用例）
 - P9 独立复审：**两轮已有**；第三轮已确认 d5f2134；C-02/F12 delta 复审进行中（目标 79198fd/32d8abc）
-- P10 最终验收：**NOT_READY**（等待第三轮复审；真实生产测试/长稳仍 DEFERRED）
+- P10 最终验收：**NOT_READY**（等待生产授权；真实生产测试 WAITING-USER，长稳 DEFERRED）
 
 ## 3. 已完成
 
@@ -48,7 +48,7 @@
 - 最终证据已绑定 0268e17 + dirty=false，推送 1c7fdad/ebbf2e6/990d896。
 - C-02 文档警告（本轮更新）、C-01 快照明文残余、C-12 PII 范围：需用户确认。
 - R2A-06 journal commit phase：OPEN，当前 fail-closed。
-- 真实 apply/rollback/boot/24h/72h：DEFERRED-BY-USER。
+- 真实 apply/rollback/boot/睡眠/Wi-Fi：**WAITING-USER**；24h/72h：DEFERRED-BY-USER。
 - NexIP 密码轮换：BLOCKED-USER。
 
 ## 5. 下一条可立即执行

@@ -213,3 +213,45 @@
 6. **真实环境范式**：真实 apply/rollback/boot/24h/72h 未执行，继续 DEFERRED-BY-USER；LONG_RUN 不在本次；凭据轮换 BLOCKED-USER。
 
 **明确不接受**：把隔离 94/94 当作真实生产 apply/rollback/boot 验证；本 delta 没有执行/验证真实 HKCU/网络/Clash。
+
+---
+
+## DELTA2 — `79198fd` / `32d8abc`（2026-11-18T06:36-08:00）
+
+**对象（精确）**：代码 `79198fd`；最终证据 `32d8abc`（final.json head=79198fd, dirty=false, **97/97**, 0 skipped, 0 zero-assertion, sum=133）；canonical self-test head=79198fd, dirty=false, 7/7；docs `103f707`；gitleaks allowlist `dbbd259`；当前 HEAD=`dbbd259`，origin 同点，工作树干净。
+
+### E.1 独立增量证据
+
+| 项 | 结果 |
+|---|---|
+| 旧拼写墓碑（TEMP/test mode，同名文件存在） | `-StaticPass 'fixture-pass'` → **exit 11，`-StaticPass was removed; use -CredentialFile`**，无 settings；`-StaticPassFile 'fixture-pass'` → **exit 11，removal message**，无 settings |
+| 新 `-CredentialFile`（TEMP，ACL hardened） | 合法文件 → **exit 10**，settings 被写（随后因无 appdata 路径失败，预期） |
+| 目标用例 `INF-APPLY-INIT-*` | **3/3 PASS，exit 0**，head=dbbd259，dirty=false |
+| 目标用例 `INF-F12-*` | **3/3 PASS，exit 0**，head=dbbd259，dirty=false |
+| F12 missing-settings 复现（TEMP core） | Settings=$null + SettingsError='settings.json missing' + Ui=true → **FAILED**，`uiSystemProxy=enabled`，reasons=`UI reports system proxy enabled, actual HKCU is disabled` + `settings invalid: settings.json missing`；**不是 DEGRADED** |
+| 提交 final.json（只读） | head=79198fd，dirty=false，**97/97**，0 skip，0 zero，sum=133，97 个 per-case 文件齐全 |
+| 提交 selftest（只读） | head=79198fd，dirty=false，**7/7**，exit 0 |
+| 独立 META | **7/7 PASS，exit 0**（TEMP） |
+| Gitleaks | 工作树/历史 **0 findings**；`.gitleaks.toml` 仅允许 `proxy_v6/tests/cases/fixtures/Run-InfraCase.ps1` 中合成字面量 `abcdef123456`，范围窄且已披露 |
+
+### E.2 逐项确认
+
+- **C-02：CLOSED（可审计）**。`-StaticPass` / `-StaticPassFile` 现在是显式墓碑参数，精确匹配、在 `$PSBoundParameters` 中检查后立即 `Fail 11`；即使 CWD 存在同名文件也不会被当作 `-CredentialFile` 路径。`INF-APPLY-INIT-02/03` 断言 removal message 而非“文件不存在”，前一轮的前缀绑定假阳性已消失。`-CredentialFile` 是唯一文件输入，`Test-V4AclHardened` 要求 ACL 合格。残余 LOW：用户若仍键入旧参数，秘密字符串会进入命令行/历史后才被拒绝；新文档用 `-CredentialFile`，这是用户操作风险，不是工具继续接受密码。
+- **F12：正确**。当前 production `settings.json` 缺失，`Get-V4StateCore` 现在在 early return 前计算 UI mismatch 并追加 reason → **FAILED + UI reason**，不是 DEGRADED，也不是 HEALTHY；符合“当前是 F11 应急恢复 + UI mismatch，不是新污染”的定性。`INF-F12-02` 覆盖 missing settings + UI on；`INF-F12-03` 覆盖 `verge.yaml` true/false/缺键/缺文件；`Get-V4UiSystemProxy` 可通过 `V4_TEST_UI_CONFIG` 测试。残余 LOW：带引号的 `enable_system_proxy: "true"` 仍解析为 unknown（fail-open 于报告层，不影响安全/不会误报 HEALTHY）。
+- **新 HIGH：无**。delta 只加墓碑/凭据文件 ACL 检查、F12 只读解析/报告；无新增生产写路径。
+- **仍存的非 delta 残余**：C-01 明文快照、C-12 PII 需用户接受/决定；R3-01 旧 proxy_diag/v2/v3 仍可直接写 HKCU（MED）；R3-02 补偿仅进程内、仍非跨进程原子；C-04 继承标志残余；R2A-06 journal commit phase OPEN；R3-03/04/05 等 LOW。
+- **Gate/账本仍滞后**：`RELEASE-GATE-V6.md`（dbbd259）仍写 Gate 10 **FAIL**、F11 **PENDING**、“SHORT_RUN_ACCEPTED 未达”；`ISSUE-LEDGER` F11 仍 FIXED-PENDING；`TASK-STATE` 仍写旧 HEAD/远端（ebbf2e6/32d8abc）。这些需更新为 79198fd/32d8abc/dbbd259、C-02 closed、F11 round3 confirmed、97/97。
+
+### E.3 增量裁定
+
+**Delta2 verdict: SHORT_RUN_ACCEPTED（有条件）**。
+
+代码层短跑可接受：C-02 前缀绑定假阳性已消失（同名文件下墓碑仍 exit 11），F12 当前 production 报 FAILED + UI reason 正确，97/97/自验 7/7 干净绑定，无新 HIGH。**无条件发布仍 NOT_READY**，条件：
+
+1. **C-01/C-12 用户书面处置**：接受 ACL 保护的明文快照、公开 IP/路径/用户名范围，或完成加密/脱敏。
+2. **Gate/账本/TASK-STATE 更新**：Gate 10/F11、C-02/C-04/C-15、97/97、head 79198fd/32d8abc/dbbd259 与 origin 同步；不得保留 Gate 10 FAIL/F11 PENDING。
+3. **R3-01/R3-02/C-04/R2A-06 处置/披露**：旧 diag/v2/v3 写 HKCU 入口加退役/latch 或书面接受；R3-02 补失败用例或接受非原子残余；C-04 继承标志/R2A-06 保持 OPEN。
+4. **真实环境范式**：真实 apply/rollback/boot/24h/72h 未执行，继续 DEFERRED-BY-USER；LONG_RUN 不在本次；凭据轮换 BLOCKED-USER。
+
+**明确不接受**：把隔离 97/97 当作真实生产 apply/rollback/boot 验证；本轮未执行/验证真实 HKCU/网络/Clash。
+

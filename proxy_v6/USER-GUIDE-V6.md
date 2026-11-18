@@ -34,7 +34,7 @@
 - 不要为修复代理而改路由、TUN、IPv6、StarSky 配置；先保留可上网状态。
 
 ## 6. 已知残余
-- 真实 apply/rollback/重启/睡眠/24h/72h 未执行（DEFERRED-BY-USER）。
+- 真实 apply/rollback/重启/睡眠/Wi-Fi 未执行（**WAITING-USER**）；24h/72h DEFERRED-BY-USER。
 - NexIP 密码未轮换（BLOCKED-USER）。
 - 快照明文凭据、公开仓库 IP/路径/用户名范围：待用户确认。
 - journal 无 commit 阶段；崩溃后保守要求回滚（R2A-06）。

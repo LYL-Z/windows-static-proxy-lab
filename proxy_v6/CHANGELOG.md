@@ -31,7 +31,7 @@
 - Gitleaks 工作树/历史 0 findings。
 
 ### 未执行/阻塞
-- 真实 apply/rollback/boot/睡眠/Wi-Fi/24h/72h：DEFERRED-BY-USER。
+- 真实 apply/rollback/boot/睡眠/Wi-Fi：**WAITING-USER**（需生产授权）；24h/72h：DEFERRED-BY-USER。
 - NexIP 密码轮换：BLOCKED-USER。
 - C-01 快照仍为明文凭据（ACL 已加固）；C-12 IP/路径/用户名公开范围待用户决定。
 - R2A-06 journal commit phase：OPEN。
