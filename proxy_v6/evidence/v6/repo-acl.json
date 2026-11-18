@@ -1,9 +1,10 @@
 {
-    "ts":  "2026-11-18T05:45:39",
+    "ts":  "2026-11-18T06:01:16",
     "root":  "D:\\claude防封\\publish",
-    "targets":  384,
-    "hardened":  384,
+    "targets":  1601,
+    "hardened":  1601,
     "failed":  [
 
-               ]
+               ],
+    "gitAndRootTargets":  1217
 }
