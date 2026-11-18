@@ -6,14 +6,14 @@
 | # | Gate 条件 | 状态 | 证据 |
 |---|---|---|---|
 | 1 | 全部已确认 HIGH 软件安全缺陷关闭 | **PARTIAL** | C-02 已关闭；F11/R2A-01 第三轮复审确认；C-01 快照明文凭据与 C-12 PII 待用户接受/决定 |
-| 2 | F01–F10 全部重新核验 | **PASS** | 92 用例；F07 16、F08 10、F09 套件、F10 10 |
+| 2 | F01–F10 全部重新核验 | **PASS** | 94 用例；F07 16、F08 10、F09 套件、F10 10 |
 | 3 | F08/F09/F10 残余路径验证 | **PASS** | F08-09/10、F09-SUITE、F10-10、INF-APPLY-INIT-01 |
 | 4 | 多文件事务负向测试全部通过 | **PASS** | F07-01..16 |
 | 5 | 回滚与并发测试全部通过 | **PASS** | INF-ROLLBACK-01..04、LOCK-01..05、FT19 |
 | 6 | 日志故障不阻断必要恢复 | **PASS** | F10-01..10、LOG-01/02 |
 | 7 | 无关配置不会被误修改 | **PASS** | INF-DRYRUN-01、F07-03/04/09、DATA/ACL |
 | 8 | 测试框架退出码正确 | **PASS** | META-01..07；0/1/2/3/4 负控 |
-| 9 | 无虚假通过/未声明跳过 | **PASS** | 零断言判失败；92 executed/0 skipped；assertions>0 |
+| 9 | 无虚假通过/未声明跳过 | **PASS** | 零断言判失败；94 executed/0 skipped；assertions>0 |
 | 10 | 连续两轮独立复审无新增 HIGH | **FAIL** | round1+round2 已做；round2 发现 R2A-01 已修，但最终提交尚未复审 |
 | 11 | 公开发布秘密扫描通过 | **PASS** | gitleaks 8.30.1 工作树/历史 0 findings |
 | — | 最终证据绑定 | **PASS** | 1c7fdad: final.json head=0268e17, dirty=false, 94/94, 0 skipped, 0 zero-assertion；ebbf2e6: selftest head=0268e17, dirty=false, 7/7 |
