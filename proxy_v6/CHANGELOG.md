@@ -41,7 +41,8 @@
 - d5f2134：rollback 仅在快照清单验证通过后才允许补救启动。
 - b9bb9a0：干净树证据（d5f2134, 92/92）。
 - 0268e17：C-02 凭据文件、F12 UI/实际状态报告、ACL owner、脱敏、系统代理写补偿（94 用例）。
-- 后续：CredentialFile + 墓碑参数、F12-02/03、gitleaks 合成字面量替换（97 用例）。
+- 79198fd：CredentialFile + 墓碑参数、F12-02/03、gitleaks 合成字面量替换（97 用例）。
+- 32d8abc：最终证据（final.json head=79198fd, dirty=false, 97/97；selftest head=79198fd, dirty=false, 7/7）。
 - 1c7fdad：最终证据（final.json head=0268e17, dirty=false, 97/97）。
 - ebbf2e6：干净 selftest 证据（head=0268e17, dirty=false, 7/7）。
 - 分支 v5/short-run-hardening 已推送；PR #1 保持 Draft，未合并 main。

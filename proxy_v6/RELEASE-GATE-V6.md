@@ -16,7 +16,7 @@
 | 9 | 无虚假通过/未声明跳过 | **PASS** | 零断言判失败；94 executed/0 skipped；assertions>0 |
 | 10 | 连续两轮独立复审无新增 HIGH | **FAIL** | round1+round2 已做；round2 发现 R2A-01 已修，但最终提交尚未复审 |
 | 11 | 公开发布秘密扫描通过 | **PASS** | gitleaks 8.30.1 工作树/历史 0 findings |
-| — | 最终证据绑定 | **PASS** | 1c7fdad: final.json head=0268e17, dirty=false, 97/97, 0 skipped, 0 zero-assertion；ebbf2e6: selftest head=0268e17, dirty=false, 7/7 |
+| — | 最终证据绑定 | **PASS** | 32d8abc: final.json head=79198fd, dirty=false, 97/97, 0 skipped, 0 zero-assertion；selftest head=79198fd, dirty=false, 7/7 |
 | 12 | 延期/阻塞项目明确披露 | **PASS** | 本文、ISSUE-LEDGER、TASK-STATE、TEST-MATRIX；F12 见专文 |
 | 13 | F12 UI/实际状态一致性 | **PASS** | INF-F12-01/02/03；state 输出 uiSystemProxy；settings 缺失时 FAILED 仍带 UI reason |
 
