@@ -8,10 +8,10 @@
     "status":  "pass",
     "passed":  true,
     "detail":  "assertions passed: 1",
-    "durationMs":  579,
+    "durationMs":  748,
     "assertions":  1,
-    "startedAt":  "2026-11-18T06:32:28.338-08:00",
-    "finishedAt":  "2026-11-18T06:32:28.917-08:00",
-    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-final-7919\\final.cases\\0055-INF-LOCK-03.json",
+    "startedAt":  "2026-11-18T07:02:32.889-08:00",
+    "finishedAt":  "2026-11-18T07:02:33.638-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0055-INF-LOCK-03.json",
     "testOutput":  ""
 }

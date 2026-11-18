@@ -8,10 +8,10 @@
     "status":  "pass",
     "passed":  true,
     "detail":  "assertions passed: 1",
-    "durationMs":  545,
+    "durationMs":  621,
     "assertions":  1,
-    "startedAt":  "2026-11-18T06:33:16.930-08:00",
-    "finishedAt":  "2026-11-18T06:33:17.475-08:00",
-    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-final-7919\\final.cases\\0087-INF-SNAP-06.json",
+    "startedAt":  "2026-11-18T07:03:29.571-08:00",
+    "finishedAt":  "2026-11-18T07:03:30.192-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0087-INF-SNAP-06.json",
     "testOutput":  ""
 }

@@ -8,10 +8,10 @@
     "status":  "pass",
     "passed":  true,
     "detail":  "assertions passed: 1",
-    "durationMs":  579,
+    "durationMs":  806,
     "assertions":  1,
-    "startedAt":  "2026-11-18T06:32:33.663-08:00",
-    "finishedAt":  "2026-11-18T06:32:34.242-08:00",
-    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-final-7919\\final.cases\\0063-INF-INTEGRITY-01.json",
+    "startedAt":  "2026-11-18T07:02:39.613-08:00",
+    "finishedAt":  "2026-11-18T07:02:40.419-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0063-INF-INTEGRITY-01.json",
     "testOutput":  ""
 }
