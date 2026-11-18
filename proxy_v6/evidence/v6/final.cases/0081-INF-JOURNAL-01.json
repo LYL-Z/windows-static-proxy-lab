@@ -1,0 +1,17 @@
+{
+    "id":  "INF-JOURNAL-01",
+    "requirement":  "TX-05",
+    "precondition":  "pending transaction journal",
+    "injectedFault":  "previous process died",
+    "expected":  "apply refuses with exit 34; clear works",
+    "actual":  "journal roundtrip; pending journal blocked apply with exit 34; clear verified",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  1299,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T06:16:48.398-08:00",
+    "finishedAt":  "2026-11-18T06:16:49.698-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-final-0268\\final.cases\\0081-INF-JOURNAL-01.json",
+    "testOutput":  ""
+}

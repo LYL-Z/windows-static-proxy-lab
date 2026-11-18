@@ -1,0 +1,17 @@
+{
+    "id":  "INF-APPLY-INIT-02",
+    "requirement":  "C-02",
+    "precondition":  "legacy -StaticPass parameter",
+    "injectedFault":  "command-line password",
+    "expected":  "rejected; no settings",
+    "actual":  "legacy -StaticPass parameter is rejected",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  1210,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T06:16:16.758-08:00",
+    "finishedAt":  "2026-11-18T06:16:17.968-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-final-0268\\final.cases\\0072-INF-APPLY-INIT-02.json",
+    "testOutput":  ""
+}

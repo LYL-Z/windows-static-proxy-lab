@@ -2,27 +2,27 @@
     "schemaVersion":  1,
     "tool":  "proxy_v6/tests/Harness.ps1",
     "harnessVersion":  "6.0.0",
-    "runId":  "08047625dec54963aa1642e695651f88",
+    "runId":  "1d077abb62fd4fb08e355ece1293ec74",
     "host":  {
                  "psVersion":  "5.1.26100.9818",
                  "psEdition":  "Desktop",
                  "os":  "Microsoft Windows NT 10.0.26300.0",
                  "clr":  "4.0.30319.42000",
                  "is64BitProcess":  true,
-                 "pid":  19684
+                 "pid":  45128
              },
     "git":  {
                 "available":  true,
-                "head":  "c562c1899488d07b67d2e1fd804e3656e1db7a27",
+                "head":  "0268e173a47641c042301e27230e94502022d221",
                 "branch":  "v5/short-run-hardening",
                 "dirty":  true,
                 "error":  null
             },
     "repoRoot":  "D:\\claude防封\\publish",
     "filter":  "NO-SUCH-TEST-*",
-    "startedAt":  "2026-11-18T05:56:11.235-08:00",
-    "finishedAt":  "2026-11-18T05:56:11.486-08:00",
-    "durationMs":  26,
+    "startedAt":  "2026-11-18T06:17:11.623-08:00",
+    "finishedAt":  "2026-11-18T06:17:11.873-08:00",
+    "durationMs":  25,
     "counts":  {
                    "registered":  0,
                    "executed":  0,

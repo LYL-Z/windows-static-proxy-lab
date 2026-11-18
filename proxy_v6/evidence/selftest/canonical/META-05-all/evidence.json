@@ -2,27 +2,27 @@
     "schemaVersion":  1,
     "tool":  "proxy_v6/tests/Harness.ps1",
     "harnessVersion":  "6.0.0",
-    "runId":  "2039942d7989410f9a7f3f721be3082b",
+    "runId":  "160a026a327641f89fb4eddb6c54ba7f",
     "host":  {
                  "psVersion":  "5.1.26100.9818",
                  "psEdition":  "Desktop",
                  "os":  "Microsoft Windows NT 10.0.26300.0",
                  "clr":  "4.0.30319.42000",
                  "is64BitProcess":  true,
-                 "pid":  38580
+                 "pid":  7196
              },
     "git":  {
                 "available":  true,
-                "head":  "c562c1899488d07b67d2e1fd804e3656e1db7a27",
+                "head":  "0268e173a47641c042301e27230e94502022d221",
                 "branch":  "v5/short-run-hardening",
                 "dirty":  true,
                 "error":  null
             },
     "repoRoot":  "D:\\claude防封\\publish",
     "filter":  "*",
-    "startedAt":  "2026-11-18T05:56:12.948-08:00",
-    "finishedAt":  "2026-11-18T05:56:13.258-08:00",
-    "durationMs":  73,
+    "startedAt":  "2026-11-18T06:17:13.273-08:00",
+    "finishedAt":  "2026-11-18T06:17:13.578-08:00",
+    "durationMs":  71,
     "counts":  {
                    "registered":  1,
                    "executed":  0,
@@ -52,9 +52,9 @@
                       "detail":  "skipped at registration: fixture registration skip: only test skipped",
                       "durationMs":  2,
                       "assertions":  0,
-                      "startedAt":  "2026-11-18T05:56:12.981-08:00",
-                      "finishedAt":  "2026-11-18T05:56:12.991-08:00",
-                      "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-055607-119-02020809\\META-05-all\\cases\\0001-FIX-SKIP-ONLY.json",
+                      "startedAt":  "2026-11-18T06:17:13.306-08:00",
+                      "finishedAt":  "2026-11-18T06:17:13.317-08:00",
+                      "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-061707-717-eda169b4\\META-05-all\\cases\\0001-FIX-SKIP-ONLY.json",
                       "testOutput":  ""
                   }
               ]

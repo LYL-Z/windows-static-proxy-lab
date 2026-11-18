@@ -1,0 +1,17 @@
+{
+    "id":  "INF-F12-01",
+    "requirement":  "F12",
+    "precondition":  "UI and HKCU proxy states differ",
+    "injectedFault":  "UI on/HKCU off; UI off/HKCU on; first hop down",
+    "expected":  "DEGRADED with explicit reasons",
+    "actual":  "UI/actual proxy mismatch and first-hop failure are DEGRADED with reasons",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  605,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T06:16:06.333-08:00",
+    "finishedAt":  "2026-11-18T06:16:06.939-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-final-0268\\final.cases\\0060-INF-F12-01.json",
+    "testOutput":  ""
+}

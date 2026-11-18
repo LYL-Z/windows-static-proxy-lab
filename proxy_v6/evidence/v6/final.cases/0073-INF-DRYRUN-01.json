@@ -1,0 +1,17 @@
+{
+    "id":  "INF-DRYRUN-01",
+    "requirement":  "PARAM-07",
+    "precondition":  "fake appdata/hop/core + real apply script",
+    "injectedFault":  "none",
+    "expected":  "exit 0; no config/settings/appdata changes; no snapshot",
+    "actual":  "real apply -DryRun reached validation and changed no config/settings/appdata",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  2207,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T06:16:17.970-08:00",
+    "finishedAt":  "2026-11-18T06:16:20.178-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-final-0268\\final.cases\\0073-INF-DRYRUN-01.json",
+    "testOutput":  ""
+}

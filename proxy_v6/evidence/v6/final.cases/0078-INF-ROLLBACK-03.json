@@ -1,0 +1,17 @@
+{
+    "id":  "INF-ROLLBACK-03",
+    "requirement":  "TX-ROLLBACK",
+    "precondition":  "winner holds the lock",
+    "injectedFault":  "lock busy",
+    "expected":  "exit 33, no start, winner lock intact",
+    "actual":  "lock-busy rollback exited 33, left the lock and did not start Clash",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  21248,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T06:16:24.808-08:00",
+    "finishedAt":  "2026-11-18T06:16:46.057-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-final-0268\\final.cases\\0078-INF-ROLLBACK-03.json",
+    "testOutput":  ""
+}

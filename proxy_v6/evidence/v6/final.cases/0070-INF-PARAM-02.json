@@ -1,0 +1,17 @@
+{
+    "id":  "INF-PARAM-02",
+    "requirement":  "PARAM-06",
+    "precondition":  "no settings",
+    "injectedFault":  "invalid Mode",
+    "expected":  "nonzero; no settings",
+    "actual":  "invalid Mode refused with exit 1",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  918,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T06:16:14.418-08:00",
+    "finishedAt":  "2026-11-18T06:16:15.336-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-final-0268\\final.cases\\0070-INF-PARAM-02.json",
+    "testOutput":  ""
+}
