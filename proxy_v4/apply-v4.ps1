@@ -21,6 +21,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'lib\V4.ps1')
+$null = Enable-V4ProductionWrites
 $exit = 0
 $lock = $null
 $logOk = Start-V4Log 'apply'
@@ -128,6 +129,14 @@ try {
     Test-V4ProfileText -Text $pt -Uid $uid | Out-Null
     $profileValidator = { param($f) Test-V4ProfileText -Text (Read-V4File $f) -Uid $uid | Out-Null }.GetNewClosure()
     $runtimeValidator = { param($f) Test-V4MihomoConfig -ConfigPath $f -WorkDir $p.AppData | Out-Null }.GetNewClosure()
+    $profileTextBuilder = {
+        $fresh = Read-V4File $pfile
+        if (-not $fresh) { throw [pscustomobject]@{ code = 10; msg = 'profiles.yaml unreadable after snapshot' } }
+        $freshEpoch = [int]([datetime]::UtcNow - [datetime]'1970-01-01').TotalSeconds
+        $freshText = Update-V4ProfileText -Text $fresh -Uid $uid -Epoch $freshEpoch
+        Test-V4ProfileText -Text $freshText -Uid $uid | Out-Null
+        return $freshText
+    }.GetNewClosure()
 
     $ops = [pscustomobject]@{
         Snapshot = ({ param($reason) New-V4Snapshot -Reason $reason -Port $s.mixedPort }).GetNewClosure()
@@ -155,6 +164,7 @@ try {
         Settings = $s
         Paths = [pscustomobject]@{ ProfilesFile = $pfile; ProfileFile = $profTarget; RuntimeFile = $p.RuntimeFile }
         ProfileText = $pt
+        ProfileTextBuilder = $profileTextBuilder
         ProfileYaml = $profYaml
         RuntimeYaml = $rtYaml
         ProfileValidator = $profileValidator

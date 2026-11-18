@@ -1,28 +1,25 @@
 # NEXT-ACTIONS — V6.0
 
-最后更新：2026-11-18T05:00:00-08:00
-规则：完成一项立即更新本文件；不得把“计划”写成“已完成”。
+最后更新：2026-11-18T05:55-08:00
 
-## 立即可执行（按顺序）
+## 已完成（本轮）
+1. F11 根因定位与网络恢复（系统代理当前关闭；Baidu/Google/ipify 200）。
+2. 生产写门闩、test registry writer、test-mode Start/Stop no-op。
+3. FT16–FT21、F07 16、F08 10、F10 10、INF 49、回滚 4 例；全量 92/92。
+4. R2A-01/02/03/04/05/07/09、R2C-03/04/08 修复。
+5. repo/proxy_v4/proxy_v6/.git ACL 加固。
+6. 零断言判失败；父用例断言；92 用例 assertions 全部 >0。
 
-1. [进行中] 分发 Agent A/B/C/D；收集只读审计与测试框架初稿。
-2. [待办] 写 F08 失败测试（7 类 profiles.yaml 用例），运行并保存失败证据。
-3. [待办] 写 F10/恢复失败测试（所有日志写入抛错），运行并保存失败证据。
-4. [待办] 写锁竞争/失败获锁删除他人锁测试（LOCK-01/02），运行并保存失败证据。
-5. [待办] 写快照失败/写入失败/回滚再失败测试（TX-01..TX-08），运行并保存失败证据。
-6. [待办] 写 Init 锁顺序测试（LOCK-08），运行并保存失败证据。
-7. [待办] 重构 `proxy_v4/lib/V4.ps1`：锁 token、恢复编排、F08 纯函数、ACL、快照存在性、日志安全、测试开关。
-8. [待办] 重构 `apply-v4.ps1`：锁前置、Init 入锁、事务引擎接入、恢复链。
-9. [待办] 让全部失败测试转绿；跑完整矩阵。
-10. [待办] Gitleaks 工作树/历史扫描；ACL/DPAPI/日志脱敏测试。
-11. [待办] 生命周期状态机隔离测试。
-12. [待办] 第一轮独立复审（Agent D + Agent E 预备）。
-13. [待办] 第二轮由不同子代理复审修改后代码与证据。
-14. [待办] 第三轮完整回归 + Gate 裁定 + 文档/CHANGELOG/中文说明。
-15. [待办] 提交并推送到 `v5/short-run-hardening`，保持 Draft PR，不合并。
+## 立即执行
+1. 运行最终全量 92 + META 7/7；保存 final.json/final.cases（干净树）。
+2. 提交当前修复；推送 v5/short-run-hardening；保持 Draft PR，不合并 main。
+3. 请 round2-transaction/round2-security/Agent E 对新提交做最终复核；确认 F11/R2A-01 关闭。
+4. 若复审无新增 HIGH，更新 RELEASE-GATE-V6 为 SHORT_RUN_ACCEPTED（仍披露真实生产测试/长稳未执行）。
+5. 若复审发现 HIGH，继续修复并保持 NOT_READY。
 
-## 用户侧（不阻塞代码工作）
-
+## 用户侧
+- C-12 公开 IP/路径/用户名范围：WAITING-USER。
+- C-01 快照明文凭据长期留存：需用户接受或后续加密/保留策略。
 - NexIP 密码轮换：BLOCKED-USER。
-- 真实重启/睡眠/重连/24h/72h：DEFERRED-BY-USER。
-- 公开仓库 IP/路径是否脱敏：WAITING-USER（未经批准不改写历史）。
+- 真实 apply/rollback/boot/睡眠/Wi-Fi/24h/72h：DEFERRED-BY-USER。
+- Clash 国内直连规则（可选 B）：WAITING-USER；当前系统代理关闭，先不修改。

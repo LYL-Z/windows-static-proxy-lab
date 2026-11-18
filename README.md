@@ -13,7 +13,8 @@ reasoning can be audited independently. It is **not** a "how to evade platform r
 | `proxy_diag/` | Round 1: staged protocol probes, 1×RTT "who closed the socket" test, control experiments, raw probe JSON |
 | `proxy_v2/` | Round 2: transactional apply/rollback/status, 300-request acceptance run, benchmark + soak tools |
 | `proxy_v3/` | Round 3: five-state machine, fault-injection bench, STUN/UDP egress probes, network matrix, IP due diligence |
-| `proxy_v4/` | Round 4: JSON settings source (no YAML parsing), DPAPI credential, lock, verified process exit, ownership record, FT01–FT15 bench |
+| `proxy_v4/` | Round 4: JSON settings source (no YAML parsing), DPAPI credential, lock, verified process exit, ownership record |
+| `proxy_v6/` | V6: independent takeover, transaction recovery, lock ownership, transaction journal, 92 isolated tests, security review, F11 incident record |
 
 ## Key technical findings
 
@@ -31,8 +32,9 @@ reasoning can be audited independently. It is **not** a "how to evade platform r
 
 ## Honest status
 
-`PASS` on config integrity, concurrency, fault injection (13/13), credential redaction.
-`PENDING` on boot/sleep/Wi-Fi lifecycle, 24h/72h soak, and credential rotation.
+V6 (commit pending): 92/92 isolated tests, 7/7 harness self-tests, Gitleaks 0 findings.
+`PENDING` on real production apply/rollback/boot/sleep/Wi-Fi, 24h/72h soak, and credential rotation.
+**F11 incident:** a lead test probe wrote `ProxyServer=x` to the real HKCU during V6 work and briefly broke browser networking on 2026-11-18. It is recorded in `proxy_v6/INCIDENT-2026-11-18.md`; the production-write latch and FT16–FT21 regression tests are in place.
 Claude service eligibility is `NOT_READY`: Anthropic's Supported Regions Policy tests **physical
 location of the person**, not IP address. A US IP is not an eligibility criterion.
 

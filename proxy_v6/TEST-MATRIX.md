@@ -1,104 +1,73 @@
 # TEST-MATRIX — V6.0
 
-最后更新：2026-11-18T04:55:00-08:00
-状态：NOT_RUN / FAIL（复现缺陷）/ PASS（修复后）/ SKIPPED（必须记录原因）/ BLOCKED
+最后更新：2026-11-18T05:52-08:00
+当前全量：**92 用例 / 92 通过 / 0 失败 / 0 跳过**（隔离运行；真实生产 apply/rollback/boot 未执行）
 
-## 1. 参数与状态
+## 1. F07 事务（16/16 PASS）
 
-| ID | 场景 | 预期 | 状态 | 证据 |
-|---|---|---|---|---|
-| PARAM-01 | Repair + DryRun | exit 11，无生产写入 | NOT_RUN | — |
-| PARAM-02 | Init + DryRun | exit 11，无 settings 写入 | NOT_RUN | — |
-| PARAM-03 | Init + Repair | exit 11，无写入 | NOT_RUN | — |
-| PARAM-04 | 缺失 settings | exit 11，无写入 | NOT_RUN | — |
-| PARAM-05 | 非法 settings JSON | exit 11，不崩溃 | NOT_RUN | — |
-| PARAM-06 | 非法 Mode 值 | 参数绑定失败，无写入 | NOT_RUN | — |
-| PARAM-07 | DryRun 只读 | 不修改 appdata/settings/HKCU；仅声明式日志 | NOT_RUN | — |
+| ID | 场景 | 结果 |
+|---|---|---|
+| F07-01 | 快照停应用后失败，进程/文件恢复 | PASS |
+| F07-02 | 第一次正式写入失败 | PASS |
+| F07-03 | 第二次写入失败，第一写回滚 | PASS |
+| F07-04 | 第三次写入失败，两写回滚 | PASS |
+| F07-05 | 代理已设置后 ACL 失败，系统代理恢复 | PASS |
+| F07-06 | 恢复失败 + 日志失败，exit 40 不抛 | PASS |
+| F07-07 | 恢复失败仍尝试进程协调 | PASS |
+| F07-08 | 成功路径写三目标/代理/owner | PASS |
+| F07-09 | 原本停止的应用不被恢复启动 | PASS（stopCalls 断言） |
+| F07-10 | owner 写失败，代理/owner 恢复 | PASS |
+| F07-11 | 恢复成功时原错误码保留 | PASS |
+| F07-12 | 成功清 journal | PASS |
+| F07-13 | 恢复成功清 journal | PASS |
+| F07-14 | 恢复失败保留 journal | PASS |
+| F07-15 | journal 写失败在首写前 abort | PASS |
+| F07-16 | 停应用后重读 profiles.yaml | PASS |
 
-## 2. 文件事务
+## 2. F08 Profile 作用域（10/10 PASS）
 
-| ID | 场景 | 预期 | 状态 | 证据 |
-|---|---|---|---|---|
-| TX-01 | 快照阶段失败 | 文件不变；应用进程状态还原；exit 非 0 | NOT_RUN | — |
-| TX-02 | 第一次正式写入失败 | 文件不变；恢复执行；exit 非 0 | NOT_RUN | — |
-| TX-03 | 第二次写入失败 | 前一次写入被回滚；文件哈希等于基线 | NOT_RUN | — |
-| TX-04 | 第三次写入失败 | 前两次写入被回滚；文件哈希等于基线 | NOT_RUN | — |
-| TX-05 | 首次写入成功后其他步骤失败 | 快照完整还原；系统代理还原 | NOT_RUN | — |
-| TX-06 | 文件被占用 | 拒写、目标完好、临时文件清理 | NOT_RUN | — |
-| TX-07 | 快照不完整/损坏 | 还原前拒绝，不覆盖现场 | NOT_RUN | — |
-| TX-08 | 回滚中途再次失败 | 报告 40；已恢复项与失败项可区分；锁释放 | NOT_RUN | — |
-| TX-09 | “磁盘空间不足” | 用注入写失败模拟，不真实填满磁盘 | NOT_RUN | — |
-| TX-10 | 临时文件权限异常 | 失败可诊断，目标不受损 | NOT_RUN | — |
-| TX-11 | 文件原本不存在 | 回滚删除新建文件，恢复“不存在”状态 | NOT_RUN | — |
+F08-01 target updated；F08-02 缺 updated 不改下一 Profile；F08-03 相似 UID；F08-04 重复 UID fail-closed；F08-05 内联注释；F08-06 最后块缺 updated；F08-07 非列表 uid；F08-08 追加；F08-09 CRLF；F08-10 current 在块后。全部 PASS。
 
-## 3. 并发与锁
+## 3. F09 Init/锁（1 套件，3 子检查 PASS）
 
-| ID | 场景 | 预期 | 状态 | 证据 |
-|---|---|---|---|---|
-| LOCK-01 | 两个事务同时执行 | 仅一个进入；另一个 exit 33 | NOT_RUN | — |
-| LOCK-02 | 未获锁进程退出 | 不删除持有者的锁 | NOT_RUN | — |
-| LOCK-03 | 其他进程持锁 | 超时拒绝，不写任何文件 | NOT_RUN | — |
-| LOCK-04 | 锁持有者异常退出 | 陈旧锁可回收 | NOT_RUN | — |
-| LOCK-05 | PID 复用 | 依据进程启动时间判陈旧 | NOT_RUN | — |
-| LOCK-06 | 重复回滚 | 串行化且幂等 | NOT_RUN | — |
-| LOCK-07 | 测试结束锁释放 | 无残留 .lock | NOT_RUN | — |
-| LOCK-08 | Init 与其他事务竞争 | Init 不越过锁写 settings | NOT_RUN | — |
+F09-SUITE：他人持锁时 Init 不写 settings；loser 不删 winner 锁；Init+DryRun exit 11。另 INF-APPLY-INIT-01、INF-INIT-01..04。
 
-## 4. 日志与异常
+## 4. F10 日志/恢复（10/10 PASS）
 
-| ID | 场景 | 预期 | 状态 | 证据 |
-|---|---|---|---|---|
-| LOG-01 | 日志目录不可写 | Start 失败不阻断主流程 | NOT_RUN | — |
-| LOG-02 | 首次写日志失败 | 无异常逃逸 | NOT_RUN | — |
-| LOG-03 | 异常处理阶段写日志失败 | 恢复仍执行 | NOT_RUN | — |
-| LOG-04 | 回滚阶段写日志失败 | 恢复仍执行，exit 40 可保留 | NOT_RUN | — |
-| LOG-05 | 证据文件输出失败 | 测试系统非零退出并明确报告 | NOT_RUN | — |
-| LOG-06 | 错误码被异常覆盖 | 原始错误码保留到恢复结果 | NOT_RUN | — |
+F10-01..10：恢复失败/日志失败/启动失败/代理恢复失败/owner 恢复失败/进程未知/原码保留；全部 PASS。
 
-## 5. 数据完整性
+## 5. F11 生产状态隔离（FT16–FT21，6/6 PASS）
 
-| ID | 场景 | 预期 | 状态 | 证据 |
-|---|---|---|---|---|
-| DATA-01 | 无关配置保持不变 | 字节/哈希一致 | NOT_RUN | — |
-| DATA-02 | 非目标 Profile 保持不变 | F08 七类用例全部通过 | NOT_RUN | — |
-| DATA-03 | 文件存在/不存在状态恢复 | 含新建文件删除 | NOT_RUN | — |
-| DATA-04 | 快照哈希一致 | 篡改被拒 | NOT_RUN | — |
-| DATA-05 | 权限不被放宽 | ACL 仅当前用户/系统/管理员 | NOT_RUN | — |
-| DATA-06 | 错误不误报成功 | exit code 与结果一致 | NOT_RUN | — |
+| ID | 场景 | 结果 |
+|---|---|---|
+| FT16 | mock 写入 ProxyServer=x，真实 HKCU 不变 | PASS |
+| FT17 | mock 抛错，操作失败且真实 HKCU 不变 | PASS |
+| FT18 | 子进程异常终止，真实 HKCU 不变 | PASS |
+| FT19 | 两个并行 mock 子进程，真实 HKCU 不变 | PASS |
+| FT20 | ProxyServer=x / 错误出口 IP 报 DEGRADED，不报 HEALTHY | PASS |
+| FT21 | 无 writer 测试被拒；HKCU/WinHTTP 前后一致 | PASS |
 
-## 6. 测试系统自验
+## 6. 基础设施/安全/生命周期（49/49 PASS）
 
-| ID | 场景 | 预期 | 状态 | 证据 |
-|---|---|---|---|---|
-| META-01 | 全部有效测试通过 | exit 0 | NOT_RUN | — |
-| META-02 | 任一必要测试失败 | 非零 | NOT_RUN | — |
-| META-03 | 测试框架自身异常 | 非零 | NOT_RUN | — |
-| META-04 | 零测试被执行 | 不得判通过 | NOT_RUN | — |
-| META-05 | 测试被跳过 | 单独记录，不冒充通过 | NOT_RUN | — |
-| META-06 | 证据写入失败 | 非零并明确报告 | NOT_RUN | — |
-| META-07 | 失败结果不被后续成功覆盖 | 汇总含失败 | NOT_RUN | — |
+- 参数：PARAM-01/02/04/05/06/07（Repair+DryRun、Init+Repair、缺/坏 settings、非法 Mode、DryRun 只读）。
+- 事务：TX-01..TX-11 对应用例（快照失败、写失败、锁文件、快照篡改/空清单/缺 profiles.yaml、部分恢复、原子写、临时文件、存在/不存在恢复）。
+- 并发/锁：LOCK-01..05（双事务、loser、陈旧锁、PID 复用、零字节锁；锁忙 rollback 33）。
+- 日志：LOG-01/02（目录不可写、日志路径不可写）。
+- 数据完整性：DATA-02/04、无关配置/ACL、YAML 转义、恢复 ACL。
+- 状态/生命周期：LIFE-01..09（依赖未启动/延迟/退出、配置损坏、重复启动、首跳不可用、配置/运行不一致）。
+- 安全：SEC-01..03（DPAPI、ACL、脱敏）；R2C-03 settings ACL 拒绝；C-01 快照 ACL。
+- 回滚：TX-ROLLBACK 01..04（真实 rollback 脚本恢复/journal/锁；损坏快照 40；锁忙 33；mixedPort 65532）。
+- Harness 自验：META-01..07 7/7 PASS；exit 0/1/2/3/4 负控全部符合；零断言当前判失败。
 
-## 7. 生命周期（隔离模拟）
+## 7. 未覆盖/披露
 
-| ID | 场景 | 预期 | 状态 | 证据 |
-|---|---|---|---|---|
-| LIFE-01 | 依赖组件未启动 | FAILED/DEGRADED，可解释 | NOT_RUN | — |
-| LIFE-02 | 依赖启动延迟 | 等待后成功或超时明确 | NOT_RUN | — |
-| LIFE-03 | 依赖进程退出 | 状态检测为 FAILED，不信任历史成功 | NOT_RUN | — |
-| LIFE-04 | 配置文件损坏 | 状态脚本输出 FAILED，不崩溃 | NOT_RUN | — |
-| LIFE-05 | 应用重复启动 | 已监听时不重复拉起 | NOT_RUN | — |
-| LIFE-06 | 本地服务不可用 | firstHopOk=false | NOT_RUN | — |
-| LIFE-07 | 用户主动退出 | 状态 FAILED/RAW | NOT_RUN | — |
-| LIFE-08 | 配置被外部改变 | marker/hash 检测 | NOT_RUN | — |
-| LIFE-09 | 配置与运行状态不一致 | DEGRADED + 具体原因 | NOT_RUN | — |
-
-## 8. 安全
-
-| ID | 场景 | 预期 | 状态 | 证据 |
-|---|---|---|---|---|
-| SEC-01 | DPAPI 往返 | 明文只存在于内存 | NOT_RUN | — |
-| SEC-02 | settings/临时文件 ACL | 无 Everyone/Users | NOT_RUN | — |
-| SEC-03 | 日志脱敏 | 密码/Basic 不出现 | NOT_RUN | — |
-| SEC-04 | 工作树秘密扫描 | 0 命中（Gitleaks） | NOT_RUN | — |
-| SEC-05 | Git 历史秘密扫描 | 0 命中或仅报告位置/次数 | NOT_RUN | — |
-| SEC-06 | 公开仓库 PII/IP | 与用户确认范围 | NOT_RUN | — |
+| 项 | 状态 |
+|---|---|
+| 真实生产 apply/rollback/state | 未执行（DEFERRED-BY-USER） |
+| 真实重启/睡眠/Wi-Fi/断网 | 未执行（DEFERRED-BY-USER） |
+| 24h/72h | DEFERRED-BY-USER |
+| 跨用户/跨机器 DPAPI | 未执行 |
+| 真实 Clash 进程停止/启动 | 仅 test-mode no-op 与隔离 fake；未真实执行 |
+| R2A-06 journal commit phase | OPEN；当前 fail-closed |
+| C-12 公开 IP/路径/用户名 | WAITING-USER |
+| C-01 快照明文凭据长期留存 | 残余风险；ACL 已加固，未加密 |

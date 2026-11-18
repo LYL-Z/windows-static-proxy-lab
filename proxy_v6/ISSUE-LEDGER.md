@@ -1,52 +1,76 @@
 # ISSUE-LEDGER — V6.0
 
-最后更新：2026-11-18T04:55:00-08:00
-状态图例：OPEN / SUSPECTED / FIXED-PENDING-TEST / VERIFIED-CLOSED / BLOCKED-USER / DEFERRED-BY-USER
+最后更新：2026-11-18T05:52-08:00
+状态图例：OPEN / FIXED-PENDING-REVIEW / VERIFIED-CLOSED / WAITING-USER / DEFERRED-BY-USER / ACCEPTED-RISK
 
-## A. 任务书要求重新裁定的 F01–F10
+## A. F11 — 生产状态污染事故（CRITICAL，最高优先级）
 
-| 编号 | 严重度 | 问题（任务书口径） | 源码位置 | V6 初始裁定 | 证据 |
-|---|---|---|---|---|---|
-| F01 | HIGH | `-Repair` 与 `-DryRun` 未互斥，DryRun 可改真实系统代理 | apply-v4.ps1:31 | UNVERIFIED（源码有互斥，需行为测试） | — |
-| F02 | HIGH | 事务标志晚于首次写入 | apply-v4.ps1:140 | UNVERIFIED / 任务书称仍 PARTIAL | — |
-| F03 | HIGH | 锁在恢复前释放，可能暴露半恢复状态 | apply-v4.ps1:170 | UNVERIFIED（另有“失败获取锁仍删除他人锁”疑似缺陷） | — |
-| F04 | MED | 托管 profile 的 updated 未每次刷新 | apply-v4.ps1:129-137 | UNVERIFIED | — |
-| F05 | MED | 测试台 13/13 但退出码 1 | tests/faultinject-v4.ps1:141 | UNVERIFIED（V5-07 仍 OPEN） | — |
-| F06 | MED | strict 组仍含 DIRECT | lib/V4.ps1:415-421 | UNVERIFIED（源码仅含 US-WA-SOCKS5） | — |
-| F07 | HIGH | 事务边界：首次写失败/中途失败/快照失败/回滚再失败未证明 | apply-v4.ps1:140-147,176-180 | PARTIAL（任务书裁定）；需负向测试 | — |
-| F08 | MED-HIGH | updated 正则未真正限定目标 Profile 块；目标无 updated 时会改到下一个 Profile | apply-v4.ps1:132-137 | PARTIAL；源码仍存在此路径 | — |
-| F09 | HIGH | `-Init` 在取得互斥锁之前写 settings | apply-v4.ps1:36-70 | PARTIAL；源码顺序仍为 Init→Lock | — |
-| F10 | HIGH | 异常处理起始处/回滚失败后的日志仍可能阻断恢复 | apply-v4.ps1:174-180 | PARTIAL；恢复链仍有未保护日志与二次失败 | — |
+| 项 | 内容 |
+|---|---|
+| ID | **F11 — PRODUCTION_STATE_CORRUPTION** |
+| 等级 | **CRITICAL**（生产状态被测试/探针污染；测试隔离失效） |
+| 现象 | HKCU Internet Settings: ProxyEnable=1, ProxyServer="x"；国内外浏览器 ERR_PROXY_CONNECTION_FAILED；QQ 正常 |
+| 根因 | 主代理 05:02:37 运行临时探针 `_probe-new.ps1`，调用 `Set-V4SystemProxy -Server 'x'`。当时 `Set-V4SystemProxy` 尚未接入 `Assert-V4ProductionOperation`，测试模式只隔离文件根，未隔离注册表。探针输出 `GUARD FAIL`，说明这次调用未抛错；探针没有恢复 HKCU，随后被删除 |
+| 责任归属 | 主代理自己的临时探针；不是 harness 测试、不是故障注入套件、不是子代理、不是 V4 生产脚本 |
+| 影响 | 仅 HKCU 系统代理值；未改路由/TUN/IPv6/StarSky/Clash 配置 |
+| 恢复 | 05:34 将 ProxyServer 改为 127.0.0.1:7897；因百度经 Clash 502，05:35 将 ProxyEnable=0；当前关闭系统代理，Baidu/Google/ipify 均 200 |
+| 代码修复 | 测试模式注册表写默认抛错；test writer 才可 mock；生产脚本必须 `Enable-V4ProductionWrites`；Start/Stop 测试模式安全 no-op |
+| 回归测试 | FT16 mock x；FT17 mock 失败；FT18 异常终止；FT19 并行；FT20 异常状态不误报 HEALTHY；FT21 HKCU/WinHTTP 前后一致 |
+| 状态 | **FIXED-PENDING-INDEPENDENT-REVIEW**；在独立复审确认前不得关闭 |
 
-## B. V6 新发现/疑似缺陷（待失败测试证实后才可关闭）
+## B. 任务书 F01–F10
 
-| 编号 | 严重度 | 疑似问题 | 位置 | 状态 |
-|---|---|---|---|---|
-| V6-S01 | HIGH | 未获取锁的进程在 finally 中无条件 `Exit-V4Lock`，会删除锁持有者的锁 | apply-v4.ps1:70,182; rollback-v4.ps1:33,59 | SUSPECTED |
-| V6-S02 | HIGH | 快照阶段失败时 `$snap` 为空且 `$applied` 为假，应用已被停止却不会重启 | apply-v4.ps1:116-118,176 | SUSPECTED |
-| V6-S03 | HIGH | 快照不记录“文件原本不存在”，回滚不会删除新生成的 v4-managed.yaml | lib/V4.ps1:230-286 | SUSPECTED |
-| V6-S04 | HIGH | 事务失败恢复只还原文件/进程，不还原系统代理 | apply-v4.ps1:176-180; lib/V4.ps1:326-340 | SUSPECTED |
-| V6-S05 | MED | `Protect-V4Acl` 早退只检查“含我”，不检查是否存在 Everyone/Users 等弱规则 | lib/V4.ps1:133 | SUSPECTED |
-| V6-S06 | HIGH | settings.json 非法时 `Get-V4State` 直接抛错，state 脚本无顶层兜底 | lib/V4.ps1:508; state-v4.ps1:14 | SUSPECTED |
-| V6-S07 | MED | V4.ps1 加载即创建 config/backup；Start-V4Log 失败会阻断整个脚本（含 DryRun） | lib/V4.ps1:28-30,58 | SUSPECTED |
-| V6-S08 | MED | `Set-V4Atomic` 失败回滚用 `Copy-Item -ErrorAction SilentlyContinue`，备份失败被吞；临时文件/ACL 语义未证 | lib/V4.ps1:289-311 | SUSPECTED |
-| V6-S09 | MED | `Start-V4Clash` 不检测“已在监听”，重复启动实例 | lib/V4.ps1:216-227 | SUSPECTED |
-| V6-S10 | MED | 锁内容可被 PID 复用误判；无 token 校验 | lib/V4.ps1:152-178 | SUSPECTED |
-| V6-S11 | MED | `Save-V4Settings` 非原子、先写后加 ACL，存在弱 ACL 窗口 | lib/V4.ps1:110-122 | SUSPECTED |
-| V6-S12 | LOW | 日志文件名仅秒级时间戳，并发/同秒运行会混写 | lib/V4.ps1:53-59 | SUSPECTED |
+| 编号 | 裁定 | 证据 |
+|---|---|---|
+| F01 | VERIFIED-CLOSED | INF-PARAM-01、F09-03；Repair+DryRun / Init+DryRun / Init+Repair 均 exit 11 且无 settings |
+| F02 | VERIFIED-CLOSED（语义修正） | 首写前 journal/脏标志；F07-02/15；真正“脏”含快照停进程，恢复已覆盖 |
+| F03 | VERIFIED-CLOSED（语义修正） | 锁 token/进程启动时间；失败获锁不删他人锁；F09-SUITE/FT21；原“释放顺序”不是真实缺陷 |
+| F04 | VERIFIED-CLOSED | F08-01/06/09：updated 每次刷新，缺字段则插入 |
+| F05 | VERIFIED-CLOSED | META-01..07 自验 + 92/92 全量 exit 0；零断言现在判失败 |
+| F06 | VERIFIED-CLOSED | INF-F06-01：strict=select 无 DIRECT；resilient=fallback 含 DIRECT |
+| F07 | VERIFIED-CLOSED（主路径） | 16 个 F07 用例；首/二/三写失败、快照失败、恢复双失败、代理/owner/进程恢复、journal |
+| F08 | VERIFIED-CLOSED | 10 个 F08 用例：缺失 updated、相似 UID、重复 UID、CRLF、内联注释、current 位置、追加 |
+| F09 | VERIFIED-CLOSED | 锁先于 Init；Init 原子写 + ACL；F09-SUITE、INF-APPLY-INIT-01、INF-INIT-01..04 |
+| F10 | VERIFIED-CLOSED | 10 个 F10 用例；日志全失败仍恢复；恢复失败返回 40；owner/proxy 恢复委托失败也 40 |
 
-## C. 继承的 V5 开放项
+## C. 第二轮复审新发现
 
 | 编号 | 严重度 | 问题 | 状态 |
 |---|---|---|---|
-| V5-01 | HIGH | Clash 2.5.10 缺 `150bfae`，重启后链式代理失效 | OPEN（上游事实；本轮不改上游） |
-| V5-02 | HIGH | 上游 #8593 系统代理回退 | OPEN（设计缓解，非本轮可关闭） |
-| V5-03 | HIGH | NexIP 密码未轮换 | BLOCKED-USER |
-| V5-05 | MED | V4 完整回滚往返未做 | OPEN（本轮用隔离往返替代，真实环境仍待用户） |
-| V5-07 | LOW | 测试台 13/13 仍 exit 1 | OPEN（本轮重写测试系统并自验） |
-| V5-08 | LOW | FT11/FT14 未测 | OPEN（本轮用隔离注入覆盖） |
+| R2A-01 | HIGH | rollback catch 未持锁/未恢复也启动 Clash；锁忙返回 40 | **FIXED-PENDING-REVIEW**：锁内恢复标志 + 33；INF-ROLLBACK-03 |
+| R2A-02 | MED | rollback 硬编码 7897 | **FIXED-PENDING-REVIEW**：读 settings.mixedPort；INF-ROLLBACK-04 |
+| R2A-03 | MED | 零条目/缺 profiles.yaml 的清单被当成功并清 journal | **FIXED-PENDING-REVIEW**：INF-SNAP-06/07 |
+| R2A-04 | MED | 恢复重建的凭据文件不重新加固 ACL | **FIXED-PENDING-REVIEW**：Restore-V4Files 调 Protect；INF-SNAP-08 |
+| R2A-05 | MED | profiles.yaml 在停应用前读、后写，可能覆盖应用退出写 | **FIXED-PENDING-REVIEW**：ProfileTextBuilder；F07-16 |
+| R2A-06 | MED | journal 无 commit 阶段；清除失败/末写后崩溃会要求回滚良好状态 | **OPEN**（已披露；当前 fail-closed，保守回滚） |
+| R2A-07 | MED | 证据断言数 0、证据绑定 36222c9+dirty | **FIXED-PENDING-REVIEW**：零断言失败；父用例断言；最终干净树重跑 |
+| R2A-08 | MED | 真实脚本子进程只靠继承环境变量隔离 | **PARTIAL**：Run-Tests 强制设置 V4_TEST_MODE/ROOT；fixture 仍继承 |
+| R2A-09 | MED | F07-05/F07-09 不可证伪 | **FIXED**：F07-05 改为代理后 ACL 失败；F07-09 断言 stopCalls |
+| R2A-10..15 | LOW | 见 ROUND2-TRANSACTION-REVIEW.md | OPEN/ACCEPTED，逐条披露 |
 
-## D. 关闭规则
+| 编号 | 严重度 | 问题 | 状态 |
+|---|---|---|---|
+| R2C-01 | HIGH | 安装/脚本树可被 Authenticated Users 改写 | **MITIGATED**：repo/proxy_v4/proxy_v6/.git 384+ 对象 ACL 已加固；repo-acl.json |
+| R2C-03 | MED | settings/state 读取不复核 ACL | **FIXED**：Get-V4Settings 校验 config/settings ACL；INF-SETTINGS-04 |
+| R2C-04 | MED | 恢复路径不重新加固凭据文件 | **FIXED**：INF-SNAP-08 |
+| R2C-05 | MED | harness 证据目录/文件宽 ACL | **MITIGATED**：evidence/reviews 目录已加固；后续运行继承 |
+| R2C-06 | LOW | 公开树 PII（绝对路径/用户名/IP） | **WAITING-USER**；不得擅自改写历史 |
+| R2C-07 | MED | 证据绑定旧 HEAD + dirty | **FIXED-PENDING**：干净树重跑 final.json |
+| R2C-08 | MED | 脱敏 JSON key/URL/空格仍泄漏 | **FIXED**：INF-REDACT-02/03 |
 
-只有“独立失败测试先证明缺陷存在 → 修复 → 同一测试转绿 + 独立复审确认”才可标 VERIFIED-CLOSED。
+## D. 继承的 V5 开放项
+
+| 编号 | 状态 |
+|---|---|
+| V5-01 上游 2.5.10 缺 150bfae | OPEN（上游事实） |
+| V5-02 #8593 系统代理回退 | OPEN（上游/设计风险） |
+| V5-03 NexIP 密码轮换 | **BLOCKED-USER** |
+| V5-05 真实 V4 回滚往返 | **DEFERRED-BY-USER**（隔离回滚已测） |
+| V5-07 13/13 仍 exit 1 | **VERIFIED-CLOSED**（旧套件废弃；新 harness 退出码自验） |
+| V5-08 FT11/FT14 | **VERIFIED-CLOSED**（注入覆盖；见 TEST-MATRIX） |
+
+## E. 关闭规则
+
+只有“独立失败测试先证明缺陷 → 修复 → 同一测试转绿 + 独立复审确认”才可标 VERIFIED-CLOSED。
+F11 在独立复审确认前保持 FIXED-PENDING-INDEPENDENT-REVIEW。
 不得以源码存在某行、静态阅读或主代理自评作为关闭依据。

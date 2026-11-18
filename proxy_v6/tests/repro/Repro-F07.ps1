@@ -39,8 +39,8 @@ function Reset-Case([hashtable]$Overrides) {
         running=$true; wasRunning=$true; proxyEnabled=$true; proxyServer='old:8080'
         writeCalls=0; restoreCalls=0; startCalls=0; ownerCalls=0; logCalls=0
         failSnapshot=$false; failAt=0; failRestore=$false; failStart=$false; failLog=$false
-        failOwner=$false; exitIp='203.0.113.10'; snapFiles=@(); snapAbsent=@()
-        stopCalls=0; journal=$false; ownerText='old-owner'; ownerRestores=0; snap=''
+        failOwner=$false; failAcl=$false; exitIp='203.0.113.10'; snapFiles=@(); snapAbsent=@()
+        stopCalls=0; journal=$false; ownerText='old-owner'; ownerRestores=0; useBuilder=$false; lastProfilesContent=''; snap=''
     }
     foreach ($k in $Overrides.Keys) { $global:St[$k] = $Overrides[$k] }
 }
@@ -73,6 +73,7 @@ function Op-WriteAtomic([string]$target, [string]$content, $validator) {
     $s = $global:St
     $s.writeCalls++
     if ($s.failAt -gt 0 -and $s.writeCalls -eq $s.failAt) { throw ('injected write failure at ' + $s.writeCalls) }
+    if ($target -eq $s.profiles) { $s.lastProfilesContent = $content }
     Put $target $content
 }
 function Op-StopApp([int]$port) { $global:St.stopCalls++; $global:St.running = $false }
@@ -89,7 +90,7 @@ function Op-GetSystemProxy { return [pscustomobject]@{ enabled=$global:St.proxyE
 function Op-GetOwnerText { return $global:St.ownerText }
 function Op-RestoreOwner([object]$text) { $global:St.ownerText = $text; $global:St.ownerRestores++ }
 function Op-SetOwner([string]$server, [string]$note) { if ($global:St.failOwner) { throw 'owner write failed' }; $global:St.ownerCalls++; $global:St.ownerText = 'clash' }
-function Op-ProtectAcl([string]$path) { return $true }
+function Op-ProtectAcl([string]$path) { if ($global:St.failAcl) { throw 'ACL hardening failed' }; return $true }
 function Op-WriteJournal([string]$snap, [string]$reason) { $global:St.journal = $true }
 function Op-ClearJournal { $global:St.journal = $false; return $true }
 function Op-Log([string]$msg, [string]$level) { $global:St.logCalls++; if ($global:St.failLog) { throw 'log blocked' } }
@@ -172,8 +173,8 @@ Check 'F07-04' 'third write fails: two writes rolled back' {
     'third write failure rolled back'
 }
 
-Check 'F07-05' 'chain verification fails: system proxy restored' {
-    Reset-Case @{ exitIp='198.51.100.9' }
+Check 'F07-05' 'failure after proxy set (ACL): system proxy restored' {
+    Reset-Case @{ failAcl=$true }
     $res = Invoke-V4ApplyTransaction -Context (New-Context)
     AssertTrue (-not $res.ok) 'transaction reported success'
     AssertTrue ($global:St.proxyServer -eq 'old:8080') ('system proxy left at ' + $global:St.proxyServer)
@@ -213,7 +214,8 @@ Check 'F07-09' 'app was not running before: failure must not leave it running' {
     $global:St.running = $false
     $res = Invoke-V4ApplyTransaction -Context (New-Context) | Out-Null
     AssertTrue ($global:St.running -eq $false) 'engine started an app that was not running before'
-    'pre-existing stopped state preserved'
+    AssertTrue ($global:St.stopCalls -ge 1) 'recovery was skipped entirely (no stop attempt)'
+    'pre-existing stopped state preserved; recovery attempted stop'
 }
 
 Check 'F07-10' 'failure after proxy set (owner write fails): proxy restored' {
@@ -231,6 +233,17 @@ Check 'F07-11' 'error code preserved when recovery succeeds' {
     $res = Invoke-V4ApplyTransaction -Context (New-Context)
     AssertTrue ($res.exitCode -eq 31) ('exitCode=' + $res.exitCode)
     '31 preserved'
+}
+
+Check 'F07-16' 'profile text is read again after the app is stopped' {
+    Reset-Case @{ useBuilder=$true }
+    $global:St.profileTextAfterStop = 'after-stop-content'
+    $ctx = New-Context
+    $ctx | Add-Member -NotePropertyName ProfileTextBuilder -NotePropertyValue { $global:St.profileTextAfterStop } -Force
+    $res = Invoke-V4ApplyTransaction -Context $ctx
+    AssertTrue ($res.ok) ('not ok: ' + $res.error)
+    AssertTrue ($global:St.lastProfilesContent -eq 'after-stop-content') 'stale pre-snapshot text was written'
+    'post-stop profile text used'
 }
 
 Check 'F07-12' 'success clears the transaction journal' {

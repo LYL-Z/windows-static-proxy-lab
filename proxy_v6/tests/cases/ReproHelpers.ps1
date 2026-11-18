@@ -25,13 +25,13 @@ function Invoke-ReproCase {
     $j = Get-Content -LiteralPath $outFile -Raw -Encoding UTF8 | ConvertFrom-Json
     if ($Id -eq '*') {
       if ([int]$j.total -lt 1) { throw 'repro suite executed zero checks' }
-      if ([int]$j.passed -ne [int]$j.total) { throw ('repro suite has failures: ' + [string]$j.passed + '/' + [string]$j.total) }
+      Assert-True ([int]$j.passed -eq [int]$j.total) ('repro suite has failures: ' + [string]$j.passed + '/' + [string]$j.total)
       Set-TestActual ('all ' + [string]$j.total + ' sub-checks passed')
       return $j
     }
     $case = @($j.cases) | Where-Object { [string]$_.id -eq $Id } | Select-Object -First 1
-    if (-not $case) { throw ('repro result does not contain ' + $Id) }
-    if (-not [bool]$case.pass) { throw ($Id + ' failed: ' + [string]$case.detail) }
+    Assert-NotNull $case ('repro result does not contain ' + $Id)
+    Assert-True ([bool]$case.pass) ($Id + ' failed: ' + [string]$case.detail)
     Set-TestActual ($Id + ': ' + [string]$case.detail)
     return $case
   }

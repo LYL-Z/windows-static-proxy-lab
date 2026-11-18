@@ -4,17 +4,25 @@
 .EXAMPLE   .\rollback-v4.ps1 -List
            .\rollback-v4.ps1
            .\rollback-v4.ps1 -SnapshotDir D:\claude防封\proxy_v4\backup\<stamp>
-  Exit: 0 ok, 40 failed, 41 system proxy could not be held.
+  Exit: 0 ok, 33 lock busy, 40 failed, 41 system proxy could not be held.
 #>
 [CmdletBinding()]
 param([string]$SnapshotDir, [switch]$List, [switch]$KeepSystemProxy)
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'lib\V4.ps1')
+$null = Enable-V4ProductionWrites
 $null = Start-V4Log 'rollback'
 $exit = 0
 $lock = $null
+$mixedPort = 7897
 
 try {
+    try {
+        $settings = Get-V4Settings
+        $mixedPort = [int]$settings.mixedPort
+    }
+    catch { }
+
     $all = @()
     if (Test-Path $script:BackupDir) {
         $all = Get-ChildItem $script:BackupDir -Directory | Where-Object { Test-Path (Join-Path $_.FullName 'manifest.json') } | Sort-Object LastWriteTime -Descending
@@ -31,44 +39,60 @@ try {
         if (-not $all) { throw 'no snapshot available' }
         $SnapshotDir = $all[0].FullName
     }
+
     $lock = Enter-V4Lock
-    if (-not $lock) { throw 'another operation holds the lock' }
+    if (-not $lock) {
+        Write-V4Log 'another operation holds the lock' -Level ERROR
+        $exit = 33
+        return
+    }
+
+    # R2A-01: lock is held until after any补救 restart. Only a failure that
+    # actually entered restore may start the app; a pre-restore failure must not.
     try {
         Write-V4Log ("rollback -> {0}" -f (Split-Path $SnapshotDir -Leaf)) -Level STEP
-        $m = Restore-V4Snapshot -SnapshotDir $SnapshotDir
-        Write-V4Log 'files restored and hash-verified' -Level OK
-        if (-not (Clear-V4Journal)) { Write-V4Log 'files restored but config\transaction.json could not be cleared' -Level WARN }
+        $restoreAttempted = $false
+        try {
+            $restoreAttempted = $true
+            $m = Restore-V4Snapshot -SnapshotDir $SnapshotDir -Port $mixedPort
+            Write-V4Log 'files restored and hash-verified' -Level OK
+            if (-not (Clear-V4Journal)) { Write-V4Log 'files restored but config\transaction.json could not be cleared' -Level WARN }
 
-        if (-not $KeepSystemProxy) {
-            $want = if ($m.systemProxy.enabled) { $m.systemProxy.server } else { 'off' }
-            if ($m.systemProxy.enabled) { Set-V4SystemProxy -Server $m.systemProxy.server } else { Clear-V4SystemProxy }
-            $px = Get-V4SystemProxy
-            $have = if ($px.enabled) { $px.server } else { 'off' }
-            if ($have -ne $want) { Write-V4Log ("system proxy want {0} have {1}" -f $want, $have) -Level ERROR; $exit = 41 }
-            else { Write-V4Log ("system proxy = {0}" -f $have) -Level OK }
-        }
-        if (Start-V4Clash -TimeoutSec 40) { Write-V4Log 'clash restarted' -Level OK }
-        else { Write-V4Log 'clash did not come back' -Level WARN }
-        # the app may re-take the proxy on start: verify once more and report honestly
-        if (-not $KeepSystemProxy -and $m.systemProxy.enabled) {
-            $px = Get-V4SystemProxy
-            if ($px.server -ne $m.systemProxy.server) {
-                Write-V4Log ("proxy taken by the app after start ({0}); snapshot wanted {1}" -f $px.server, $m.systemProxy.server) -Level ERROR
-                $exit = 41
+            if (-not $KeepSystemProxy -and $m.systemProxy) {
+                $want = if ($m.systemProxy.enabled) { $m.systemProxy.server } else { 'off' }
+                if ($m.systemProxy.enabled) { Set-V4SystemProxy -Server $m.systemProxy.server } else { Clear-V4SystemProxy }
+                $px = Get-V4SystemProxy
+                $have = if ($px.enabled) { $px.server } else { 'off' }
+                if ($have -ne $want) { Write-V4Log ("system proxy want {0} have {1}" -f $want, $have) -Level ERROR; $exit = 41 }
+                else { Write-V4Log ("system proxy = {0}" -f $have) -Level OK }
             }
+            if (Start-V4Clash -TimeoutSec 40 -Port $mixedPort) { Write-V4Log 'clash restarted' -Level OK }
+            else { Write-V4Log 'clash did not come back' -Level WARN }
+            if (-not $KeepSystemProxy -and $m.systemProxy -and $m.systemProxy.enabled) {
+                $px = Get-V4SystemProxy
+                if ($px.server -ne $m.systemProxy.server) {
+                    Write-V4Log ("proxy taken by the app after start ({0}); snapshot wanted {1}" -f $px.server, $m.systemProxy.server) -Level ERROR
+                    $exit = 41
+                }
+            }
+            Set-V4Owner -Owner 'rollback' -SystemProxy ((Get-V4SystemProxy).server) -Note ('snapshot=' + (Split-Path $SnapshotDir -Leaf))
         }
-        Set-V4Owner -Owner 'rollback' -SystemProxy ((Get-V4SystemProxy).server) -Note ('snapshot=' + (Split-Path $SnapshotDir -Leaf))
+        catch {
+            Write-V4Log ('rollback failed: ' + (Get-V4Redacted $_.Exception.Message)) -Level ERROR
+            if ($restoreAttempted) {
+                try {
+                    if (Start-V4Clash -TimeoutSec 40 -Port $mixedPort) { Write-V4Log 'clash restarted after failed restore' -Level WARN }
+                    else { Write-V4Log 'clash did not come back after failed restore' -Level ERROR }
+                }
+                catch { Write-V4Log ('clash restart after failed restore also failed: ' + (Get-V4Redacted $_.Exception.Message)) -Level ERROR }
+            }
+            $exit = 40
+        }
     }
     finally { if ($lock) { $null = Exit-V4Lock $lock } }
 }
 catch {
-    Write-V4Log ('rollback failed: ' + (Get-V4Redacted $_.Exception.Message)) -Level ERROR
-    # A-12: Restore-V4Snapshot may have stopped the app before failing. Do not leave it down.
-    try {
-        if (Start-V4Clash -TimeoutSec 40) { Write-V4Log 'clash restarted after failed restore' -Level WARN }
-        else { Write-V4Log 'clash did not come back after failed restore' -Level ERROR }
-    }
-    catch { Write-V4Log ('clash restart after failed restore also failed: ' + (Get-V4Redacted $_.Exception.Message)) -Level ERROR }
+    Write-V4Log ('rollback refused/failed before restore: ' + (Get-V4Redacted $_.Exception.Message)) -Level ERROR
     $exit = 40
 }
 finally { exit $exit }

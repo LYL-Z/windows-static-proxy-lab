@@ -16,7 +16,8 @@ $cases = @(
   @{ id='F07-12'; pre='clean fixture'; fault='none'; exp='journal cleared after success' },
   @{ id='F07-13'; pre='second write fails'; fault='recovery succeeds'; exp='journal cleared after recovery' },
   @{ id='F07-14'; pre='second write fails'; fault='recovery fails'; exp='journal retained for the next run' },
-  @{ id='F07-15'; pre='journal writer fails'; fault='journal disk full'; exp='exit 34 before the first live write' }
+  @{ id='F07-15'; pre='journal writer fails'; fault='journal disk full'; exp='exit 34 before the first live write' },
+  @{ id='F07-16'; pre='app rewrites profiles.yaml while stopping'; fault='stale pre-snapshot text'; exp='post-stop text is written' }
 )
 foreach ($c in $cases) {
   $id = [string]$c.id

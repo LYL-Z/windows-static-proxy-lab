@@ -23,3 +23,11 @@ Three remaining files still matched the account identifiers; those occurrences w
 
 Rebuild `config/settings.json` yourself (`apply-v4.ps1 -Init`), set your own endpoint, and rotate any
 credential that was ever written to disk in plaintext. Treat every snapshot directory as secret.
+
+## V6 additions (2026-11-18)
+
+- `-StaticPass` is accepted by `-Init` for explicit migration and **will appear in the command line / shell history**. Prefer migrating from the current Clash profile. Clean the history afterwards if used.
+- Snapshot/backup directories contain plaintext proxy credentials by design (needed for restore). Their ACL is now hardened before copying, but they are **not encrypted**. Do not upload `backup/` to cloud drives, tickets, or chats.
+- `Get-V4Settings` now refuses a config/settings ACL that is not hardened (code 12); re-run `-Init` under the lock to repair.
+- Repository/scripts/evidence ACLs were hardened against local `Authenticated Users` modification (see `proxy_v6/evidence/v6/repo-acl.json`).
+- F11: a lead test probe wrote `ProxyServer=x` to real HKCU on 2026-11-18. Root cause, recovery and regression tests are in `proxy_v6/INCIDENT-2026-11-18.md` and `proxy_v6/ISSUE-LEDGER.md`.

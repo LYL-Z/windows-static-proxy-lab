@@ -1,68 +1,58 @@
 # TASK-STATE — V6.0 独立工程接管
 
-最后更新：2026-11-18T04:55:00-08:00（America/Los_Angeles）
+最后更新：2026-11-18T05:53-08:00（America/Los_Angeles）
 执行者：DeepSeek Harness 主代理（lead）+ 独立子代理
 
-## 1. 基线与环境（已核验）
+## 1. 基线
 
-| 项 | 值 | 核验方式 |
-|---|---|---|
-| 仓库 | https://github.com/LYL-Z/windows-static-proxy-lab | `git remote -v` |
-| 本地仓库 | `D:\claude防封\publish` | `git rev-parse --show-toplevel` |
-| 分支 | `v5/short-run-hardening` | `git status -sb` |
-| 本地 HEAD | `36222c92c829a2ef08b71af2a3a3ff9a3c44b396` | `git rev-parse HEAD` |
-| 远端分支 HEAD | `36222c92c829a2ef08b71af2a3a3ff9a3c44b396` | `git fetch --all` 后 `git rev-parse origin/v5/short-run-hardening` |
-| origin/main | `2960db07f1571f69f59193ff3a60476a67c81354` | `git rev-parse origin/main` |
-| 工作区 | 干净（无未提交变更） | `git status --porcelain` 空 |
-| PR #1 | OPEN，Draft=true，head=v5/short-run-hardening，base=main，mergeable=MERGEABLE | `gh pr view 1 --json ...` |
-| 运行环境 | Windows PowerShell 5.1.26100；Pester 3.4.0；Gitleaks 已安装；无 pwsh、无 PSScriptAnalyzer | 工具探测 |
-| 生产网络 | **本轮未修改**；未执行 apply/rollback/state 的真实网络路径 | 纪律约束 |
+| 项 | 值 |
+|---|---|
+| 仓库 | https://github.com/LYL-Z/windows-static-proxy-lab |
+| 本地路径 | D:\claude防封\publish |
+| 分支 | v5/short-run-hardening |
+| 初始冻结基线 | 36222c92c829a2ef08b71af2a3a3ff9a3c44b396 |
+| 已提交 V6 修复 | abe0eaa4b29f9d40b8157420d96fa09013d165da |
+| 当前工作树 | F11/第二轮复审修复未提交；文档更新中 |
+| 远端 | 未推送最新提交（ahead 1 + 本地改动） |
+| 生产网络 | 系统代理当前关闭（ProxyEnable=0，ProxyServer=127.0.0.1:7897）；Baidu/Google/ipify 直连 200 |
 
-## 2. 当前阶段
+## 2. 阶段
 
-- P0 基线冻结：**完成**
-- P1 持久化工程文件：**进行中**（本文件、ISSUE-LEDGER、TEST-MATRIX、DECISION-LOG、NEXT-ACTIONS、RELEASE-GATE-V6）
-- P2 子代理调度：**进行中**
-- P3 F01–F10 复现：**未开始**
-- P4 故障注入台：**未开始**
-- P5 测试矩阵：**未开始**
-- P6 测试系统自验：**未开始**
-- P7 凭据/公开仓库安全：**未开始**
-- P8 生命周期隔离验收：**未开始**
-- P9 独立复审循环：**未开始**
-- P10 最终验收：**未开始**
+- P0 基线/事故调查：**完成**（F11 根因定位）
+- P1 持久化状态：**进行中**（本文件、账本、矩阵、Gate、CHANGELOG）
+- P2 子代理：**完成两轮**（A/B/C/D + round2-A/C + Agent E）
+- P3 F01–F10：**完成**（92 测试）
+- P4 故障注入：**完成**（隔离 mock/夹具）
+- P5 测试矩阵：**92/92 PASS**
+- P6 测试系统自验：**META 7/7 PASS**
+- P7 安全：C-03/C-10/C-11 关闭；C-01/C-02/C-12 残余披露
+- P8 生命周期隔离：**通过**（LIFE 用例）
+- P9 独立复审：**两轮已有**；最终轮待新提交后复审
+- P10 最终验收：**NOT_READY**（见 RELEASE-GATE-V6）
 
 ## 3. 已完成
 
-1. 冻结并核验本地/远端 HEAD、PR #1 状态、工作区干净。
-2. 完整读取 `proxy_v4/apply-v4.ps1`、`rollback-v4.ps1`、`state-v4.ps1`、`lib/V4.ps1`、`tests/faultinject-v4.ps1` 及 V4/V5 Gate 文档。
-3. 确认已知残余缺陷 F07–F10 的源码位置；确认 V5-07（13/13 但 exit 1）仍需独立复验。
-4. 建立 `proxy_v6/` 文档、测试、证据、复审目录。
+1. F11 根因确认：主代理 05:02:37 临时探针 `Set-V4SystemProxy -Server 'x'`，当时无生产写门闩，真实写入 HKCU。
+2. 恢复网络：05:34 改 127.0.0.1:7897；05:35 关闭系统代理；Baidu/Google/ipify 200。
+3. 生产写门闩：`Enable-V4ProductionWrites`、test registry writer、test-mode Start/Stop no-op。
+4. FT16–FT21 隔离回归全部通过。
+5. F07 16/16、F08 10/10、F10 10/10、F09 3 子检查、INF 49/49。
+6. R2A-01/02/03/04/05/07/09 修复；R2C-03/04/08 修复；repo/evidence ACL 加固。
+7. 零断言用例改判失败；父用例均有断言。
+8. Gitleaks 工作树/历史 0 findings。
 
-## 4. 正在执行
+## 4. 未完成/阻塞
 
-- 创建持久化状态文件并冻结基线。
-- 分发 Agent A/B/C/D（事务审计、测试基础设施、安全、独立代码审查）。
+- F11 独立复审确认（当前 FIXED-PENDING-INDEPENDENT-REVIEW）。
+- 最终干净树重跑 + 推送（当前证据仍绑定 abe0eaa + dirty）。
+- C-02 文档警告（本轮更新）、C-01 快照明文残余、C-12 PII 范围：需用户确认。
+- R2A-06 journal commit phase：OPEN，当前 fail-closed。
+- 真实 apply/rollback/boot/24h/72h：DEFERRED-BY-USER。
+- NexIP 密码轮换：BLOCKED-USER。
 
-## 5. 未完成
+## 5. 下一条可立即执行
 
-- F01–F10 逐项独立负向测试与裁定。
-- 事务/锁/快照/日志故障注入台。
-- 实际代码修复（不先修，先让测试失败）。
-- 测试框架自身退出码与零测试自验。
-- Gitleaks 历史与工作树扫描。
-- 两轮独立复审与最终 Gate。
-
-## 6. 具体阻塞
-
-- 无硬阻塞。
-- 用户侧待办（不阻塞其他工作）：
-  - NexIP 密码轮换：**BLOCKED-USER**，不得虚构。
-  - 24h/72h 长稳、真实重启/睡眠/重连：**DEFERRED-BY-USER**。
-  - 公开仓库 IP/路径脱敏决定：**WAITING-USER**（未经批准不改写历史）。
-
-## 7. 下一条可立即执行的操作
-
-1. 启动 Agent A/B/C/D，收集只读审计与测试框架初稿。
-2. 在 `proxy_v6/tests/` 写 F08/F10 失败测试并运行，记录原始失败证据。
-3. 编写事务引擎与锁/恢复重构，使失败测试转绿。
+1. 完成 ISSUE-LEDGER/CHANGELOG/GATE/USER-GUIDE/SECURITY-REVIEW。
+2. 提交当前修复；干净树重跑 92 用例与 META；生成 final.json + final.cases。
+3. 请 round2 复审对新提交复核 F11/R2A-01。
+4. 推送分支，保持 Draft PR，不合 main。

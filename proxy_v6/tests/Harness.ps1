@@ -438,8 +438,9 @@ function Invoke-HarnessCase {
         $detail = 'assertions passed: ' + [string]$script:HarnessCaseAssertions
         if (-not $script:HarnessCaseActual) { $script:HarnessCaseActual = 'all assertions passed' }
       } else {
-        $detail = 'body completed without assertions or exceptions'
-        if (-not $script:HarnessCaseActual) { $script:HarnessCaseActual = 'body completed' }
+        $status = 'fail'
+        $detail = 'no assertions executed; a test body that only returns is not a pass'
+        $script:HarnessCaseActual = 'no assertions executed'
       }
     } catch {
       $msg = [string]$_.Exception.Message

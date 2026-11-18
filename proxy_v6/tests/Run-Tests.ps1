@@ -24,6 +24,10 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+# R2A-08: the runner itself owns the test-mode contract, so children inherit it
+# even when the caller starts from a clean environment.
+$env:V4_TEST_MODE = '1'
+if (-not $env:V4_TEST_ROOT) { $env:V4_TEST_ROOT = Join-Path $env:TEMP ('v6-runner-' + $PID) }
 $testsDir = $PSScriptRoot
 
 try {

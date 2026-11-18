@@ -15,7 +15,7 @@ function Invoke-InfraCase {
     }
     if (-not (Test-Path -LiteralPath $out -PathType Leaf)) { throw ('infra case ' + $Id + ' did not write its result') }
     $j = Get-Content -LiteralPath $out -Raw -Encoding UTF8 | ConvertFrom-Json
-    if (-not [bool]$j.pass) { throw ($Id + ' failed: ' + [string]$j.detail) }
+    Assert-True ([bool]$j.pass) ($Id + ' failed: ' + [string]$j.detail)
     Set-TestActual ([string]$j.actual)
     return $j
   }
@@ -33,6 +33,7 @@ $cases = @(
   @{ id='INF-SETTINGS-01'; req='SEC-02'; pre='clean root'; fault='none'; exp='settings DPAPI at rest, ACL restricted, roundtrip' },
   @{ id='INF-SETTINGS-02'; req='PARAM-05'; pre='invalid settings JSON'; fault='corrupt settings'; exp='code 11' },
   @{ id='INF-SETTINGS-03'; req='PARAM-04'; pre='no settings'; fault='missing settings'; exp='code 11' },
+  @{ id='INF-SETTINGS-04'; req='R2C-03'; pre='hardened settings, then Everyone read ACE'; fault='ACL widened after save'; exp='Get-V4Settings refuses with code 12' },
   @{ id='INF-INIT-01'; req='F09'; pre='runtime profile with one socks5 node'; fault='none'; exp='migrated through injected writer' },
   @{ id='INF-INIT-02'; req='F09'; pre='runtime profile with two socks5 nodes'; fault='ambiguous profile'; exp='rejected; writer not called' },
   @{ id='INF-INIT-03'; req='F09'; pre='explicit init missing password'; fault='incomplete credentials'; exp='rejected; writer not called' },
@@ -57,11 +58,20 @@ $cases = @(
   @{ id='INF-APPLY-INIT-01'; req='F09'; pre='no appdata; explicit credentials'; fault='Init reaches missing paths'; exp='settings written under lock; exit 10; lock released' },
   @{ id='INF-DRYRUN-01'; req='PARAM-07'; pre='fake appdata/hop/core + real apply script'; fault='none'; exp='exit 0; no config/settings/appdata changes; no snapshot' },
   @{ id='INF-STATE-SCRIPT-01'; req='LIFE-04'; pre='corrupt settings'; fault='state probe'; exp='FAILED JSON and exit 3' },
+  @{ id='INF-F06-01'; req='F06'; pre='built profiles'; fault='none'; exp='strict=select without DIRECT; resilient=fallback with DIRECT' },
+  @{ id='INF-ROLLBACK-01'; req='TX-ROLLBACK'; pre='valid snapshot + journal'; fault='none'; exp='real rollback script restores files, clears journal/lock' },
+  @{ id='INF-ROLLBACK-02'; req='TX-ROLLBACK'; pre='tampered snapshot'; fault='hash mismatch'; exp='exit 40, live files intact, lock released' },
+  @{ id='INF-ROLLBACK-03'; req='TX-ROLLBACK'; pre='winner holds the lock'; fault='lock busy'; exp='exit 33, no start, winner lock intact' },
+  @{ id='INF-ROLLBACK-04'; req='TX-ROLLBACK'; pre='settings mixedPort=65532'; fault='non-default mixed port'; exp='rollback restart uses 65532' },
   @{ id='INF-LOCK-05'; req='LOCK-04'; pre='zero-byte lock older than grace'; fault='empty lock file'; exp='reclaimed, not stuck forever' },
   @{ id='INF-JOURNAL-01'; req='TX-05'; pre='pending transaction journal'; fault='previous process died'; exp='apply refuses with exit 34; clear works' },
   @{ id='INF-YAML-01'; req='DATA-02'; pre='credentials containing quote/newline/backslash'; fault='YAML injection attempt'; exp='escaped; no injected top-level key' },
   @{ id='INF-SNAP-05'; req='TX-11'; pre='existing profiles/*.yaml'; fault='snapshot path separator'; exp='recorded as profiles\name and restored' },
-  @{ id='INF-REDACT-02'; req='SEC-03'; pre='non-registered secret forms'; fault='pass/secret/Bearer/short Basic/URL/user'; exp='all redacted' }
+  @{ id='INF-SNAP-06'; req='TX-07'; pre='manifest with zero file entries'; fault='empty manifest'; exp='refused; no false success' },
+  @{ id='INF-SNAP-07'; req='TX-07'; pre='manifest missing profiles.yaml coverage'; fault='partial manifest'; exp='refused' },
+  @{ id='INF-SNAP-08'; req='SEC-02'; pre='credential file deleted before restore'; fault='recreated file inherits ACL'; exp='restored file is ACL-hardened' },
+  @{ id='INF-REDACT-02'; req='SEC-03'; pre='non-registered secret forms'; fault='pass/secret/Bearer/short Basic/URL/user'; exp='all redacted' },
+  @{ id='INF-REDACT-03'; req='SEC-03'; pre='JSON key / spaces / URL / Cookie'; fault='structured secret forms'; exp='all redacted' }
 )
 foreach ($c in $cases) {
   $id = [string]$c.id

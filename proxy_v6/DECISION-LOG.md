@@ -30,3 +30,10 @@
 
 ## D-007 安全测试不输出秘密原文
 - 决定：Gitleaks 使用 `--redact`；自定义扫描只输出文件/行号/掩码长度；报告不写密码、用户名、DPAPI 密文。
+
+## D-008 F11 生产事故处置（2026-11-18 05:28–05:55）
+- 确认责任操作：主代理临时探针 `_probe-new.ps1` 在 05:02:37 调用 `Set-V4SystemProxy -Server 'x'`；当时无生产写门闩，真实写入 HKCU。
+- 决定：不掩盖、不归因子代理；登记 F11 CRITICAL；先恢复网络（05:34 设 127.0.0.1:7897，05:35 关闭系统代理），再修复隔离。
+- 决定：增加 `Enable-V4ProductionWrites` 门闩 + test registry writer；生产脚本显式启用；测试模式 Start/Stop 安全 no-op。
+- 决定：在最终独立复审确认前，F11 保持 FIXED-PENDING-INDEPENDENT-REVIEW，不关闭。
+- 决定：当前不执行 B 方案（Clash 国内直连规则/重新开系统代理）；先完成事故调查与 V6 验收。

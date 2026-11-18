@@ -35,9 +35,25 @@ $script:LogFile      = $null
 
 # S07: nothing is created at dot-source time. DryRun must not leave config/backup
 # directories behind; each writer creates exactly what it needs.
+$script:ProductionWritesEnabled = $false
+$script:TestRegistryWriter = $null
+
+function Enable-V4ProductionWrites {
+    if ($script:TestMode) { return $false }
+    $script:ProductionWritesEnabled = $true
+    return $true
+}
+
+function Set-V4TestRegistryWriter {
+    param([scriptblock]$Writer)
+    if (-not $script:TestMode) { throw 'Set-V4TestRegistryWriter is test-mode only' }
+    $script:TestRegistryWriter = $Writer
+}
+
 function Assert-V4ProductionOperation {
     param([string]$Name)
     if ($script:TestMode) { throw ('V4 test mode blocks real operation: ' + $Name) }
+    if (-not $script:ProductionWritesEnabled) { throw ('V4 production write blocked (call Enable-V4ProductionWrites in apply/rollback first): ' + $Name) }
 }
 function Ensure-V4Dir {
     param([string]$Path)
@@ -51,9 +67,8 @@ function Get-V4Redacted {
     param([string]$Text)
     if (-not $Text) { return $Text }
     foreach ($s in $script:Secrets) { if ($s -and $s.Length -ge 3) { $Text = $Text.Replace($s, '***') } }
-    $Text = [regex]::Replace($Text, '(?i)\b(password|passwd|pwd|pass|secret)(\s*[:=]\s*)[^\r\n]+', '$1$2***')
-    $Text = [regex]::Replace($Text, '(?i)\b(username|user)(\s*[:=]\s*)("[^"]*"|''[^'']*''|[^\s,;}]+)', '$1$2***')
-    $Text = [regex]::Replace($Text, '(?i)\b(token)(\s*[:=]\s*)("[^"]*"|''[^'']*''|[^\s,;}]+)', '$1$2***')
+    # Covers quoted JSON keys, quoted values with spaces, and unquoted key: value lines.
+    $Text = [regex]::Replace($Text, '(?i)("?(?:password|passwd|pwd|pass|secret|token|username|user|authorization|cookie)"?\s*[:=]\s*)("[^"]*"|''[^'']*''|[^\r\n]+)', '$1"***"')
     $Text = [regex]::Replace($Text, '(?i)(Basic\s+)([A-Za-z0-9+/=]{4,})', '$1***')
     $Text = [regex]::Replace($Text, '(?i)(Bearer\s+)([A-Za-z0-9._~+/=-]{4,})', '$1***')
     $Text = [regex]::Replace($Text, '(?i)([a-z][a-z0-9+.-]*://)[^/@\s]+@', '$1***@')
@@ -214,6 +229,9 @@ function Invoke-V4ApplyTransaction {
         }
         if ($ops.IsAppRunning) { $wasRunning = [bool](& $ops.IsAppRunning) }
         $snap = & $ops.Snapshot $Context.Reason
+        # R2A-05: read profiles.yaml AFTER the app is stopped (snapshot), so a
+        # desktop-app flush during shutdown cannot be overwritten with stale text.
+        if ($Context.ProfileTextBuilder) { $Context.ProfileText = [string](& $Context.ProfileTextBuilder) }
         if ($ops.WriteJournal) {
             try { & $ops.WriteJournal $snap $Context.Reason | Out-Null; $journalWritten = $true }
             catch { throw [pscustomobject]@{ code = 34; msg = ('cannot write transaction journal: ' + $_.Exception.Message) } }
@@ -354,6 +372,8 @@ function Assert-V4SettingsInput {
 
 function Get-V4Settings {
     if (-not (Test-Path -LiteralPath $script:SettingsPath)) { throw (New-V4Fault 11 'settings.json missing; run with -Init first') }
+    if (-not (Test-V4AclHardened -Path $script:ConfigDir -Allowed (Get-V4AllowedSidSet))) { throw (New-V4Fault 12 'config directory ACL is not hardened; re-run -Init under the lock') }
+    if (-not (Test-V4AclHardened -Path $script:SettingsPath -Allowed (Get-V4AllowedSidSet))) { throw (New-V4Fault 12 'settings.json ACL is not hardened; re-run -Init under the lock') }
     try { $j = Get-Content -LiteralPath $script:SettingsPath -Raw -Encoding UTF8 | ConvertFrom-Json }
     catch { throw (New-V4Fault 11 'settings.json is not valid JSON') }
     if (-not $j -or -not $j.staticProxy -or -not $j.firstHop) { throw (New-V4Fault 11 'settings.json structure is invalid') }
@@ -682,6 +702,7 @@ function Test-V4Port {
 
 function Stop-V4Clash {
     param([int]$TimeoutSec = 25, [int]$Port = 7897)
+    if ($script:TestMode) { return $true }   # test mode: never stop a real process
     Assert-V4ProductionOperation 'Stop-V4Clash'
     $pids = Get-V4AppPids
     if ($pids.Count -gt 0) {
@@ -728,6 +749,12 @@ function Start-V4ClashCore {
 
 function Start-V4Clash {
     param([int]$TimeoutSec = 45, [int]$Port = 7897)
+    if ($script:TestMode) {
+        if ($env:V4_TEST_START_LOG) {
+            try { Add-Content -LiteralPath $env:V4_TEST_START_LOG -Value ('start|' + $TimeoutSec + '|' + $Port) } catch { }
+        }
+        return $true   # test mode: never launch a real process
+    }
     Assert-V4ProductionOperation 'Start-V4Clash'
     $p = Get-V4Paths
     if (-not $p.Exe) { throw 'clash-verge.exe not found' }
@@ -854,6 +881,8 @@ function Test-V4SnapshotManifest {
         if ($absent -contains $name) { throw ('snapshot manifest has a duplicate absent entry: ' + $name) }
         $absent += $name
     }
+    if ($entries.Count -eq 0) { throw 'snapshot manifest has no files' }
+    if (-not (($names -contains 'profiles.yaml') -or ($absent -contains 'profiles.yaml'))) { throw 'snapshot manifest does not cover profiles.yaml' }
     return [pscustomobject]@{ manifest = $m; entries = $entries; absent = $absent }
 }
 
@@ -877,6 +906,7 @@ function Restore-V4Files {
             $expected = $e.sha256
             $validator = ({ param($f) if ((Get-FileHash -LiteralPath $f -Algorithm SHA256).Hash.ToLowerInvariant() -ne $expected.ToLowerInvariant()) { throw 'restored hash mismatch' } }).GetNewClosure()
             Set-V4Atomic -TargetPath $target -Content $content -Validator $validator | Out-Null
+            if (-not (Protect-V4Acl -Path $target)) { throw 'restored file ACL could not be hardened' }
             $restored += $e.name
         }
         catch { $failures += [pscustomobject]@{ name = $e.name; error = $_.Exception.Message } }
@@ -964,19 +994,27 @@ function Get-V4SystemProxy {
     return [pscustomobject]@{ enabled = [bool]$v.ProxyEnable; server = $v.ProxyServer }
 }
 
-function Set-V4SystemProxy {
-    param([string]$Server)
-    Assert-V4ProductionOperation 'Set-V4SystemProxy'
+function Write-V4SystemProxyRegistry {
+    param([bool]$Enabled, [string]$Server)
+    if ($script:TestMode) {
+        if (-not $script:TestRegistryWriter) { throw 'V4 test mode blocks a real system-proxy write and no test registry writer is installed' }
+        & $script:TestRegistryWriter $Enabled $Server
+        return
+    }
+    Assert-V4ProductionOperation 'system proxy registry write'
     $k = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings'
     Set-ItemProperty $k -Name ProxyServer -Value $Server
-    Set-ItemProperty $k -Name ProxyEnable -Value 1
+    Set-ItemProperty $k -Name ProxyEnable -Value $(if ($Enabled) { 1 } else { 0 })
     Update-V4WinInet
 }
 
+function Set-V4SystemProxy {
+    param([string]$Server)
+    Write-V4SystemProxyRegistry -Enabled $true -Server $Server
+}
+
 function Clear-V4SystemProxy {
-    Assert-V4ProductionOperation 'Clear-V4SystemProxy'
-    Set-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings' -Name ProxyEnable -Value 0
-    Update-V4WinInet
+    Write-V4SystemProxyRegistry -Enabled $false -Server ((Get-V4SystemProxy).server)
 }
 
 function Update-V4WinInet {

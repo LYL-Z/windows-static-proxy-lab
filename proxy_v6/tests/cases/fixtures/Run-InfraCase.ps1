@@ -151,14 +151,16 @@ try {
         }
         'INF-GUARD-01' {
             $blocked = 0
-            foreach ($op in @({ Set-V4SystemProxy -Server '127.0.0.1:1' }, { Clear-V4SystemProxy }, { Start-V4Clash }, { Stop-V4Clash })) {
+            foreach ($op in @({ Set-V4SystemProxy -Server '127.0.0.1:1' }, { Clear-V4SystemProxy })) {
                 try { & $op | Out-Null } catch { $blocked++ }
             }
-            Assert-Infra ($blocked -eq 4) ('test-mode guard blocked ' + $blocked + '/4 operations')
+            Assert-Infra ($blocked -eq 2) ('test-mode guard blocked ' + $blocked + '/2 registry operations')
+            Assert-Infra (Start-V4Clash) 'test-mode Start-V4Clash was not a safe no-op'
+            Assert-Infra (Stop-V4Clash) 'test-mode Stop-V4Clash was not a safe no-op'
             $p = Get-V4Paths
             Assert-Infra (-not $p.AppData) 'test mode fell back to the real appdata'
             Assert-Infra (-not $p.Exe) 'test mode fell back to the real executable'
-            $script:Actual = '4/4 production operations blocked; paths did not fall back'
+            $script:Actual = 'registry writes blocked; process start/stop are safe no-ops; paths did not fall back'
         }
         'INF-REDACT-01' {
             Register-V4Secret 'SuperSecret-123'
@@ -193,7 +195,7 @@ try {
             $script:Actual = 'DPAPI at rest, no plaintext, ACL restricted, Get-V4Settings roundtrip'
         }
         'INF-SETTINGS-02' {
-            New-Item -ItemType Directory -Path (Join-Path $root 'config') -Force | Out-Null
+            Save-V4Settings -Host_ '203.0.113.10' -Port 1080 -Username 'fixture-user' -Password 'fixture-pass' -HopHost '127.0.0.1' -HopPort 11119 -MixedPort 7897
             Put-Text (Join-Path $root 'config\settings.json') '{ this is not json'
             Assert-FaultCode { Get-V4Settings } 11 'invalid settings JSON'
             $script:Actual = 'invalid settings rejected with code 11'
@@ -506,6 +508,13 @@ try {
             Assert-Infra (($j.reasons -join ' ') -match 'settings') 'state reasons do not mention settings'
             $script:Actual = 'state script emitted FAILED JSON and exit 3 for corrupt settings'
         }
+        'INF-SETTINGS-04' {
+            Save-V4Settings -Host_ '203.0.113.10' -Port 1080 -Username 'fixture-user' -Password 'fixture-pass' -HopHost '127.0.0.1' -HopPort 11119 -MixedPort 7897
+            $sp = Join-Path $root 'config\settings.json'
+            & icacls $sp /grant '*S-1-1-0:(R)' | Out-Null
+            Assert-FaultCode { Get-V4Settings } 12 'settings with a widened ACL'
+            $script:Actual = 'Get-V4Settings refuses a settings file whose ACL was widened'
+        }
         'INF-INIT-04' {
             $rt = Join-Path $root 'runtime4.yaml'
             Put-Text $rt ('proxies:' + $LF + '  - name: node' + $LF + '    type: socks5' + $LF + '    server: 203.0.113.10' + $LF + '    port: 1080' + $LF + '    username: "fixture-user"' + $LF + '    password: "p#ss\"quoted"' + $LF)
@@ -515,6 +524,97 @@ try {
             Assert-Infra ($global:InitSaved -ne $null) 'init did not call the writer'
             Assert-Infra ($global:InitSaved.pass -eq 'p#ss"quoted') ('quoted password parsed as [' + $global:InitSaved.pass + ']')
             $script:Actual = 'quoted # and escaped quote preserved by the init scalar parser'
+        }
+        'INF-F06-01' {
+            $s = [pscustomobject]@{ host='203.0.113.10'; port=1080; username='u'; password='p'; hopHost='127.0.0.1'; hopPort=11119; mixedPort=7897 }
+            $strict = Build-V4Profile -S $s -Mode 'strict'
+            $resilient = Build-V4Profile -S $s -Mode 'resilient'
+            Assert-Infra (-not $strict.Contains('"DIRECT"')) 'strict profile contains DIRECT'
+            Assert-Infra ($strict.Contains('type: select')) 'strict profile is not a select group'
+            Assert-Infra ($resilient.Contains('"DIRECT"')) 'resilient profile lost DIRECT'
+            Assert-Infra ($resilient.Contains('type: fallback')) 'resilient profile is not fallback'
+            $script:Actual = 'strict=select without DIRECT; resilient=fallback with DIRECT'
+        }
+        'INF-ROLLBACK-01' {
+            $fx = New-SnapshotFixture
+            $snapProfiles = Join-Path $fx.snap 'profiles.yaml'
+            $expected = Get-Sha $snapProfiles
+            Write-V4Journal -SnapshotDir $fx.snap -Reason 'rollback-test'
+            Put-Text (Join-Path $fx.app 'profiles.yaml') 'changed-live'
+            Put-Text (Join-Path $fx.app 'clash-verge.yaml') 'changed-runtime'
+            $env:V4_TEST_APPDATA = $fx.app
+            try {
+                $rollback = Join-Path $repo 'proxy_v4\rollback-v4.ps1'
+                $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $rollback -SnapshotDir $fx.snap -KeepSystemProxy 2>&1
+                $c = $LASTEXITCODE
+                Assert-Infra ($c -eq 0) ('rollback exit=' + $c + ' out=' + (($out | Select-Object -Last 5) -join ' | '))
+                Assert-Infra ((Get-Sha (Join-Path $fx.app 'profiles.yaml')) -eq $expected) 'rollback did not restore profiles.yaml'
+                Assert-Infra ($null -eq (Get-V4Journal)) 'rollback did not clear the journal'
+                Assert-Infra (-not (Test-Path -LiteralPath (Join-Path $root 'config\.lock'))) 'rollback left the lock behind'
+                $script:Actual = 'real rollback script restored files, cleared journal and lock'
+            }
+            finally { Remove-Item Env:V4_TEST_APPDATA -ErrorAction SilentlyContinue }
+        }
+        'INF-ROLLBACK-02' {
+            $fx = New-SnapshotFixture
+            $liveBefore = Get-Sha (Join-Path $fx.app 'profiles.yaml')
+            Put-Text (Join-Path $fx.snap 'clash-verge.yaml') 'tampered'
+            $env:V4_TEST_APPDATA = $fx.app
+            try {
+                $rollback = Join-Path $repo 'proxy_v4\rollback-v4.ps1'
+                $prevEap = $ErrorActionPreference
+                $ErrorActionPreference = 'Continue'
+                try { $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $rollback -SnapshotDir $fx.snap -KeepSystemProxy 2>&1 }
+                finally { $ErrorActionPreference = $prevEap }
+                $c = $LASTEXITCODE
+                Assert-Infra ($c -eq 40) ('corrupt snapshot rollback exit=' + $c)
+                Assert-Infra ((Get-Sha (Join-Path $fx.app 'profiles.yaml')) -eq $liveBefore) 'live files changed despite a refused snapshot'
+                Assert-Infra (-not (Test-Path -LiteralPath (Join-Path $root 'config\.lock'))) 'failed rollback left the lock behind'
+                $script:Actual = 'corrupt snapshot rollback exited 40, live files intact, lock released'
+            }
+            finally { Remove-Item Env:V4_TEST_APPDATA -ErrorAction SilentlyContinue }
+        }
+        'INF-ROLLBACK-03' {
+            $l = Enter-V4Lock -TimeoutSec 2
+            Assert-Infra ($null -ne $l) 'could not acquire the test lock'
+            $log = Join-Path $root 'start.log'
+            $env:V4_TEST_START_LOG = $log
+            try {
+                $rollback = Join-Path $repo 'proxy_v4\rollback-v4.ps1'
+                $prevEap = $ErrorActionPreference
+                $ErrorActionPreference = 'Continue'
+                try { $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $rollback -SnapshotDir (Join-Path $root 'missing') 2>&1 }
+                finally { $ErrorActionPreference = $prevEap }
+                $c = $LASTEXITCODE
+                Assert-Infra ($c -eq 33) ('lock-busy rollback exit=' + $c)
+                Assert-Infra (Test-Path -LiteralPath (Join-Path $root 'config\.lock')) 'loser deleted the winner lock'
+                Assert-Infra (-not (Test-Path -LiteralPath $log) -or (Get-Content -LiteralPath $log -Raw).Trim().Length -eq 0) 'lock-busy rollback attempted to start Clash'
+                $script:Actual = 'lock-busy rollback exited 33, left the lock and did not start Clash'
+            }
+            finally {
+                Remove-Item Env:V4_TEST_START_LOG -ErrorAction SilentlyContinue
+                $null = Exit-V4Lock $l
+            }
+        }
+        'INF-ROLLBACK-04' {
+            $fx = New-SnapshotFixture
+            Save-V4Settings -Host_ '203.0.113.10' -Port 1080 -Username 'fixture-user' -Password 'fixture-pass' -HopHost '127.0.0.1' -HopPort 11119 -MixedPort 65532
+            $env:V4_TEST_APPDATA = $fx.app
+            $log = Join-Path $root 'start.log'
+            $env:V4_TEST_START_LOG = $log
+            try {
+                $rollback = Join-Path $repo 'proxy_v4\rollback-v4.ps1'
+                $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $rollback -SnapshotDir $fx.snap -KeepSystemProxy 2>&1
+                $c = $LASTEXITCODE
+                Assert-Infra ($c -eq 0) ('rollback exit=' + $c + ' out=' + (($out | Select-Object -Last 5) -join ' | '))
+                $text = if (Test-Path -LiteralPath $log) { Get-Content -LiteralPath $log -Raw } else { '' }
+                Assert-Infra ($text -match '\|65532') ('rollback did not use settings.mixedPort: ' + $text)
+                $script:Actual = 'rollback used settings.mixedPort 65532 for the restart'
+            }
+            finally {
+                Remove-Item Env:V4_TEST_APPDATA -ErrorAction SilentlyContinue
+                Remove-Item Env:V4_TEST_START_LOG -ErrorAction SilentlyContinue
+            }
         }
         'INF-LOCK-05' {
             Ensure-V4Dir (Join-Path $root 'config')
@@ -573,6 +673,51 @@ try {
             Assert-Infra $res.ok ('restore failed: ' + (($res.failures | ForEach-Object { $_.name + ':' + $_.error }) -join '; '))
             Assert-Infra ((Get-Sha $sub) -eq $before) 'existing profile was not restored'
             $script:Actual = 'existing profiles/*.yaml recorded with a separator and restored'
+        }
+        'INF-SNAP-06' {
+            $snap = Join-Path $root 'empty-snap'
+            Ensure-V4Dir $snap
+            $m = [ordered]@{ schema=2; files=@(); absent=@(); systemProxy=@{enabled=$false;server=''} }
+            Put-Text (Join-Path $snap 'manifest.json') ($m | ConvertTo-Json -Depth 5)
+            $threw = $false
+            try { Restore-V4Files -SnapshotDir $snap -AppData (Join-Path $root 'app') -ProfilesDir (Join-Path $root 'app\profiles') | Out-Null } catch { $threw = $true }
+            Assert-Infra $threw 'empty manifest was accepted as a successful restore'
+            $script:Actual = 'zero-entry snapshot manifest refused'
+        }
+        'INF-SNAP-07' {
+            $fx = New-SnapshotFixture
+            $mp = Join-Path $fx.snap 'manifest.json'
+            $m = Get-Content -LiteralPath $mp -Raw -Encoding UTF8 | ConvertFrom-Json
+            $m.files = @($m.files | Where-Object { [string]$_.name -ne 'profiles.yaml' })
+            $m.absent = @($m.absent | Where-Object { [string]$_ -ne 'profiles.yaml' })
+            Put-Text $mp ($m | ConvertTo-Json -Depth 7)
+            $threw = $false
+            try { Restore-V4Files -SnapshotDir $fx.snap -AppData $fx.app -ProfilesDir (Join-Path $fx.app 'profiles') | Out-Null } catch { $threw = $true }
+            Assert-Infra $threw 'manifest without profiles.yaml was accepted'
+            $script:Actual = 'snapshot not covering profiles.yaml refused'
+        }
+        'INF-SNAP-08' {
+            $fx = New-SnapshotFixture
+            $runtime = Join-Path $fx.app 'clash-verge.yaml'
+            Remove-Item -LiteralPath $runtime -Force
+            $res = Restore-V4Files -SnapshotDir $fx.snap -AppData $fx.app -ProfilesDir (Join-Path $fx.app 'profiles')
+            Assert-Infra $res.ok ('restore failed: ' + (($res.failures | ForEach-Object { $_.name + ':' + $_.error }) -join '; '))
+            Assert-Infra (Test-V4AclHardened -Path $runtime -Allowed (Get-V4AllowedSidSet)) 'recreated runtime file is not ACL-hardened'
+            $script:Actual = 'recreated credential-bearing file was ACL-hardened after restore'
+        }
+        'INF-REDACT-03' {
+            $checks = @(
+                @{ text='{"password":"json-secret","user":"json-user"}'; forbidden='json-secret' },
+                @{ text='{"token":"tok-123"}'; forbidden='tok-123' },
+                @{ text='user: a b'; forbidden='a b' },
+                @{ text='socks5://user:pass@203.0.113.10:1080'; forbidden='user:pass' },
+                @{ text='Cookie: session=abc'; forbidden='session=abc' }
+            )
+            foreach ($c in $checks) {
+                $out = Get-V4Redacted $c.text
+                Assert-Infra ($out -notmatch [regex]::Escape($c.forbidden)) ('leaked: ' + $c.forbidden + ' in ' + $out)
+            }
+            $script:Actual = 'JSON keys, user with spaces, URL userinfo and Cookie redacted'
         }
         'INF-REDACT-02' {
             $checks = @(
