@@ -56,6 +56,7 @@ Run from the skill directory:
 - references/v1-v6-lessons.md: failures, wrong assumptions, corrections, and reusable rules from V1-V6.
 - references/architecture.md: layered model and state classification.
 - references/safety.md: authorization, backup, test isolation, credential/publication rules.
+- references/targeted-findings.md: GEOIP/CN rule diff, Baidu 502 attribution, SOCKS5 UDP ASSOCIATE result, WebRTC split-path explanation, candidate options.
 - examples/: synthetic snapshots and commands.
 
 ## Non-negotiable rules
