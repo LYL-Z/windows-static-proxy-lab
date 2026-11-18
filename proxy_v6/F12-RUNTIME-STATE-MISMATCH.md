@@ -39,9 +39,14 @@ Clash Verge 的 `verge.yaml` 仍保存：
 - 状态输出新增 `uiSystemProxy`；
 - UI 与 HKCU 不一致时报告额外 reason；
 - 在有 settings 且其他路径正常时降为 DEGRADED；
-- **当前生产 settings.json 缺失**时，状态仍是 FAILED（settings missing），但 reasons 会同时包含 UI/HKCU 不一致，不能据此报 HEALTHY；
+- 生产目录 `D:\claude防封\proxy_v4\config\settings.json` **存在**（933B，DACL 尚未 protected）；**publish 仓库的 `proxy_v4\config` 没有 settings.json**。因此 V6 state 从 publish 运行会 FAILED（settings missing）；若部署到生产并指向生产配置，预期 DEGRADED + UI reason。当前生产仍是 baseline，没有 `uiSystemProxy` 输出。
 - 不再用 UI 或节点测速单条件判 HEALTHY。
-测试：`INF-F12-01`（DEGRADED）、`INF-F12-02`（FAILED + UI reason）、`INF-F12-03`（verge.yaml true/false/missing）。
+测试：`INF-F12-01`（有 settings 时 DEGRADED）、`INF-F12-02`（settings 缺失时 FAILED + UI reason，适用于 publish 路径）、`INF-F12-03`（verge.yaml true/false/missing）。F12 的“检测”不等于“恢复使用”或“用户验收”。
+
+## 5b. 当前生产状态判定
+- 从 HKCU/UI/进程/出口只读观测：**DEGRADED**（系统代理关闭、UI 显示开启、浏览器走 StarSky 直连；Clash 链可用但未被浏览器使用）。
+- 不是 HEALTHY；也不是新的 FAILED 事故。
+- 生产 baseline 脚本没有 V6 的 `uiSystemProxy` 字段；只有部署 V6 后，才能由生产脚本输出该诊断。
 
 ## 6. 处理建议
 - 当前保持 `ProxyEnable=0`，所有站点可用；不自动改回，避免中断。

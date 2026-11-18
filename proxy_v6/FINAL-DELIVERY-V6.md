@@ -22,7 +22,7 @@
 ## 1b. 独立复审最终结论
 - final-acceptance DELTA2（对象 code 79198fd / evidence 32d8abc）：**SHORT_RUN_ACCEPTED（有条件）**；无条件发布仍 **NOT_READY**。
 - C-02：旧 `-StaticPass`/`-StaticPassFile` 在 CWD 有同名文件时也 exit 11 并输出 removal 文案 → **CLOSED（可审计）**。
-- F12：settings 缺失 + HKCU=0/UI=on → **FAILED + UI reason**，不是 DEGRADED/HEALTHY。
+- F12：publish 路径无 settings → **FAILED + UI reason**；生产目录有 settings（933B）但仍是 baseline，实际只读判定为 **DEGRADED**（HKCU off/UI on/浏览器走 StarSky），不是 HEALTHY。
 - 新 HIGH：无。
 - 条件：C-01/C-12 用户书面处置；V6 未部署生产；残余需接受或修复；真实 apply/rollback/boot 等 WAITING-USER。
 - 独立复审确认的残余（按名称，避免编号混淆）：
@@ -41,7 +41,7 @@
 | TEST_ISOLATION | **PASS（V6 harness）/ PARTIAL（整体）** | F11 根因已定位并修复；FT16–FT21；tests 前后 HKCU/WinHTTP 一致；old proxy_diag/v2/v3 仍可直写 HKCU（R3-01），不属于 V6 harness |
 | CONFIG_INTEGRITY | **PASS（隔离）/ NOT VERIFIED（生产）** | 事务/journal/快照/恢复测试通过；生产仍是 baseline，未做真实事务 |
 | PRODUCTION_DEPLOYMENT | **NOT_DEPLOYED** | 生产 5 个核心文件 = 36222c9；publish V6 = 79198fd；无部署记录 |
-| CURRENT_NETWORK_STATE | **DEGRADED（可用，不是 HEALTHY）** | HKCU 0/127.0.0.1:7897；UI on；直连 54.202.22.253；Clash 7897 显式出口 72.245.197.103；7897/11119 监听正常 |
+| CURRENT_NETWORK_STATE | **DEGRADED（可用，不是 HEALTHY）** | HKCU 0/127.0.0.1:7897；UI on；直连 54.202.22.253；Clash 7897 显式出口 72.245.197.103；7897/11119 监听正常；生产 settings 存在但 baseline |
 | USER_ACCEPTANCE | **NOT_GRANTED** | 用户未接受 C-01/C-12，也未批准部署/真实 apply/恢复方案 |
 | BOOT_LIFECYCLE | **WAITING-USER / NOT RUN** | 开机、睡眠、Wi-Fi 重连未实测；此前误标 DEFERRED，现纠正 |
 | CREDENTIAL_SECURITY | **PARTIAL / BLOCKED** | C-02 代码已移除命令行密码；C-01 快照明文凭据未加密；NexIP 轮换 BLOCKED-USER；生产 settings ACL 未受保护 |
