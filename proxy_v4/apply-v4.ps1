@@ -29,6 +29,8 @@ function Fail([int]$c, [string]$m) { throw [pscustomobject]@{ code = $c; msg = $
 try {
     Write-V4Log ("mode={0} dryRun={1} init={2}" -f $Mode, [bool]$DryRun, [bool]$Init) -Level STEP
     if ($Repair -and $DryRun) { Fail 11 "-Repair and -DryRun are mutually exclusive" }
+    if ($Init -and $DryRun)     { Fail 11 "-Init and -DryRun are mutually exclusive" }
+    if ($Init -and $Repair)     { Fail 11 "-Init and -Repair are mutually exclusive" }
 
     # ---------- INIT: one-time migration into the JSON store ----------
     if ($Init) {
@@ -125,15 +127,21 @@ try {
             $pt = $pt.TrimEnd() + "`n- uid: $uid`n  type: local`n  name: V4-Managed`n  file: v4-managed.yaml`n  updated: $epoch`n"
         }
         $epoch = [int]([datetime]::UtcNow - [datetime]'1970-01-01').TotalSeconds
-        # F04: refresh the timestamp on EVERY run, not only when the item is created
-        if ($pt -match ('(?m)^(  updated:\s*)\S+$')) {
-            $pt = [regex]::Replace($pt, '(?m)^(  updated:\s*)\S+$', ('${1}' + $epoch))
+        # F08: refresh ONLY our own item timestamp - a global regex would also rewrite
+        # every other subscription's `updated` field
+        $mi = $pt.IndexOf(('uid: ' + $uid))
+        if ($mi -ge 0) {
+            $rxUpd = New-Object System.Text.RegularExpressions.Regex '(?m)^(  updated:\s*)\S+$'
+            $tail = $rxUpd.Replace($pt.Substring($mi), ('${1}' + $epoch), 1)
+            $pt = $pt.Substring(0, $mi) + $tail
         }
         $pt = [regex]::Replace($pt, '(?m)^current:\s*\S+', ('current: ' + $uid))
+        # F07: the transaction starts at the FIRST live write (profiles.yaml), not after it
+        $applied = $true
         Set-V4Atomic -TargetPath $pfile -Content $pt -Validator { param($f) if ((Read-V4File $f) -notmatch '(?m)^current:\s*\S+') { throw 'profiles.yaml has no current entry' } } | Out-Null
         Write-V4Log 'dedicated local profile registered; subscription profile untouched' -Level OK
         $val = { param($f) Test-V4MihomoConfig -ConfigPath $f -WorkDir $p.AppData | Out-Null }
-        $applied = $true   # F02: from the FIRST write onward the tree is half-changed
+
         Set-V4Atomic -TargetPath $profTarget -Content $profYaml -Validator $val | Out-Null
         Set-V4Atomic -TargetPath $p.RuntimeFile -Content $rtYaml -Validator $val | Out-Null
         $applied = $true
@@ -166,7 +174,7 @@ catch {
     if ($tc -and $tc.code) { $exit = [int]$tc.code; Write-V4Log $tc.msg -Level ERROR }
     else { $exit = 1; Write-V4Log ('unexpected: ' + (Get-V4Redacted $_.Exception.Message)) -Level ERROR }
     if ($applied -and $snap) {
-        Write-V4Log 'mid-transaction failure; restoring snapshot' -Level WARN
+        try { Write-V4Log 'mid-transaction failure; restoring snapshot' -Level WARN } catch { }   # F10: log must not gate recovery
         try { Restore-V4Snapshot -SnapshotDir $snap | Out-Null; Start-V4Clash -TimeoutSec 30 | Out-Null }
         catch { Write-V4Log ('restore failed: ' + (Get-V4Redacted $_.Exception.Message)) -Level ERROR; $exit = 40 }
     }
