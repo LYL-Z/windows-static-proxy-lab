@@ -6,7 +6,7 @@
 | 项 | 结果 |
 |---|---|
 | Gitleaks 8.30.1 工作树（.gitleaks.toml） | 0 findings |
-| Gitleaks 全历史（.gitleaks.toml） | 0 findings；唯一历史命中为合成 fixture abcdef123456，按路径/正则 allowlist 披露 |
+| Gitleaks 全历史（.gitleaks.toml） | 0 findings；R5-01 已修复：仅精确 regex abcdef123456 allowlist，**不再整文件路径放行** |
 | 合成 canary 验证 | github-pat / generic-api-key 可检出；扫描有效 |
 | DPAPI blob / GitHub token / 私钥 / 真实代理凭据 | 0 命中 |
 | 测试夹具合成凭据 | 仅 fixture-* / canary，无真实值 |

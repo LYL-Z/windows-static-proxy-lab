@@ -23,7 +23,7 @@
 - final-acceptance DELTA2（对象 code 79198fd / evidence 32d8abc）：**SHORT_RUN_ACCEPTED（有条件）**；无条件发布仍 **NOT_READY**。
 - C-02：旧 `-StaticPass`/`-StaticPassFile` 在 CWD 有同名文件时也 exit 11 并输出 removal 文案 → **CLOSED（可审计）**。
 - F12：publish 路径无 settings → **FAILED + UI reason**；生产目录有 settings（933B）但仍是 baseline，实际只读判定为 **DEGRADED**（HKCU off/UI on/浏览器走 StarSky），不是 HEALTHY。
-- 新 HIGH：无。
+- 新 HIGH：无。security DELTA2 亦独立确认 C-02/F12/C-04/C-08，未发现新 HIGH；R5-01（整文件路径 allowlist 会抑制未来 secret）已收窄为仅精确 regex `abcdef123456`，重扫 HEAD/工作树/历史 0。
 - 条件：C-01/C-12 用户书面处置；V6 未部署生产；残余需接受或修复；真实 apply/rollback/boot 等 WAITING-USER。
 - 独立复审确认的残余（按名称，避免编号混淆）：
   - R2A-06：journal 无提交阶段（MED，fail-closed）。
@@ -31,7 +31,8 @@
   - 事务 R3-01：生产写门闩只覆盖注册表/进程入口，ACL 写入器、Start-V4ClashCore -Launch、settings/owner/journal 未在门闩内（MED）。
   - R3-02：系统代理写入补偿仅覆盖进程内异常，非跨进程原子（LOW）。
   - R3D-04：C-04 owner 无负向用例（LOW）；R3D-05：写补偿无失败用例（LOW）。
-  - R5D-01：凭据文件 ACL 加固此前只有“<受保护文件>”文字，现已补 Protect-V4Acl 示例（LOW）。
+  - R5D-01：凭据文件 ACL 加固此前只有“<受保护文件>”文字，现已补 Protect-V4Acl 示例（LOW，已文档修复）。
+  - R5-01：gitleaks 曾整文件路径 allowlist，现已改为仅精确合成字面量，重扫 0（已修复）。
   - C-01/C-12、NexIP 轮换仍为 BLOCKED/USER 项。
 
 ## 2. 十个 Gate（证据/状态）

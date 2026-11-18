@@ -195,3 +195,53 @@ F11 latch 只覆盖 `proxy_v4/lib/V4.ps1` 的系统代理函数。以下 tracked
 - **R3-02：部分修复**（补偿有效，仍非原子）。
 - **新 HIGH**：F12/C-04/C-08/补偿路径未发现新的生产 HIGH；但 C-02 仍未关闭，因此最终不能把 Gate 1 标 PASS。另有新的 LOW：gitleaks 1 条合成命中，使 Gate 11 的“0 findings”失效。
 - 最终状态：**NOT_READY / SHORT_RUN_ACCEPTED WITH CONDITIONS**。阻断项：C-02 旧语法（HIGH）、C-01/C-12 用户书面接受、R3-01 旧写入面；Gate 11 需重新扫描/处理合成命中后才能 PASS。
+
+---
+
+## DELTA2 — 2026-11-18 06:38 — 79198fd / 32d8abc / dbbd259
+
+**审查对象（final delta）**：代码 79198fd；最终证据 32d8abc（final.json head=79198fd、dirty=false、97/97、0 skipped）；规范 selftest head=79198fd、dirty=false、7/7；文档 103f707；gitleaks allowlist dbbd259。当前检出 HEAD 为 12821d1（dbbd259 之后为 FINAL-DELIVERY/GATE/TASK/F12 措辞等文档提交；已核对 79198fd..12821d1 无 .ps1 生产代码变化）。审查时工作树干净；本节只追加，不改变原 DELTA 的历史记录。
+
+### E1. C-02：CLOSED（旧前缀假阳性已消除）
+
+- apply-v4.ps1 现在同时声明 -CredentialFile 与墓碑 -StaticPass/-StaticPassFile；在任何文件读取/锁/Init 之前检查 PSBoundParameters，两个旧拼写都会 Fail 11：”-StaticPass was removed; use -CredentialFile <protected file>” / 同格式的 StaticPassFile。
+- 独立测试（%TEMP% + V4_TEST_MODE=1，不触 HKCU/网络）：
+  - 旧 -StaticPass 传入一个**确实存在的同名文件绝对路径**：exit 11、removal=true、settings 不存在；没有被当作 -StaticPassFile 读取。
+  - 旧 -StaticPassFile 传入存在文件：exit 11、removal=true、settings 不存在。
+  - 新 -CredentialFile + 受 ACL 保护的文件：exit 10（测试根无 appdata）、settings 已写、settings 内无明文口令；支持路径工作。
+  - 同一测试中不再出现“文件存在 → exit 10 写 settings”的旧假阳性；INF-APPLY-INIT-02/03 现在断言 exit 11 且输出包含 removal 文案。
+- 残余（低，非未关闭）：用户若手工键入旧拼写，口令仍会短暂出现在自己的命令行/Shell 历史中；但工具在读取前明确拒绝，不读取、不存储、不注册该值。原 C-02 的代码接受路径已关闭。
+
+### E2. F12：报告准确（settings missing => FAILED + UI reason，不是 DEGRADED）
+
+- Get-V4StateCore 在 settings 校验前计算 UI/HKCU mismatch 并加入 reason；SettingsError/缺 settings 的 early return 只把 state 置为 FAILED，reason 保留。
+- 合成验证（无 HKCU 读写）：
+  - Settings=null、SystemProxy=off、UiSystemProxy=true、无 SettingsError：state=FAILED；reasons=[“UI reports system proxy enabled, actual HKCU is disabled”, “settings.json missing”]。
+  - Settings=null、SettingsError=“settings.json missing”、Ui=true：state=FAILED；reasons=[UI mismatch, “settings invalid: settings.json missing”]。
+  - 因此当前生产“HKCU=0/UI=on/settings missing”应报 FAILED + UI reason，而不是 DEGRADED；与 lead 描述一致。受约束未读取 live HKCU/UI/网络。
+  - INF-F12-01/02/03 均 PASS：UI on/off 对照、missing settings 保留 reason、verge.yaml true/false/missing key/missing file 解析。
+- state-v4.ps1 的 JSON/文本均输出 uiSystemProxy；F12 专文同步更新。
+
+### E3. 其他状态
+
+- C-04：owner SID 校验已在；原 C-04 可判 CLOSED；非继承 DACL 的幂等性低残余仍在。
+- C-08：URL/JSON/API-key/Cookie 脱敏已独立验证；保持 CLOSED。
+- R3-02：本地补偿已验证（第二次写失败恢复旧 ProxyServer/ProxyEnable）；仍非跨进程原子，保持 PARTIAL/低残余。
+- C-01/C-12/C-13/C-14：状态未变；C-01 快照明文凭据与 C-12 PII 仍需用户书面接受/决定；C-13/C-14 为 accepted low。R3-01 旧 diag/v2/v3 直接写 HKCU 的入口仍在，仍需退役/门闩或用户接受。
+
+### E4. gitleaks：0（with allowlist）但 allowlist 过宽（R5-01，MEDIUM）
+
+- 最终 HEAD 精确树：gitleaks 8.30.1 + .gitleaks.toml，0 findings；工作树 0；全历史 0（24 commits / 1410 blobs）。合成 X-Api-Key 字面量已替换，旧的 1 条合成命中不再出现。
+- **新发现 R5-01（MEDIUM，扫描完整性）**：.gitleaks.toml 的 allowlist 同时写了整个文件路径 proxy_v6/tests/cases/fixtures/Run-InfraCase.ps1 与该合成字面量正则。gitleaks 的 allowlist 字段按 OR 生效；独立实验：
+  - 在 TEMP 复制该路径并放入一个合成高熵 token；同一 token 另放 other.ps1；用本仓库 allowlist 扫描 → 只有 other.ps1 被报，allowlisted 路径内的 token 被抑制。
+  - 用 useDefault、无 allowlist 的配置扫描同一批文件 → 两条都报。
+  - 证明：该 allowlist 会抑制该文件中**任何**未来 secret，而不只是历史合成字面量。Gate 11 的“0 findings”在输出上成立，但稳健性不成立。
+  - 建议：删除 paths，只保留精确 regex/commit/fingerprint allowlist（或显式 condition=AND）；修复后重跑 tree/history/worktree。该发现是扫描器配置问题，不是真实凭据；不应为此降低 secret 扫描要求。
+
+### E5. 测试与最终结论
+
+- INF：54/54 PASS、exit 0（HEAD=ddf1d58，代码 79198fd；含 INF-APPLY-INIT-02/03、INF-F12-01/02/03、INF-GUARD、INF-REDACT）。
+- final.json：head=79198fd、dirty=false、97/97、0 skipped；selftest：head=79198fd、dirty=false、7/7。未独立运行全量 97/FT；FT 读取真实 HKCU/WinHTTP，受“不触碰真实 HKCU”约束。
+- **无新增 HIGH**：C-02 已关闭；F12、C-04、C-08、R3-02 补偿路径未发现新的生产 HIGH。当前剩余为 MEDIUM（R5-01 allowlist 过宽、R3-01 旧写入面、R3-02 非原子）与已披露的 C-01/C-12 用户决策/LOW（C-13/C-14、C-04 继承残余）。
+- 最终安全状态：**SHORT_RUN_ACCEPTED WITH CONDITIONS**。条件：用户书面接受 C-01/C-12；R3-01 旧脚本退役/门闩；R5-01 allowlist 收窄并重扫。无 C-02 HIGH 阻断；不是无条件发布，LONG_RUN 仍 DEFERRED，服务资格仍 NOT_READY，凭据轮换仍 BLOCKED-USER。
+
