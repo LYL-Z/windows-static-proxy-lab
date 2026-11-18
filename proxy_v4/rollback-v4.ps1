@@ -70,6 +70,14 @@ try {
             }
             if (Start-V4Clash -TimeoutSec 40 -Port $mixedPort) { Write-V4Log 'clash restarted' -Level OK }
             else { Write-V4Log 'clash did not come back' -Level WARN }
+            # A restarted Clash Verge may reassert its saved system-proxy=on state.
+            # Rollback to an "off" snapshot must win, and if it cannot, fail closed.
+            if (-not $KeepSystemProxy -and $m.systemProxy -and -not $m.systemProxy.enabled) {
+                Clear-V4SystemProxy
+                $px = Get-V4SystemProxy
+                if ($px.enabled) { Write-V4Log ('proxy reasserted after restart: ' + $px.server) -Level ERROR; $exit = 41 }
+                else { Write-V4Log 'system proxy held off after restart' -Level OK }
+            }
             if (-not $KeepSystemProxy -and $m.systemProxy -and $m.systemProxy.enabled) {
                 $px = Get-V4SystemProxy
                 if ($px.server -ne $m.systemProxy.server) {
