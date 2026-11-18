@@ -32,7 +32,7 @@ reasoning can be audited independently. It is **not** a "how to evade platform r
 
 ## Honest status
 
-V6 (commits d5f2134 / evidence b9bb9a0): 94/94 isolated tests, 7/7 harness self-tests, Gitleaks 0 findings.
+V6 (commit 0268e17 / evidence 1c7fdad + ebbf2e6): 94/94 isolated tests, 7/7 harness self-tests, Gitleaks 0 findings.
 `PENDING` on real production apply/rollback/boot/sleep/Wi-Fi, 24h/72h soak, and credential rotation.
 **F11 incident:** a lead test probe wrote `ProxyServer=x` to the real HKCU during V6 work and briefly broke browser networking on 2026-11-18. It is recorded in `proxy_v6/INCIDENT-2026-11-18.md`; the production-write latch and FT16–FT21 regression tests are in place.
 Claude service eligibility is `NOT_READY`: Anthropic's Supported Regions Policy tests **physical
