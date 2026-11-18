@@ -417,7 +417,6 @@ proxy-groups:
     type: select
     proxies:
       - "US-WA-SOCKS5"
-      - "DIRECT"
 "@
     }
 @"

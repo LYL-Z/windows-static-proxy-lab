@@ -133,8 +133,9 @@ Remove-Item $bench -Recurse -Force -ErrorAction SilentlyContinue
 $passed = @($script:Results | Where-Object { $_.pass }).Count
 Write-Host ''
 Write-Host ("  result {0}/{1}" -f $passed, $script:Results.Count) -ForegroundColor $(if($passed -eq $script:Results.Count){'Green'}else{'Red'})
-$ev = @{ ts=(Get-Date).ToString('s'); passed=$passed; total=$script:Results.Count; scenarios=$script:Results
+$total = $script:Results.Count
+$ev = @{ ts=(Get-Date).ToString('s'); passed=$passed; total=$total; scenarios=$script:Results
          notCovered=@('FT11 disk-full (needs a full volume)','FT14 log-write failure (needs a read-only log target)') }
 if ($Json) { $ev | ConvertTo-Json -Depth 5 }
 if ($OutFile) { Write-V4File -Path $OutFile -Content ($ev | ConvertTo-Json -Depth 5); Write-Host ("  evidence -> {0}" -f $OutFile) }
-exit $(if ($passed -eq $R.Count) { 0 } else { 1 })
+if ($passed -eq $total) { exit 0 } else { Write-Host "  EXIT 1: deviation" -ForegroundColor Red; exit 1 }

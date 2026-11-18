@@ -28,6 +28,7 @@ function Fail([int]$c, [string]$m) { throw [pscustomobject]@{ code = $c; msg = $
 
 try {
     Write-V4Log ("mode={0} dryRun={1} init={2}" -f $Mode, [bool]$DryRun, [bool]$Init) -Level STEP
+    if ($Repair -and $DryRun) { Fail 11 "-Repair and -DryRun are mutually exclusive" }
 
     # ---------- INIT: one-time migration into the JSON store ----------
     if ($Init) {
@@ -123,10 +124,16 @@ try {
             $epoch = [int](New-TimeSpan -Start ([datetime]'1970-01-01') -End (Get-Date)).TotalSeconds
             $pt = $pt.TrimEnd() + "`n- uid: $uid`n  type: local`n  name: V4-Managed`n  file: v4-managed.yaml`n  updated: $epoch`n"
         }
+        $epoch = [int]([datetime]::UtcNow - [datetime]'1970-01-01').TotalSeconds
+        # F04: refresh the timestamp on EVERY run, not only when the item is created
+        if ($pt -match ('(?m)^(  updated:\s*)\S+$')) {
+            $pt = [regex]::Replace($pt, '(?m)^(  updated:\s*)\S+$', ('${1}' + $epoch))
+        }
         $pt = [regex]::Replace($pt, '(?m)^current:\s*\S+', ('current: ' + $uid))
         Set-V4Atomic -TargetPath $pfile -Content $pt -Validator { param($f) if ((Read-V4File $f) -notmatch '(?m)^current:\s*\S+') { throw 'profiles.yaml has no current entry' } } | Out-Null
         Write-V4Log 'dedicated local profile registered; subscription profile untouched' -Level OK
         $val = { param($f) Test-V4MihomoConfig -ConfigPath $f -WorkDir $p.AppData | Out-Null }
+        $applied = $true   # F02: from the FIRST write onward the tree is half-changed
         Set-V4Atomic -TargetPath $profTarget -Content $profYaml -Validator $val | Out-Null
         Set-V4Atomic -TargetPath $p.RuntimeFile -Content $rtYaml -Validator $val | Out-Null
         $applied = $true
@@ -152,7 +159,7 @@ try {
         Protect-V4Acl -Path $p.RuntimeFile | Out-Null
         Write-V4Log ("DONE exit={0} snapshot={1}" -f $got, $snap) -Level OK
     }
-    finally { Exit-V4Lock }
+    finally { }   # F03: lock released by the outer finally, AFTER any restore
 }
 catch {
     $tc = $_.TargetObject
@@ -164,4 +171,4 @@ catch {
         catch { Write-V4Log ('restore failed: ' + (Get-V4Redacted $_.Exception.Message)) -Level ERROR; $exit = 40 }
     }
 }
-finally { exit $exit }
+finally { Exit-V4Lock; exit $exit }
