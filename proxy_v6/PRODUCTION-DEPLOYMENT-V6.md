@@ -1,7 +1,7 @@
 # V6 生产部署报告（2026-11-18）
 
 ## 结论
-- V6 已部署到实际运行目录，当前状态 **HEALTHY**。
+- V6 已部署到实际运行目录；TCP 代理路径正常，但整体状态为 **DEGRADED（TCP_ONLY）**，因为 UDP/WebRTC 未代理。
 - 系统代理：**启用**，指向本机 Clash mixed 端口；Clash UI 与实际状态一致。
 - 国内/国外网站均通过 Clash 规则验证：百度 200、Google 200；静态代理出口已验证。
 - 真实回滚已执行并验证；发现并修复“回滚到 off 后 Clash 重启重新写回 on”的缺陷。
@@ -21,7 +21,7 @@
 ## 执行证据
 1. **DryRun**：exit 0；first hop 200；暂存配置通过 mihomo -t；HKCU 未变。
 2. **真实 apply**：exit 0；snapshot 创建；Clash 重启；系统代理启用；自带 exit 校验通过。
-3. **状态**：state-v4.ps1 -Json → state=HEALTHY、mode=NEXIP、systemProxy=127.0.0.1:7897、uiSystemProxy=enabled、clashRunning=true、mixedPort=true、firstHopOk=true、exitViaChain=<static-exit>。
+3. **状态**：state-v4.ps1 -Json → state=DEGRADED（TCP_ONLY）、mode=NEXIP、systemProxy=127.0.0.1:7897、uiSystemProxy=enabled、udpProxied=disabled、clashRunning=true、mixedPort=true、firstHopOk=true、exitViaChain=<static-exit>；warning 明确说明 UDP/WebRTC 未代理。
 4. **真实回滚**：
    - 第一次回滚到 ProxyEnable=0 快照时，Clash 重启后把 HKCU 重新写回 on；已定位并修复（回滚在 restart 后强制 Clear 并校验，失败则 exit 41）。
    - 修复后回滚：exit 0，HKCU ProxyEnable=0，日志 "system proxy held off after restart"。

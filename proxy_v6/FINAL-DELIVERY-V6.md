@@ -2,7 +2,7 @@
 
 ## 0. 结论
 - **生产部署已执行**：实际运行目录现为 V6 代码 `4e72df9`（不是 baseline）。
-- **当前网络状态：HEALTHY**：系统代理启用并指向本机 Clash mixed 端口；Clash UI 与实际一致；国内/国外站点经代理均可用；静态代理出口校验通过。
+- **当前网络状态：DEGRADED（TCP_ONLY）**：系统代理启用并指向本机 Clash mixed 端口；Clash UI 与实际一致；国内/国外站点经代理均可用；静态代理出口校验通过。UDP/WebRTC 未代理，因此整体不是全系统 HEALTHY。
 - **CODE/TEST**：最终 97/97 隔离测试通过（head=4e72df9, dirty=false, 0 skipped, 0 zero-assertion）；META 自验 7/7（harness 未变）。
 - **真实回滚已执行**：发现并修复“回滚到 proxy-off 后 Clash 重启重新写回 on”的缺陷；修复后回滚到 off 成功，再 apply 恢复 HEALTHY。
 - **未重启**：开机/睡眠/Wi-Fi 重连仍为 WAITING-USER；24h/72h 仍为 DEFERRED-BY-USER。
@@ -34,7 +34,7 @@
 | TEST_ISOLATION | **PASS（V6）/ PARTIAL（整体）** | FT16–FT21；测试前后 HKCU/WinHTTP 一致；旧 diag/v2/v3 入口仍可直写 HKCU |
 | CONFIG_INTEGRITY | **PASS（生产本轮）** | DryRun/apply/state/rollback 均成功；配置保留 |
 | PRODUCTION_DEPLOYMENT | **DEPLOYED & VERIFIED** | 生产文件与 V6 4e72df9 匹配；真实 apply/rollback 完成 |
-| CURRENT_NETWORK_STATE | **HEALTHY** | 代理启用、UI 一致、百度/Google 200、静态出口正确 |
+| CURRENT_NETWORK_STATE | **DEGRADED（TCP_ONLY）** | TCP 代理启用、UI 一致、百度/Google 200、静态出口正确；UDP/WebRTC 未代理，带明确 warning |
 | USER_ACCEPTANCE | **PENDING FINAL CONFIRMATION** | 部署已获授权并执行；最终使用确认与 C-01/C-12 待用户 |
 | BOOT_LIFECYCLE | **PARTIAL / WAITING-USER** | 未重启；已发现 Clash 登录任务，未发现 V4 自动启动；StarSky 顺序未验证 |
 | CREDENTIAL_SECURITY | **PARTIAL / BLOCKED** | settings DPAPI + ACL；C-01 快照仍明文（ACL 保护）；NexIP 轮换 BLOCKED-USER |

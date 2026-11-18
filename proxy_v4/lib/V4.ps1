@@ -1450,6 +1450,7 @@ function Get-V4StateCore {
         }
     }
     if ($uiMismatch -and $out.state -ne 'FAILED') { $out.state = 'DEGRADED' }
+    if ($UdpProxied -eq $false -and $out.state -eq 'HEALTHY') { $out.state = 'DEGRADED' }
     return $out
 }
 
