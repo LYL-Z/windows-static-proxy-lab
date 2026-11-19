@@ -490,6 +490,8 @@ function Get-V4Socks5Candidates {
             port = (& $get 'port')
             user = (& $get 'username')
             pass = (& $get 'password')
+            dialer = (& $get 'dialer-proxy')
+            udp = (& $get 'udp')
         }
     }
     return $cands
@@ -1383,7 +1385,15 @@ function Get-V4UdpProxied {
         $p = Get-V4Paths
         if (-not $p.RuntimeFile -or -not (Test-Path -LiteralPath $p.RuntimeFile)) { return $null }
         $t = Read-V4File $p.RuntimeFile
-        if ($t -and $t -match '(?m)^\s+udp:\s*(true|false)\s*$') { return ($Matches[1] -eq 'true') }
+        if (-not $t) { return $null }
+        $section = [regex]::Match($t, '(?ms)^proxies:[ \t]*\r?$\n(?<items>.*?)(?=^[A-Za-z_][\w-]*[ \t]*:|\z)')
+        if (-not $section.Success) { return $null }
+        $managed = @(Get-V4Socks5Candidates $section.Groups['items'].Value | Where-Object {
+            (Get-V4YamlScalar $_.name) -eq 'US-WA-SOCKS5' -and $_.dialer -eq 'STAR-FIRSTHOP'
+        })
+        if ($managed.Count -eq 1 -and $managed[0].udp -in @('true', 'false')) {
+            return ($managed[0].udp -eq 'true')
+        }
     } catch { }
     return $null
 }
@@ -1414,6 +1424,7 @@ function Get-V4StateCore {
         windowsTargetsClash = $false
         uiSystemProxy = $(if ($null -eq $UiSystemProxy) { 'unknown' } elseif ($UiSystemProxy) { 'enabled' } else { 'disabled' })
         udpProxied = $(if ($null -eq $UdpProxied) { 'unknown' } elseif ($UdpProxied) { 'enabled' } else { 'disabled' })
+        udpDataPlane = 'not_probed'
         pathScope = $(if ($UdpProxied -eq $false) { 'TCP_ONLY' } else { 'UNKNOWN' })
         warnings = @()
     }
@@ -1423,7 +1434,9 @@ function Get-V4StateCore {
         $out.reasons += ('UI reports system proxy ' + $(if ($UiSystemProxy) { 'enabled' } else { 'disabled' }) + ', actual HKCU is ' + $(if ($actualProxyEnabled) { 'enabled' } else { 'disabled' }))
     }
     if ($UdpProxied -eq $false) {
-        $out.warnings += 'UDP/WebRTC is not proxied (upstream udp=false); UDP may use a direct/other path. TCP-only scope.'
+        $out.warnings += 'The managed SOCKS5 node has udp=false. Browser WebRTC may use another path.'
+    } elseif ($UdpProxied -eq $true) {
+        $out.warnings += 'The managed SOCKS5 node has udp=true. UDP relay and browser coverage require separate measurements.'
     }
     if ($SettingsError) {
         $out.state = 'FAILED'; $out.mode = 'UNKNOWN'

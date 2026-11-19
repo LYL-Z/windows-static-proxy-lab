@@ -356,7 +356,35 @@ try {
             Assert-Infra ($h.chainStatus -eq 'EXPECTED_EXIT' -and $h.windowsTargetsClash) 'recovered dependency was not verified'
             $i = Get-V4StateCore -Settings $settings -Owner $null -SystemProxy $proxyOk -AppPids @(1) -MixedPortOpen $true -FirstHop $hopOk -GetExitIp $exitOk -SettingsError 'bad settings'
             Assert-Infra ($i.state -eq 'FAILED' -and ($i.reasons -join ' ') -match 'settings invalid') 'settings error not reported'
-            $script:Actual = '9 state-core branches matched'
+            $app = New-TestAppData
+            $runtime = Join-Path $app 'clash-verge.yaml'
+            $env:V4_TEST_APPDATA = $app
+            try {
+                $yaml = @(
+                    'proxies:'
+                    '- name: OtherProxy'
+                    '  type: socks5'
+                    '  udp: true'
+                    '- name: "US-WA-SOCKS5"'
+                    '  type: socks5'
+                    '  dialer-proxy: "STAR-FIRSTHOP"'
+                    '  udp: false'
+                    'listeners:'
+                    '- name: OtherListener'
+                    '  udp: true'
+                ) -join $LF
+                Put-Text $runtime $yaml
+                Assert-Infra ($false -eq (Get-V4UdpProxied)) 'an unrelated node or listener supplied the managed UDP flag'
+                $enabled = $yaml.Replace('udp: false', 'udp: true')
+                Put-Text $runtime $enabled
+                Assert-Infra ($true -eq (Get-V4UdpProxied)) 'managed UDP flag true was not read'
+                $udpState = Get-V4StateCore -Settings $settings -SystemProxy $proxyOk -AppPids @(1) -MixedPortOpen $true -FirstHop $hopOk -GetExitIp $httpExit -UdpProxied $true
+                Assert-Infra ($udpState.udpDataPlane -eq 'not_probed') 'the configuration flag was promoted to UDP data-plane success'
+                Put-Text $runtime ($enabled.Replace('STAR-FIRSTHOP', 'OtherHop'))
+                Assert-Infra ($null -eq (Get-V4UdpProxied)) 'UDP reported a result for an unrecognized dialer'
+            }
+            finally { Remove-Item Env:V4_TEST_APPDATA -ErrorAction SilentlyContinue }
+            $script:Actual = 'state branches and managed UDP evidence passed'
         }
         'INF-INTEGRITY-01' {
             $app = New-TestAppData

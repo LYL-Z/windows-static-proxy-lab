@@ -7,6 +7,11 @@
 用 `chainStatus` 检查经该监听端口的 HTTPS 出口。即使 Windows 指向其他代理，也会独立验证链路。
 当仅验证了代理规则命中的 IPv4 HTTPS 流量时，应用自身网络、DNS、UDP 和 WebRTC 的覆盖范围需要分别核实。
 
+路由判断可以在 Mihomo 的只读连接视图中核对实际命中规则与代理链。`GEOIP,CN,DIRECT`
+按目标地址匹配。一条 HTTPS 出口探测仅说明该目标的路径。
+`udpProxied` 是托管 SOCKS5 节点的配置值，`udpDataPlane` 显示数据面测试状态。
+SOCKS5 的 UDP ASSOCIATE 回复、实际 UDP 往返、Chrome WebRTC 候选各自提供不同证据。
+
 ## 2. 安全使用
 1. 本仓库脚本只用于用户自己的 Windows 主机；不要在生产网络未备份时运行 apply。
 2. **不要直接运行测试**来验证生产网络；V6 测试全部使用 `V4_TEST_MODE=1` + TEMP，且生产写门闩默认关闭。

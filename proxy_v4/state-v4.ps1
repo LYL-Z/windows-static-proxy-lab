@@ -27,7 +27,7 @@ function Get-StateResult {
             state = 'FAILED'; mode = 'UNKNOWN'; reasons = @(('state probe failed: ' + $stateError))
             clashRunning = $false; mixedPort = $false; systemProxy = 'unknown'
             owner = 'unknown'; firstHopOk = $false; exitViaChain = $null; uiSystemProxy = 'unknown'
-            udpProxied = 'unknown'; pathScope = 'UNKNOWN'; warnings = @()
+            udpProxied = 'unknown'; udpDataPlane = 'not_probed'; pathScope = 'UNKNOWN'; warnings = @()
             chainStatus = 'NOT_PROBED'; windowsTargetsClash = $false
         }
     }
@@ -40,7 +40,7 @@ function Get-StateResult {
         clashRunning = $st.clashRunning; mixedPort = $st.mixedPort
         systemProxy = $st.systemProxy; ownerRecorded = $st.owner
         uiSystemProxy = $st.uiSystemProxy
-        udpProxied = $st.udpProxied; pathScope = $st.pathScope
+        udpProxied = $st.udpProxied; udpDataPlane = $st.udpDataPlane; pathScope = $st.pathScope
         warnings = @($st.warnings)
         firstHopOk = $st.firstHopOk; exitViaChain = $st.exitViaChain
         chainStatus = $st.chainStatus; windowsTargetsClash = $st.windowsTargetsClash
@@ -64,7 +64,7 @@ function Write-StateResult($result) {
     'clashRunning   {0}' -f $result.clashRunning
     'mixedPort      {0}' -f $result.mixedPort
     'systemProxy    {0}   (owner record: {1})' -f $result.systemProxy, $result.ownerRecorded
-    'uiSystemProxy  {0}   pathScope {1}   udpProxied {2}' -f $result.uiSystemProxy, $result.pathScope, $result.udpProxied
+    'uiSystemProxy  {0}   pathScope {1}   UDP configured {2}   UDP data plane {3}' -f $result.uiSystemProxy, $result.pathScope, $result.udpProxied, $result.udpDataPlane
     if ($result.warnings.Count) { Write-Host 'warnings:'; $result.warnings | ForEach-Object { '  - ' + $_ } }
     'firstHopOk     {0}' -f $result.firstHopOk
     'chainStatus    {0}   windowsTargetsClash {1}' -f $result.chainStatus, $result.windowsTargetsClash
