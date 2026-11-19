@@ -72,10 +72,10 @@ function Assert-FaultCode {
     Assert-Infra ($got -eq $Code) ($Message + ': expected code ' + $Code + ', got ' + $got)
 }
 function Start-FakeHop {
-    param([int]$Port, [string]$ReadyFile)
+    param([int]$Port, [string]$ReadyFile, [string]$Reply = 'Complete')
     $scriptPath = Join-Path $root 'fake-hop.ps1'
     $body = @'
-param([int]$Port, [string]$Ready)
+param([int]$Port, [string]$Ready, [string]$Reply)
 $crlf = [string][char]13 + [string][char]10
 $l = New-Object System.Net.Sockets.TcpListener([System.Net.IPAddress]::Loopback, $Port)
 $l.Start()
@@ -85,7 +85,18 @@ for ($n = 0; $n -lt 6; $n++) {
     try {
         $c = $l.AcceptTcpClient()
         $s = $c.GetStream()
-        $resp = [System.Text.Encoding]::ASCII.GetBytes('HTTP/1.1 200 Connection Established' + $crlf + $crlf)
+        if ($Reply -eq 'Stalled') { Start-Sleep -Milliseconds 700 }
+        if ($Reply -eq 'Fragmented') {
+            $prefix = [Text.Encoding]::ASCII.GetBytes('HTTP/1.1 2')
+            $s.Write($prefix, 0, $prefix.Length)
+            Start-Sleep -Milliseconds 75
+        }
+        $statusLine = switch ($Reply) {
+            'Fragmented' { '00 Connection Established' }
+            'Malformed' { 'HTTP/1.1 2000 invalid' }
+            default { 'HTTP/1.1 200 Connection Established' }
+        }
+        $resp = [Text.Encoding]::ASCII.GetBytes($statusLine + $crlf + $crlf)
         $s.Write($resp, 0, $resp.Length)
         $s.Flush()
         Start-Sleep -Milliseconds 150
@@ -96,7 +107,7 @@ for ($n = 0; $n -lt 6; $n++) {
 $l.Stop()
 '@
     Put-Text $scriptPath $body
-    $p = Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $scriptPath, '-Port', [string]$Port, '-Ready', $ReadyFile) -PassThru -WindowStyle Hidden
+    $p = Start-Process -FilePath 'powershell.exe' -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $scriptPath, '-Port', [string]$Port, '-Ready', $ReadyFile, '-Reply', $Reply) -PassThru -WindowStyle Hidden
     $deadline = (Get-Date).AddSeconds(8)
     while ((Get-Date) -lt $deadline) {
         if (Test-Path -LiteralPath $ReadyFile) { return $p }
@@ -278,6 +289,51 @@ try {
             Assert-Infra ($global:LaunchCount -eq 1) 'timeout path did not launch exactly once'
             $script:Actual = 'timeout returned false after one launch'
         }
+        'INF-FIRSTHOP-01' {
+            $port = Get-FreePort
+            $down = Test-V4FirstHop -Port $port -TimeoutMs 900
+            Assert-Infra (-not $down.ok -and $down.status -eq 'TCP_UNAVAILABLE') 'closed port was treated as ready'
+            $expected = [ordered]@{ Fragmented = 'CONNECT_OK'; Malformed = 'INVALID_REPLY'; Stalled = 'CONNECT_TIMEOUT' }
+            foreach ($reply in $expected.Keys) {
+                $readyFile = Join-Path $root ($reply + '.ready')
+                $hop = Start-FakeHop -Port $port -ReadyFile $readyFile -Reply $reply
+                try {
+                    $budget = if ($reply -eq 'Stalled') { 200 } else { 1500 }
+                    $r = Test-V4FirstHop -Port $port -TimeoutMs $budget
+                    Assert-Infra ($r.status -eq $expected[$reply] -and $r.ok -eq ($reply -eq 'Fragmented')) ('unexpected CONNECT result for ' + $reply + ': ' + $r.status)
+                }
+                finally { Stop-FakeHop $hop }
+                $port = Get-FreePort
+            }
+            $script:Actual = 'loopback TCP, complete fragmented status, malformed line and timeout classified independently'
+        }
+        'INF-REPAIR-GUARD-01' {
+            $app = New-TestAppData
+            $core = Join-Path $root 'fake-core.cmd'
+            Put-Text $core 'exit /b 0'
+            $ui = Join-Path $app 'verge.yaml'
+            $env:V4_TEST_APPDATA = $app
+            $env:V4_TEST_CORE = $core
+            $env:V4_TEST_UI_CONFIG = $ui
+            try {
+                Save-V4Settings -Host_ '203.0.113.10' -Port 1080 -Username 'fixture-user' -Password 'fixture-pass' -HopHost '127.0.0.1' -HopPort (Get-FreePort) -MixedPort (Get-FreePort)
+                $apply = Join-Path $repo 'proxy_v4\apply-v4.ps1'
+                foreach ($case in @(
+                    @{ ui = 'false'; reason = 'disabled or unknown' }
+                    @{ ui = 'true'; reason = 'marker could not be verified' }
+                )) {
+                    Put-Text $ui ('enable_system_proxy: ' + $case.ui)
+                    $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $apply -Repair 2>&1
+                    $rc = $LASTEXITCODE
+                    Assert-Infra ($rc -eq 32 -and ($out -join ' ') -match $case.reason) ('repair guard failed for ' + $case.reason + '; exit=' + $rc)
+                    Assert-Infra (-not (Test-Path -LiteralPath (Join-Path $root 'config\owner.json'))) 'repair wrote an owner record'
+                }
+            }
+            finally {
+                Remove-Item Env:V4_TEST_APPDATA,Env:V4_TEST_CORE,Env:V4_TEST_UI_CONFIG -ErrorAction SilentlyContinue
+            }
+            $script:Actual = 'manual repair declined a saved disabled mode and unverified markers before first-hop probing'
+        }
         'INF-F12-01' {
             $settings = [pscustomobject]@{ host='203.0.113.10'; mixedPort=7897; hopPort=11119 }
             $off = [pscustomobject]@{ enabled=$false; server='127.0.0.1:7897' }
@@ -293,6 +349,8 @@ try {
             Assert-Infra (($b.reasons -join ' ') -match 'UI reports system proxy disabled') 'UI-off/HKCU-on mismatch not reported'
             $c = Get-V4StateCore -Settings $settings -Owner $null -SystemProxy $on -AppPids @(1) -MixedPortOpen $true -FirstHop $hopBad -GetExitIp $exitOk -SettingsError '' -UiSystemProxy $true
             Assert-Infra ($c.state -eq 'DEGRADED') ('UI on + first hop down reported ' + $c.state)
+            $unreadable = Get-V4StateCore -Settings $settings -SystemProxy $null -AppPids @(1) -MixedPortOpen $true -FirstHop $hopOk -GetExitIp $exitOk -UiSystemProxy $true
+            Assert-Infra ($unreadable.systemProxy -eq 'unknown' -and -not $unreadable.windowsTargetsClash) 'unreadable proxy state was reported as off'
             $script:Actual = 'UI/actual proxy mismatch and first-hop failure are DEGRADED with reasons'
         }
         'INF-F12-02' {
@@ -620,8 +678,14 @@ try {
             $text = ($out -join [Environment]::NewLine)
             $j = $text | ConvertFrom-Json
             Assert-Infra ($j.state -eq 'FAILED') ('state=' + $j.state)
+            Assert-Infra ($j.recoveryAction -eq 'REVIEW_SETTINGS_OR_PROBE') 'corrupt settings did not prompt state review'
             Assert-Infra (($j.reasons -join ' ') -match 'settings') 'state reasons do not mention settings'
-            $script:Actual = 'state script emitted FAILED JSON and exit 3 for corrupt settings'
+            Put-Text (Join-Path $root 'config\transaction.json') '{ not json'
+            $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $state -Json 2>&1
+            $c = $LASTEXITCODE
+            $j = ($out -join [Environment]::NewLine) | ConvertFrom-Json
+            Assert-Infra ($c -eq 3 -and $j.recoveryAction -eq 'REVIEW_PENDING_TRANSACTION') 'existing transaction did not take priority'
+            $script:Actual = 'corrupt settings produce FAILED and exit 3; a remaining journal takes priority in recovery guidance'
         }
         'INF-SETTINGS-04' {
             Save-V4Settings -Host_ '203.0.113.10' -Port 1080 -Username 'fixture-user' -Password 'fixture-pass' -HopHost '127.0.0.1' -HopPort 11119 -MixedPort 7897

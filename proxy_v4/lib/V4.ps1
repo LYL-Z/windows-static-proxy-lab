@@ -998,7 +998,7 @@ function Get-V4SystemProxy {
         return [pscustomobject]@{ enabled = $enabled; server = $env:V4_TEST_PROXY_SERVER }
     }
     $k = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings'
-    $v = Get-ItemProperty $k -ErrorAction SilentlyContinue
+    $v = Get-ItemProperty -LiteralPath $k -ErrorAction Stop
     return [pscustomobject]@{ enabled = [bool]$v.ProxyEnable; server = $v.ProxyServer }
 }
 
@@ -1066,22 +1066,54 @@ function Get-V4ExitIp {
 }
 
 function Test-V4FirstHop {
-    param([int]$Port, [int]$TimeoutMs = 6000)
-    if (-not (Test-V4Port -Port $Port)) { return [pscustomobject]@{ ok=$false; detail="port $Port not listening" } }
+    param([int]$Port, [ValidateRange(1, 60000)][int]$TimeoutMs = 6000)
     $c = New-Object System.Net.Sockets.TcpClient
+    $clock = [Diagnostics.Stopwatch]::StartNew()
+    $stage = 'TCP'
     try {
-        $c.Connect('127.0.0.1', $Port); $c.ReceiveTimeout = $TimeoutMs
+        if (-not $c.ConnectAsync('127.0.0.1', $Port).Wait($TimeoutMs)) {
+            return [pscustomobject]@{ ok=$false; status='TCP_UNAVAILABLE'; detail="loopback port $Port connection timed out" }
+        }
+        $stage = 'CONNECT'
         $s = $c.GetStream()
+        $s.WriteTimeout = [int][Math]::Max(1, $TimeoutMs - $clock.ElapsedMilliseconds)
         $b = [System.Text.Encoding]::ASCII.GetBytes("CONNECT api.ipify.org:443 HTTP/1.1`r`nHost: api.ipify.org:443`r`n`r`n")
-        $s.Write($b, 0, $b.Length); $s.Flush()
+        $s.Write($b, 0, $b.Length)
+        $reply = New-Object System.Text.StringBuilder
         $buf = New-Object byte[] 256
-        $n = $s.Read($buf, 0, $buf.Length)
-        if ($n -le 0) { return [pscustomobject]@{ ok=$false; detail='closed without reply' } }
-        $line = ([System.Text.Encoding]::ASCII.GetString($buf,0,$n) -split "`r`n")[0]
-        if ($line -match '^HTTP/\d\.\d\s+200') { return [pscustomobject]@{ ok=$true; detail=$line } }
-        return [pscustomobject]@{ ok=$false; detail=$line }
+        while ($reply.Length -lt 1024) {
+            $remaining = $TimeoutMs - $clock.ElapsedMilliseconds
+            if ($remaining -le 0) {
+                return [pscustomobject]@{ ok=$false; status='CONNECT_TIMEOUT'; detail='timed out waiting for the CONNECT status line' }
+            }
+            $s.ReadTimeout = [int]$remaining
+            $n = $s.Read($buf, 0, $buf.Length)
+            if ($n -eq 0) {
+                return [pscustomobject]@{ ok=$false; status='INCOMPLETE_REPLY'; detail='closed before a complete CONNECT status line' }
+            }
+            [void]$reply.Append([Text.Encoding]::ASCII.GetString($buf, 0, $n))
+            $text = $reply.ToString()
+            $end = $text.IndexOf("`r`n", [StringComparison]::Ordinal)
+            if ($end -lt 0) { continue }
+            if ($end -ge 1024 -or $text.Substring(0, $end) -notmatch '^HTTP/\d\.\d[ \t]+(?<status>[1-5][0-9]{2})(?:[ \t]|$)') { break }
+            $status = [int]$Matches.status
+            return [pscustomobject]@{
+                ok = ($status -eq 200)
+                status = $(if ($status -eq 200) { 'CONNECT_OK' } else { 'CONNECT_REFUSED' })
+                detail = ('HTTP CONNECT ' + $status)
+            }
+        }
+        return [pscustomobject]@{ ok=$false; status='INVALID_REPLY'; detail='invalid or overlong CONNECT status line' }
     }
-    catch { return [pscustomobject]@{ ok=$false; detail=$_.Exception.Message } }
+    catch {
+        if ($stage -eq 'TCP') { return [pscustomobject]@{ ok=$false; status='TCP_UNAVAILABLE'; detail="cannot connect to loopback port $Port" } }
+        $errorCause = $_.Exception.GetBaseException()
+        if ($clock.ElapsedMilliseconds -ge $TimeoutMs -or
+            ($errorCause -is [Net.Sockets.SocketException] -and $errorCause.SocketErrorCode -eq 'TimedOut')) {
+            return [pscustomobject]@{ ok=$false; status='CONNECT_TIMEOUT'; detail='timed out exchanging the CONNECT request' }
+        }
+        return [pscustomobject]@{ ok=$false; status='CONNECT_IO_ERROR'; detail='I/O error exchanging the CONNECT request' }
+    }
     finally { $c.Close() }
 }
 
@@ -1416,9 +1448,10 @@ function Get-V4StateCore {
         state = 'UNKNOWN'; mode = 'UNKNOWN'; reasons = @()
         clashRunning = (@($AppPids).Count -gt 0)
         mixedPort = [bool]$MixedPortOpen
-        systemProxy = $(if ($SystemProxy -and $SystemProxy.enabled) { Get-V4Redacted $SystemProxy.server } else { 'off' })
+        systemProxy = $(if ($null -eq $SystemProxy) { 'unknown' } elseif ($SystemProxy.enabled) { Get-V4Redacted $SystemProxy.server } else { 'off' })
         owner = $(if ($Owner) { $Owner.owner } else { 'none' })
         firstHopOk = $false
+        firstHopStatus = 'NOT_PROBED'
         exitViaChain = $null
         chainStatus = 'NOT_PROBED'
         windowsTargetsClash = $false
@@ -1429,7 +1462,7 @@ function Get-V4StateCore {
         warnings = @()
     }
     $actualProxyEnabled = [bool]($SystemProxy -and $SystemProxy.enabled)
-    $uiMismatch = ($null -ne $UiSystemProxy -and [bool]$UiSystemProxy -ne $actualProxyEnabled)
+    $uiMismatch = ($null -ne $SystemProxy -and $null -ne $UiSystemProxy -and [bool]$UiSystemProxy -ne $actualProxyEnabled)
     if ($uiMismatch) {
         $out.reasons += ('UI reports system proxy ' + $(if ($UiSystemProxy) { 'enabled' } else { 'disabled' }) + ', actual HKCU is ' + $(if ($actualProxyEnabled) { 'enabled' } else { 'disabled' }))
     }
@@ -1450,12 +1483,16 @@ function Get-V4StateCore {
     }
     $expectedProxy = '127.0.0.1:' + $Settings.mixedPort
     $out.windowsTargetsClash = ($actualProxyEnabled -and $SystemProxy.server -eq $expectedProxy)
-    if (-not $out.windowsTargetsClash) {
+    if ($null -eq $SystemProxy) {
+        $out.reasons += 'Windows proxy state could not be read'
+    } elseif (-not $out.windowsTargetsClash) {
         $out.reasons += ('Windows proxy is ' + $out.systemProxy + '; expected ' + $expectedProxy)
     }
     if ($FirstHop) {
         $out.firstHopOk = [bool]$FirstHop.ok
-        if (-not $out.firstHopOk) { $out.reasons += ('first hop down: ' + $FirstHop.detail) }
+        $out.firstHopStatus = if ($FirstHop.PSObject.Properties['status']) { $FirstHop.status }
+            elseif ($out.firstHopOk) { 'CONNECT_OK' } else { 'UNAVAILABLE' }
+        if (-not $out.firstHopOk) { $out.reasons += ('first-hop check failed: ' + $FirstHop.detail) }
     }
     else { $out.reasons += 'first hop probe unavailable' }
     if (-not $out.clashRunning) { $out.mode = 'RAW'; $out.state = 'FAILED'; $out.reasons += 'clash not running' }
@@ -1492,7 +1529,7 @@ function Get-V4State {
     catch { $settingsError = Get-V4FaultMessage $_ }
     $owner = Get-V4Owner
     try { $px = Get-V4SystemProxy }
-    catch { $px = [pscustomobject]@{ enabled = $false; server = '(registry unreadable)' } }
+    catch { $px = $null }
     $pids = Get-V4AppPids
     $mixed = $false
     $hop = $null

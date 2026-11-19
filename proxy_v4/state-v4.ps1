@@ -27,6 +27,7 @@ function Get-StateResult {
             state = 'FAILED'; mode = 'UNKNOWN'; reasons = @(('state probe failed: ' + $stateError))
             clashRunning = $false; mixedPort = $false; systemProxy = 'unknown'
             owner = 'unknown'; firstHopOk = $false; exitViaChain = $null; uiSystemProxy = 'unknown'
+            firstHopStatus = 'NOT_PROBED'; recoveryAction = 'REVIEW_SETTINGS_OR_PROBE'
             udpProxied = 'unknown'; udpDataPlane = 'not_probed'; pathScope = 'UNKNOWN'; warnings = @()
             chainStatus = 'NOT_PROBED'; windowsTargetsClash = $false
         }
@@ -42,16 +43,28 @@ function Get-StateResult {
         uiSystemProxy = $st.uiSystemProxy
         udpProxied = $st.udpProxied; udpDataPlane = $st.udpDataPlane; pathScope = $st.pathScope
         warnings = @($st.warnings)
-        firstHopOk = $st.firstHopOk; exitViaChain = $st.exitViaChain
+        firstHopOk = $st.firstHopOk; firstHopStatus = $st.firstHopStatus; exitViaChain = $st.exitViaChain
         chainStatus = $st.chainStatus; windowsTargetsClash = $st.windowsTargetsClash
         integrity = $integrity
     }
-    if (-not $integrity.markerOk -and $integrity.profileExists) {
-        $result.reasons += 'managed profile lost its marker (subscription/app overwrite?) - re-run apply-v4.ps1'
+    $markersOk = $integrity.markerOk -and $integrity.runtimeMarkerOk
+    if (-not $markersOk -and $st.mode -eq 'NEXIP') {
+        $result.reasons += 'managed profile or runtime marker could not be verified'
     }
-    if (-not $integrity.markerOk -and $result.state -eq 'HEALTHY') { $result.state = 'DEGRADED' }
-    if ($result.chainStatus -eq 'EXPECTED_EXIT' -and -not $result.windowsTargetsClash -and $result.uiSystemProxy -eq 'enabled') {
-        $result.reasons += 'Clash HTTPS is usable while the Windows proxy differs. With authorization, use apply-v4.ps1 -Repair to restore the intended Windows proxy.'
+    if (-not $markersOk -and $result.state -eq 'HEALTHY') { $result.state = 'DEGRADED' }
+    $result.recoveryAction = switch ($true) {
+        { [bool](Get-V4Journal) } { 'REVIEW_PENDING_TRANSACTION'; break }
+        { $st.mode -eq 'UNKNOWN' } { 'REVIEW_SETTINGS_OR_PROBE'; break }
+        { -not $st.clashRunning -or -not $st.mixedPort } { 'CHECK_CLASH_STARTUP'; break }
+        { -not $result.firstHopOk } { 'CHECK_FIRST_HOP'; break }
+        { -not $markersOk } { 'REVIEW_MANAGED_PROFILE'; break }
+        { $result.chainStatus -ne 'EXPECTED_EXIT' } { 'CHECK_HTTPS_CHAIN'; break }
+        { $result.systemProxy -eq 'unknown' -or $result.uiSystemProxy -ne 'enabled' } { 'REVIEW_PROXY_MODE'; break }
+        { -not $result.windowsTargetsClash } { 'CONSIDER_MANUAL_REPAIR'; break }
+        default { 'NO_PROXY_CHANGE_INDICATED' }
+    }
+    if ($result.recoveryAction -eq 'CONSIDER_MANUAL_REPAIR') {
+        $result.reasons += 'Clash HTTPS is usable while the Windows proxy differs. Review proxy ownership and obtain authorization before running apply-v4.ps1 -Repair.'
     }
     return $result
 }
@@ -66,8 +79,9 @@ function Write-StateResult($result) {
     'systemProxy    {0}   (owner record: {1})' -f $result.systemProxy, $result.ownerRecorded
     'uiSystemProxy  {0}   pathScope {1}   UDP configured {2}   UDP data plane {3}' -f $result.uiSystemProxy, $result.pathScope, $result.udpProxied, $result.udpDataPlane
     if ($result.warnings.Count) { Write-Host 'warnings:'; $result.warnings | ForEach-Object { '  - ' + $_ } }
-    'firstHopOk     {0}' -f $result.firstHopOk
+    'firstHopOk     {0}   firstHopStatus {1}' -f $result.firstHopOk, $result.firstHopStatus
     'chainStatus    {0}   windowsTargetsClash {1}' -f $result.chainStatus, $result.windowsTargetsClash
+    'recoveryAction {0}' -f $result.recoveryAction
     'exitViaChain   {0}' -f $result.exitViaChain
     'profile marker {0}   runtime marker {1}' -f $integrity.markerOk, $integrity.runtimeMarkerOk
     if ($result.reasons.Count) { Write-Host 'reasons:'; $result.reasons | ForEach-Object { '  - ' + $_ } }

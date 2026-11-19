@@ -40,7 +40,9 @@ SOCKS5 的 UDP ASSOCIATE 回复、实际 UDP 往返、Chrome WebRTC 候选各自
 - 如果浏览器 ERR_PROXY_CONNECTION_FAILED：先读 HKCU ProxyEnable/ProxyServer；若值异常，关闭系统代理即可恢复直连。
 - 如果 Clash 7897 无监听：关闭系统代理，检查 Clash 核心/端口，再决定是否重启。
 - 不要为修复代理而改路由、TUN、IPv6、StarSky 配置；先保留可上网状态。
-- 两个开关均开启时仍需校验代理目标。链路显示 `EXPECTED_EXIT` 且 Windows 目标不符时，可在备份和授权后运行 `apply-v4.ps1 -Repair`。它通过 HTTP(S) 入口复核静态 IPv4，仅在验证后尝试恢复当前用户的代理目标。复测实际浏览器的国内和国际访问以及出口。当前可用设置应作为失败时的恢复依据。
+- 查看 `firstHopStatus` 和 `recoveryAction`。Clash 尚未就绪时先检查核心与监听。首跳 TCP 不可用、CONNECT 超时或握手回复异常时，优先检查首跳进程和网络。存在待处理事务、托管标记缺失或代理意图不明时，先核对状态。
+- 显示 `CONSIDER_MANUAL_REPAIR` 时，检查是否有其他客户端正在写入 Windows 代理。备份并取得授权后，可运行 `apply-v4.ps1 -Repair`。脚本要求 Clash 已保存启用系统代理且托管配置可核实，并在修改前复核静态 HTTPS 出口。修改后复测浏览器的国内和国际访问以及出口。
+- 开机或节点切换后采样可记录依赖何时恢复。自动恢复需要真实生命周期证据，前台检查不会接管 Windows 代理。
 - `-Samples` 在一次前台运行中有限次复核，适合观察依赖启动或节点变更。等待时间从上一轮结束计起。JSON 多样本模式每行一个对象，退出码代表末次采样；交付证据时应脱敏。
 - `-DryRun` 在受限临时目录生成候选文件并验证，不写项目日志或锁。它会探测首跳，核心也可能尝试下载缺失的地理数据。
 

@@ -80,6 +80,14 @@ try {
     $p = Get-V4Paths
     if (-not $p.AppData -or -not $p.Core) { Fail 10 'clash paths not found' }
 
+    if ($Repair) {
+        if ((Get-V4UiSystemProxy) -ne $true) { Fail 32 'saved Clash system proxy is disabled or unknown; review the intended mode before repair' }
+        $integrity = Get-V4Integrity -Paths $p
+        if (-not $integrity.markerOk -or -not $integrity.runtimeMarkerOk) {
+            Fail 32 'managed profile or runtime marker could not be verified; review the active profile before repair'
+        }
+    }
+
     # ---------- first hop must really proxy ----------
     $hop = Test-V4FirstHop -Port $s.hopPort
     if (-not $hop.ok) { Fail 20 ('first hop not usable: ' + $hop.detail) }
@@ -94,8 +102,12 @@ try {
         $got = Get-V4ExitIp -Proxy ('http://' + $target) -TimeoutSec 5
         if ($got -ne $s.host) { Fail 31 'chain HTTPS exit did not match the configured static IPv4; nothing changed' }
         $current = Get-V4SystemProxy
-        if ($current.enabled -ne $prev.enabled -or $current.server -ne $prev.server) {
-            Fail 32 'Windows proxy changed during the probe; retry after the other client settles'
+        if ((Get-V4UiSystemProxy) -ne $true -or $current.enabled -ne $prev.enabled -or $current.server -ne $prev.server) {
+            Fail 32 'saved Clash mode or Windows proxy changed during the probe; review the current state before retrying'
+        }
+        $currentIntegrity = Get-V4Integrity -Paths $p
+        if (-not $currentIntegrity.markerOk -or -not $currentIntegrity.runtimeMarkerOk -or $currentIntegrity.profileHash -ne $integrity.profileHash) {
+            Fail 32 'managed profile changed or could not be verified after the probe; review the active profile before repair'
         }
         if ($current.enabled -and $current.server -eq $target) {
             Write-V4Log 'REPAIR OK: Windows proxy already targets the verified Clash HTTPS path' -Level OK

@@ -48,6 +48,8 @@ $cases = @(
   @{ id='INF-F12-01'; req='F12'; pre='UI and HKCU proxy states differ'; fault='UI on/HKCU off; UI off/HKCU on; first hop down'; exp='DEGRADED with explicit reasons' },
   @{ id='INF-F12-02'; req='F12'; pre='settings missing + UI on/HKCU off'; fault='state early return'; exp='FAILED but still includes UI mismatch reason' },
   @{ id='INF-F12-03'; req='F12'; pre='verge.yaml variations'; fault='UI parser'; exp='true/false/missing key/missing file handled' },
+  @{ id='INF-FIRSTHOP-01'; req='LIFE-03'; pre='isolated loopback listener'; fault='absent listener, fragmented CONNECT status, malformed and stalled replies'; exp='bounded, distinct results and recovery to CONNECT_OK' },
+  @{ id='INF-REPAIR-GUARD-01'; req='F12'; pre='synthetic V4 settings and UI file'; fault='saved proxy off or managed profile missing'; exp='exit 32 before probing or touching proxy settings' },
   @{ id='INF-INTEGRITY-01'; req='LIFE-08'; pre='marked profile + runtime chain'; fault='tamper profile'; exp='marker detected then lost' },
   @{ id='INF-SNAP-01'; req='TX-11'; pre='snapshot without managed profile'; fault='file created after snapshot'; exp='restore deletes it' },
   @{ id='INF-SNAP-02'; req='DATA-04'; pre='tampered snapshot file'; fault='hash mismatch'; exp='refused before live write' },
