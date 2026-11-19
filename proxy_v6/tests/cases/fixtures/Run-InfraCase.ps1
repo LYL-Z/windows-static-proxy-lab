@@ -871,7 +871,15 @@ function Start-V4Clash {
                     'rollback exit={0}, expected={1}, journal retained={2}, out={3}' -f $code, $expected, $journalRetained, (($out | Select-Object -Last 4) -join ' | '))
                 Assert-Infra ((Get-Sha (Join-Path $fx.app 'profiles.yaml')) -eq (Get-Sha (Join-Path $fx.snap 'profiles.yaml'))) 'rollback did not restore profiles.yaml'
                 Assert-Infra (-not (Test-Path -LiteralPath (Join-Path $root 'config\.lock'))) 'rollback left the lock behind'
-                if ($keep) { Assert-Infra (-not (Test-Path -LiteralPath $env:V4_FIXTURE_PROXY_WRITE_LOG)) '-KeepSystemProxy unexpectedly performed a proxy write' }
+                if ($keep) {
+                    Assert-Infra ((Get-V4Journal).data.keepSystemProxy -eq $true) 'pending rollback lost its keep-proxy intent'
+                    $savedPreference = $ErrorActionPreference
+                    $ErrorActionPreference = 'Continue'
+                    try { $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $rollback 2>&1 }
+                    finally { $ErrorActionPreference = $savedPreference }
+                    Assert-Infra ($LASTEXITCODE -eq 41) 'resumed rollback failed to preserve and verify the original keep-proxy mode'
+                    Assert-Infra (-not (Test-Path -LiteralPath $env:V4_FIXTURE_PROXY_WRITE_LOG)) 'initial or resumed rollback unexpectedly performed a proxy write'
+                }
                 $script:Actual = 'real rollback script reported incomplete recovery, retained the journal and released the lock'
             }
             finally { Remove-Item Env:V4_TEST_APPDATA,Env:V4_FIXTURE_START_FAILURE,Env:V4_FIXTURE_PROXY_WRITE_LOG,Env:V4_TEST_PROXY_ENABLE,Env:V4_TEST_PROXY_SERVER -ErrorAction SilentlyContinue }

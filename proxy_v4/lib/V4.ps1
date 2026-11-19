@@ -195,7 +195,7 @@ function Get-V4Journal {
 }
 
 function Write-V4Journal {
-    param([string]$SnapshotDir, [string]$Reason = 'apply')
+    param([string]$SnapshotDir, [string]$Reason = 'apply', [switch]$KeepSystemProxy)
     Ensure-V4Dir $script:ConfigDir
     $o = [ordered]@{
         schema = 1
@@ -204,6 +204,7 @@ function Write-V4Journal {
         started = (Get-Date).ToString('o')
         pid = $PID
     }
+    if ($Reason -eq 'rollback') { $o['keepSystemProxy'] = [bool]$KeepSystemProxy }
     Set-V4Atomic -TargetPath (Get-V4JournalPath) -Content ($o | ConvertTo-Json -Depth 4) | Out-Null
 }
 

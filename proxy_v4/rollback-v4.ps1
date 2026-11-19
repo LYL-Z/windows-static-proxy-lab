@@ -53,6 +53,10 @@ try {
         $restoreAttempted = $false
         try {
             $journal = Get-V4Journal
+            $rollbackJournal = $journal -and -not $journal.corrupt -and $journal.data.reason -eq 'rollback'
+            if ($rollbackJournal -and -not $PSBoundParameters.ContainsKey('KeepSystemProxy')) {
+                $KeepSystemProxy = [bool]$journal.data.keepSystemProxy
+            }
             if (-not $SnapshotDir) {
                 if ($journal -and $journal.corrupt) { throw 'transaction journal is unreadable; select a verified snapshot explicitly' }
                 if ($journal) { $SnapshotDir = [string]$journal.data.snapshot }
@@ -67,8 +71,8 @@ try {
             Test-V4SnapshotManifest -SnapshotDir $SnapshotDir | Out-Null
             Write-V4Log ('restoring verified snapshot ' + (Split-Path $SnapshotDir -Leaf)) -Level STEP
             $keptProxy = if ($KeepSystemProxy) { Get-V4SystemProxy } else { $null }
-            if (-not $journal -or $journal.corrupt -or $journal.data.snapshot -ne $SnapshotDir) {
-                Write-V4Journal -SnapshotDir $SnapshotDir -Reason 'rollback'
+            if (-not $rollbackJournal -or $journal.data.snapshot -ne $SnapshotDir -or [bool]$journal.data.keepSystemProxy -ne [bool]$KeepSystemProxy) {
+                Write-V4Journal -SnapshotDir $SnapshotDir -Reason 'rollback' -KeepSystemProxy:$KeepSystemProxy
             }
             $restoreAttempted = $true
             $m = Restore-V4Snapshot -SnapshotDir $SnapshotDir -Port $mixedPort
