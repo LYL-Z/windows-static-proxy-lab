@@ -116,3 +116,25 @@ endpoint. Verifying the UDP data plane requires a matching response to a
 datagram sent through that relay while the TCP association remains open.
 [RFC 1928](https://www.rfc-editor.org/rfc/rfc1928.html) ·
 [RFC 8828](https://www.rfc-editor.org/rfc/rfc8828.html)
+
+## 6. Paired SOCKS5 checks
+
+Use the same public HTTPS URL, SOCKS5 endpoint and first hop for both
+requests. Fix the address family to IPv4 for the client-resolved case.
+With curl, `socks5h://` sends the name to the proxy. `socks5://` resolves
+locally. When using a custom probe to send an IPv4 CONNECT, keep the original
+hostname for TLS verification, SNI and HTTP Host. For each variant record the
+CONNECT reply or EOF, TLS outcome and origin HTTP status. Run the pair against a
+provider-documented HTTPS endpoint as a control. Success via IPv4 narrows the
+failure to what differs with domain addressing, such as remote DNS, policy or
+the selected destination address. Ask the provider which addresses and errors
+it observed at the test time.
+
+For UDP, compare a known responding service over the OS UDP path and over the
+advertised SOCKS5 relay. Use the same resolved destination and port for the
+IPv4 pair and verify the response transaction ID. Keep the SOCKS TCP
+association open. Record whether the UDP send returned and whether a matching
+response arrived. If TCP control traffic uses another hop, ask whether the
+provider accepts its observed TCP and UDP source addresses for one association.
+An OS-path response verifies the endpoint on that path. A relay timeout leaves
+provider forwarding, source validation and the return path unresolved.
