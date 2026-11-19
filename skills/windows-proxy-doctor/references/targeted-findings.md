@@ -96,3 +96,23 @@ left unchanged; only the Skill branch was updated.
 Report layers separately: UI, HKCU/WinHTTP, listener, first hop, DNS, TCP,
 UDP/WebRTC, exit. A single green page, a ping, or a third-party IP score is not
 a full health or eligibility verdict.
+
+Compare the same public URLs with explicit proxy and direct transport. The
+default curl path can inherit proxy environment variables, while `-Direct`
+requests direct transport from curl. Label an HTTP CONNECT error separately
+from an origin HTTP error or TLS/transport failure. Keep ordinary certificate
+validation enabled. Use public, unauthenticated URLs in the probe.
+
+A GEOIP decision describes the destination address selected at that time.
+Use the proxy's connection view to confirm the matched rule and selected chain.
+CDN addresses and the resolver used for rule lookup can change the match.
+An IP panel describes the specific endpoint the panel queried.
+[Mihomo route rules](https://wiki.metacubex.one/en/config/rules/)
+
+For WebRTC, record the candidate type, transport, STUN/TURN endpoint and
+whether gathering completed. A UDP server-reflexive candidate shows an
+observed public mapping. A SOCKS5 UDP ASSOCIATE success gives the relay
+endpoint. Verifying the UDP data plane requires a matching response to a
+datagram sent through that relay while the TCP association remains open.
+[RFC 1928](https://www.rfc-editor.org/rfc/rfc1928.html) ·
+[RFC 8828](https://www.rfc-editor.org/rfc/rfc8828.html)

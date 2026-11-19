@@ -62,6 +62,13 @@ try {
         Assert-True ($LASTEXITCODE -eq 2) ('exit=' + $LASTEXITCODE)
         Assert-True (($out -join ' ') -match 'UI and HKCU') 'consistency issue missing'
     }
+    Check 'https-layer-classification' {
+        . (Join-Path $root 'scripts\NetworkPathResult.ps1')
+        Assert-True ((ConvertFrom-ProxyDoctorCurlResult '200 200' 0).status -eq 'ok') 'valid HTTPS response failed'
+        Assert-True ((ConvertFrom-ProxyDoctorCurlResult '502 200' 0).status -eq 'http_error') 'HTTP 502 counted as success'
+        Assert-True ((ConvertFrom-ProxyDoctorCurlResult '000 502' 56).status -eq 'proxy_connect_error') 'CONNECT 502 conflated with origin 502'
+        Assert-True ((ConvertFrom-ProxyDoctorCurlResult '000 200' 60).status -eq 'transport_error') 'TLS failure counted as success'
+    }
     Check 'backup-roundtrip' {
         $src = Join-Path $tmp 'backup'; New-Item -ItemType Directory -Path (Join-Path $src 'snap') -Force | Out-Null
         Set-Content (Join-Path $src 'snap\manifest.json') '{"schema":2,"files":[]}' -Encoding UTF8

@@ -8,23 +8,44 @@ param(
     [string]$Proxy = '',
     [string[]]$Urls = @('https://www.baidu.com','https://www.google.com'),
     [string[]]$DnsNames = @('www.baidu.com','www.google.com'),
-    [switch]$Json
+    [switch]$Json,
+    [switch]$Direct
 )
 $ErrorActionPreference = 'Continue'
+. (Join-Path $PSScriptRoot 'NetworkPathResult.ps1')
+if ($Direct -and $Proxy) { throw 'Use either -Direct or -Proxy.' }
+if ($Proxy) {
+    $given = if ($Proxy -match '^\w+://') { $Proxy } else { 'http://' + $Proxy }
+    [uri]$proxyUri = $null
+    if (-not [uri]::TryCreate($given, [UriKind]::Absolute, [ref]$proxyUri) -or
+        $proxyUri.Scheme -notin @('http','https','socks4','socks4a','socks5','socks5h') -or
+        -not $proxyUri.Host -or $proxyUri.UserInfo -or $proxyUri.AbsolutePath -ne '/' -or
+        $proxyUri.Query -or $proxyUri.Fragment -or $given.Contains('@')) {
+        throw 'Use an unauthenticated proxy endpoint without a path, query, or fragment.'
+    }
+}
 $curl = Get-Command curl.exe -ErrorAction SilentlyContinue
 $http = @()
 foreach ($u in $Urls) {
-    if (-not $curl) { $http += [ordered]@{ url=$u; status='skipped'; code=$null; detail='curl.exe not found' }; continue }
-    $curlArgs = @('-sS','--max-time','12','--ssl-no-revoke','-o','NUL','-w','%{http_code}')
-    if ($Proxy) { $curlArgs += @('-x',$Proxy) }
-    $curlArgs += $u
-    $code = & $curl.Source @curlArgs 2>$null
-    $http += [ordered]@{ url=$u; status=$(if ($LASTEXITCODE -eq 0) { 'ok' } else { 'failed' }); code=[string]$code; detail='' }
+    [uri]$url = $null
+    if (-not [uri]::TryCreate($u, [UriKind]::Absolute, [ref]$url) -or
+        $url.Scheme -notin @('http','https') -or $url.UserInfo) {
+        throw 'Probe URLs must use HTTP(S) and contain no credentials.'
+    }
+    $label = $url.GetLeftPart([UriPartial]::Path)
+    if (-not $curl) { $http += [ordered]@{ url=$label; status='skipped'; code=$null; detail='curl.exe not found' }; continue }
+    $curlArgs = @('-q','-sS','--max-time','12','-o','NUL','-w','%{http_code} %{http_connect}')
+    if ($Proxy) { $curlArgs += @('-x',$Proxy,'--noproxy','no-match.invalid') }
+    if ($Direct) { $curlArgs += @('--noproxy','*') }
+    $raw = (& $curl.Source @curlArgs -- $u 2>$null) -join ''
+    $measurement = ConvertFrom-ProxyDoctorCurlResult -Raw $raw -ExitCode $LASTEXITCODE
+    $measurement.url = $label
+    $http += $measurement
 }
 $dns = @()
 foreach ($n in $DnsNames) {
     try {
-        $r = Resolve-DnsName -Name $n -Type A -ErrorAction Stop | Where-Object { $_.IPAddress } | Select-Object -First 1
+        $r = Resolve-DnsName -Name $n -Type A -DnsOnly -ErrorAction Stop | Where-Object { $_.Type -eq 'A' } | Select-Object -First 1
         $dns += [ordered]@{ name=$n; status=$(if ($r) { 'ok' } else { 'empty' }); address=$r.IPAddress }
     } catch { $dns += [ordered]@{ name=$n; status='failed'; address=$null } }
 }
@@ -32,9 +53,10 @@ $out = [ordered]@{
     schema = 1
     ts = (Get-Date).ToString('o')
     proxy = $Proxy
+    transportSelection = $(if ($Proxy) { 'explicit_proxy' } elseif ($Direct) { 'direct' } else { 'curl_environment' })
     http = @($http)
     dns = @($dns)
     udp = 'not_probed'
-    notes = 'TCP/DNS only. WebRTC/UDP needs a browser or protocol-specific probe.'
+    notes = 'The DNS sample reports a Windows A answer. Browser/proxy resolver path and UDP/WebRTC require separate measurement.'
 }
 if ($Json) { $out | ConvertTo-Json -Depth 6 } else { $out | Format-List }
