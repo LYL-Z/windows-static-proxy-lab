@@ -2,7 +2,7 @@
 
 ## Default
 
-All scripts are read-only unless a script explicitly requires -Apply. The default snapshot reads HKCU, WinHTTP, process/listener metadata, and the Clash Verge UI setting. It does not print passwords, DPAPI blobs, cookies, tokens, or full command lines.
+The default snapshot reads the current user's Internet Settings, process and listener metadata, and the saved Clash Verge system-proxy setting. `-IncludeWriterEvidence` reads existing event logs with the current shell's permissions. Output excludes raw registry values from events, full executable paths, and command lines. There is no extension, service, or driver to install with the Skill. `Test-NetworkPath.ps1` sends active HTTP(S) or DNS probes when requested. Backup protection and extraction write output files when explicitly invoked.
 
 ## Production writes
 
@@ -10,8 +10,9 @@ Any change to system proxy, WinHTTP, proxy client configs, routes, TUN, DNS, ada
 
 ## Backups
 
-- Protect-Backup.ps1 creates a DPAPI CurrentUser encrypted copy; it does not delete plaintext originals and does not claim plaintext is gone.
-- Unprotect-Backup.ps1 refuses to overwrite existing output.
+- Protect-Backup.ps1 creates a DPAPI CurrentUser encrypted copy. Plaintext originals and extracted files require restrictive ACLs, local storage, and a separate retention decision.
+- Unprotect-Backup.ps1 verifies the encrypted and decrypted hashes before creating the requested plaintext file. Use a private output directory. An interrupted write can leave a partial output at that path.
+- Protect-Backup.ps1 still creates a temporary plaintext ZIP during encryption. Normal cleanup removes it. If protection is interrupted, check the private Windows temporary directory for the residual `wpdoctor-*.zip` and verify the correct copy before any cleanup.
 - Verify the SHA-256 of the zip before and after encryption/decryption.
 - Never delete the only valid backup.
 
@@ -33,4 +34,4 @@ Any change to system proxy, WinHTTP, proxy client configs, routes, TUN, DNS, ada
 - UI and OS state can change between reads; capture time and evidence.
 - A proxy listener can be alive while the upstream path is down.
 - TCP and UDP/WebRTC can legitimately use different paths.
-- DPAPI encryption protects at rest for the same Windows user; it does not protect against a compromised user session.
+- Verify recovery under the original Windows user on the same machine. The Skill package is portable. Treat its DPAPI recovery payload as tied to the originating Windows profile and machine.

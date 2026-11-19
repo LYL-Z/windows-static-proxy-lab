@@ -62,6 +62,38 @@ try {
         Assert-True ($LASTEXITCODE -eq 2) ('exit=' + $LASTEXITCODE)
         Assert-True (($out -join ' ') -match 'UI and HKCU') 'consistency issue missing'
     }
+    Check 'pac-keeps-effective-selection-unknown' {
+        $f = Get-Content (Join-Path $testDir 'fixtures\state-healthy.json') -Raw | ConvertFrom-Json
+        $f | Add-Member -NotePropertyName pacConfigured -NotePropertyValue $true
+        $path = Join-Path $tmp 'pac.json'
+        $f | ConvertTo-Json | Set-Content -LiteralPath $path
+        $j = & (Join-Path $root 'scripts\Get-ProxyDoctorSnapshot.ps1') -TestFixture $path -IncludeWriterEvidence -Json | ConvertFrom-Json
+        Assert-True ($j.state -eq 'UNKNOWN' -and $j.pacConfigured) 'PAC was promoted to verified manual routing'
+        Assert-True ($j.writerEvidence.status -eq 'not_queried_in_fixture') 'fixture writer query was attempted'
+        $j | ConvertTo-Json | Set-Content -LiteralPath $path
+        $out = & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'scripts\Test-ProxyConsistency.ps1') -SnapshotFile $path -Json
+        Assert-True ($LASTEXITCODE -eq 3) ('exit=' + $LASTEXITCODE)
+        Assert-True ($null -eq ($out | ConvertFrom-Json).consistent) 'PAC consistency was reported as verified'
+    }
+    Check 'registry-writer-evidence-scope-and-redaction' {
+        . (Join-Path $root 'scripts\ProxyRegistryEvents.ps1')
+        $sid = 'S-1-5-21-100-200-300-1001'
+        $key = "$sid\Software\Microsoft\Windows\CurrentVersion\Internet Settings"
+        $security = [xml]@"
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event"><System><Provider Name="Microsoft-Windows-Security-Auditing"/><EventID>4657</EventID><TimeCreated SystemTime="2026-01-01T01:00:00Z"/></System><EventData><Data Name="ObjectName">\REGISTRY\USER\$key</Data><Data Name="ObjectValueName">AutoConfigURL</Data><Data Name="ProcessName">X:\Example\Private\writer.exe</Data><Data Name="NewValue">https://configuration.invalid/example</Data></EventData></Event>
+"@
+        $sysmon = [xml]@"
+<Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event"><System><Provider Name="Microsoft-Windows-Sysmon"/><EventID>13</EventID><TimeCreated SystemTime="2026-01-01T01:00:00Z"/></System><EventData><Data Name="TargetObject">HKU\$key\ProxyServer</Data><Data Name="Image">X:\Example\Private\service.exe</Data><Data Name="Details">hidden-proxy.invalid</Data></EventData></Event>
+"@
+        $written = @(ConvertFrom-ProxyDoctorRegistryEvent $security $sid; ConvertFrom-ProxyDoctorRegistryEvent $sysmon $sid)
+        Assert-True ($written.Count -eq 2) 'expected both event formats to match'
+        Assert-True ($written[0].field -eq 'AutoConfigURL' -and $written[0].process -eq 'writer.exe') 'wrong Security writer fields'
+        Assert-True ($written[1].field -eq 'ProxyServer' -and $written[1].process -eq 'service.exe') 'wrong Sysmon writer fields'
+        Assert-True (($written | ConvertTo-Json) -notmatch 'private|\.invalid|S-1-5') 'private event detail leaked'
+        Assert-True ($null -eq (ConvertFrom-ProxyDoctorRegistryEvent $sysmon 'S-1-5-21-100-200-300-1002')) 'event matched a different user hive'
+        ($sysmon.Event.EventData.Data | Where-Object Name -eq 'TargetObject').InnerText = "HKU\$key\Connections\ProxyServer"
+        Assert-True ($null -eq (ConvertFrom-ProxyDoctorRegistryEvent $sysmon $sid)) 'event matched another registry key'
+    }
     Check 'https-layer-classification' {
         . (Join-Path $root 'scripts\NetworkPathResult.ps1')
         Assert-True ((ConvertFrom-ProxyDoctorCurlResult '200 200' 0).status -eq 'ok') 'valid HTTPS response failed'
@@ -111,6 +143,18 @@ try {
         Assert-True ($LASTEXITCODE -eq 0) 'unprotect failed'
         $m = Get-Content ($enc + '.json') -Raw | ConvertFrom-Json
         Assert-True ((Get-FileHash $zip -Algorithm SHA256).Hash -eq [string]$m.zipSha256) 'zip hash mismatch'
+        $m.zipSha256 = '0' * 64
+        $m | ConvertTo-Json | Set-Content -LiteralPath ($enc + '.json')
+        $rejectedZip = Join-Path $tmp 'rejected.zip'
+        $sentinel = $rejectedZip + '.tmp'
+        Set-Content -LiteralPath $sentinel 'existing-file'
+        $rejectedExit = & {
+            $ErrorActionPreference = 'Continue'
+            & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'scripts\Unprotect-Backup.ps1') -InFile $enc -OutFile $rejectedZip 2>$null | Out-Null
+            $LASTEXITCODE
+        }
+        Assert-True ($rejectedExit -ne 0 -and -not (Test-Path -LiteralPath $rejectedZip)) 'invalid hash yielded plaintext output'
+        Assert-True ((Get-Content -LiteralPath $sentinel) -eq 'existing-file') 'existing temporary file was overwritten or deleted'
     }
 }
 finally { Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue }

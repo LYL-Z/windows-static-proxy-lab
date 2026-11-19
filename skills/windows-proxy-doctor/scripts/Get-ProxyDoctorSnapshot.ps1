@@ -7,6 +7,7 @@ it exists for isolated tests and never touches the real machine.
 [CmdletBinding()]
 param(
     [switch]$Json,
+    [switch]$IncludeWriterEvidence,
     [string]$TestFixture = '',
     [ValidateRange(1, 65535)][int]$MixedPort = 7897,
     [ValidateRange(1, 65535)][int]$FirstHopPort = 11119
@@ -26,11 +27,19 @@ function Get-UiEnabled {
     return $null
 }
 
-function Get-PortOpen([int]$port) {
+function Get-LocalListener([int]$port) {
     try {
-        $c = Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction Stop | Select-Object -First 1
-        return [bool]$c
-    } catch { return $false }
+        Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction Stop | Where-Object {
+            $_.LocalAddress -in @('0.0.0.0', '::') -or [System.Net.IPAddress]::IsLoopback([System.Net.IPAddress]::Parse($_.LocalAddress))
+        }
+    } catch { }
+}
+
+function Get-ListenerProcessNames($listeners) {
+    foreach ($ownerId in @($listeners | Select-Object -ExpandProperty OwningProcess -Unique)) {
+        $process = Get-Process -Id $ownerId -ErrorAction SilentlyContinue
+        if ($process) { $process.ProcessName }
+    }
 }
 
 function Get-ProxyProcesses {
@@ -42,6 +51,7 @@ if ($TestFixture) {
     $f = Get-Content -LiteralPath $TestFixture -Raw | ConvertFrom-Json
     $proxyEnabled = ConvertTo-Bool $f.proxyEnabled
     $proxyServer = [string]$f.proxyServer
+    $pacConfigured = [bool]$f.pacConfigured
     $uiEnabled = $f.uiEnabled
     if ($null -ne $uiEnabled) { $uiEnabled = [bool]$uiEnabled }
     $procRunning = ConvertTo-Bool $f.processRunning
@@ -50,33 +60,44 @@ if ($TestFixture) {
     $exitMatches = if ($null -eq $f.exitMatches) { $null } else { [bool]$f.exitMatches }
 } else {
     $k = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings'
-    $p = Get-ItemProperty -LiteralPath $k -ErrorAction SilentlyContinue
-    $proxyEnabled = ([int]$p.ProxyEnable -eq 1)
-    $proxyServer = [string]$p.ProxyServer
+    try {
+        $p = Get-ItemProperty -LiteralPath $k -ErrorAction Stop
+        $proxyEnabled = ([int]$p.ProxyEnable -eq 1)
+        $proxyServer = [string]$p.ProxyServer
+        $pacConfigured = -not [string]::IsNullOrWhiteSpace($p.AutoConfigURL)
+    } catch {
+        $proxyEnabled = $null
+        $proxyServer = ''
+        $pacConfigured = $null
+    }
     $uiEnabled = Get-UiEnabled
     $procRunning = (@(Get-ProxyProcesses).Count -gt 0)
-    $mixedOpen = Get-PortOpen $MixedPort
-    $firstHopOpen = Get-PortOpen $FirstHopPort
+    $mixedListeners = @(Get-LocalListener $MixedPort)
+    $firstHopListeners = @(Get-LocalListener $FirstHopPort)
+    $mixedOpen = $mixedListeners.Count -gt 0
+    $firstHopOpen = $firstHopListeners.Count -gt 0
     $exitMatches = $null
 }
 
 $reasons = New-Object System.Collections.Generic.List[string]
-$targetsMixed = if ($proxyEnabled) { Test-ProxyDoctorTarget -Server $proxyServer -Port $MixedPort } else { $false }
+$targetsMixed = if ($proxyEnabled) { Test-ProxyDoctorTarget -Server $proxyServer -Port $MixedPort } else { $proxyEnabled }
 if ($proxyEnabled -and $targetsMixed -eq $false) {
     $reasons.Add(('Windows manual HTTP(S) proxy does not target the expected mixed port ' + $MixedPort))
 }
 if (-not $procRunning) { $reasons.Add('proxy client process not running') }
 if (-not $mixedOpen) { $reasons.Add(('mixed port ' + $MixedPort + ' not listening')) }
 if ($proxyEnabled -and -not $mixedOpen) { $reasons.Add('system proxy enabled but mixed port is down') }
-if (-not $proxyEnabled -and $mixedOpen) { $reasons.Add('mixed port is up but system proxy is off') }
-if ($null -ne $uiEnabled -and ([bool]$uiEnabled -ne [bool]$proxyEnabled)) {
+if ($proxyEnabled -eq $false -and $mixedOpen) { $reasons.Add('mixed port is up but system proxy is off') }
+if ($null -ne $proxyEnabled -and $null -ne $uiEnabled -and $uiEnabled -ne $proxyEnabled) {
     $reasons.Add(('UI enable_system_proxy=' + $uiEnabled + ' but HKCU ProxyEnable=' + $proxyEnabled))
 }
 
 $state = 'UNKNOWN'
 if (-not $procRunning -or -not $mixedOpen) { $state = 'FAILED' }
+elseif ($null -eq $proxyEnabled) { $reasons.Add('HKCU Internet Settings could not be read') }
 elseif ($proxyEnabled -and $targetsMixed -eq $false) { $state = 'DEGRADED' }
 elseif ($null -ne $uiEnabled -and ([bool]$uiEnabled -ne [bool]$proxyEnabled)) { $state = 'DEGRADED' }
+elseif ($pacConfigured) { $reasons.Add('PAC configured, application proxy selection was not measured') }
 elseif (-not $proxyEnabled) { $state = 'DEGRADED'; $reasons.Add('proxy client is running but Windows proxy is off') }
 elseif (-not $firstHopOpen) { $state = 'DEGRADED'; $reasons.Add(('first hop port ' + $FirstHopPort + ' not listening')) }
 elseif ($null -ne $exitMatches -and -not $exitMatches) { $state = 'DEGRADED'; $reasons.Add('exit path does not match expected proxy') }
@@ -92,8 +113,9 @@ $out = [ordered]@{
     schema = 1
     ts = (Get-Date).ToString('o')
     source = $(if ($TestFixture) { 'test-fixture' } else { 'live-read-only' })
-    proxyEnabled = [bool]$proxyEnabled
+    proxyEnabled = $proxyEnabled
     proxyServer = $displayServer
+    pacConfigured = $pacConfigured
     proxyTargetsMixedPort = $targetsMixed
     uiEnabled = $uiEnabled
     processRunning = [bool]$procRunning
@@ -105,9 +127,20 @@ $out = [ordered]@{
     state = $state
     reasons = @($reasons)
 }
+if (-not $TestFixture) {
+    $out.mixedPortProcesses = @(Get-ListenerProcessNames $mixedListeners)
+    $out.firstHopPortProcesses = @(Get-ListenerProcessNames $firstHopListeners)
+}
+if ($IncludeWriterEvidence) {
+    $out.writerEvidence = if ($TestFixture) { @{ status = 'not_queried_in_fixture' } } else {
+        . (Join-Path $PSScriptRoot 'ProxyRegistryEvents.ps1')
+        @{ lookbackMinutes = 15; sources = @(Get-ProxyDoctorWriterEvidence) }
+    }
+}
 if ($Json) { $out | ConvertTo-Json -Depth 6 }
 else {
     Write-Host ('STATE ' + $out.state)
-    $out.GetEnumerator() | ForEach-Object { if ($_.Key -ne 'reasons') { Write-Host (('{0} = {1}' -f $_.Key, $_.Value)) } }
+    $out.GetEnumerator() | Where-Object { $_.Key -notin @('reasons', 'writerEvidence') } | ForEach-Object { Write-Host (('{0} = {1}' -f $_.Key, ($_.Value -join ', '))) }
     if ($out.reasons.Count) { $out.reasons | ForEach-Object { Write-Host ('  - ' + $_) } }
+    if ($IncludeWriterEvidence) { $out.writerEvidence | ConvertTo-Json -Depth 5 }
 }

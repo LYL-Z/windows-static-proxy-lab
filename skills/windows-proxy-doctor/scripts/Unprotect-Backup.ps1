@@ -1,6 +1,6 @@
 #Requires -Version 5.1
 <#
-Decrypt a Protect-Backup .dpapi file to a new zip path and verify its SHA-256.
+Verify a Protect-Backup .dpapi file, then decrypt to a new zip path.
 Refuses to overwrite. Does not extract or modify the source.
 #>
 [CmdletBinding()]
@@ -15,14 +15,32 @@ Add-Type -AssemblyName System.Security
 $manifestPath = $InFile + '.json'
 if (-not (Test-Path -LiteralPath $manifestPath)) { Write-Error 'manifest not found'; exit 3 }
 $m = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+if ($m.schema -ne 1 -or $m.scope -ne 'CurrentUser-DPAPI' -or
+    $m.encryptedSha256 -notmatch '^[0-9A-Fa-f]{64}$' -or $m.zipSha256 -notmatch '^[0-9A-Fa-f]{64}$') {
+    throw 'invalid DPAPI backup manifest'
+}
 $enc = [System.IO.File]::ReadAllBytes($InFile)
+$sha = [System.Security.Cryptography.SHA256]::Create()
 try {
-    $bytes = [System.Security.Cryptography.ProtectedData]::Unprotect($enc, $null, [System.Security.Cryptography.DataProtectionScope]::CurrentUser)
-} catch { Write-Error 'DPAPI decrypt failed (wrong user or corrupt file)'; exit 3 }
-$tmp = $OutFile + '.tmp'
-[System.IO.File]::WriteAllBytes($tmp, $bytes)
-$h = (Get-FileHash -LiteralPath $tmp -Algorithm SHA256).Hash
-if ($m.zipSha256 -and $h -ne [string]$m.zipSha256) { Remove-Item -LiteralPath $tmp -Force; Write-Error 'zip hash mismatch'; exit 3 }
-Move-Item -LiteralPath $tmp -Destination $OutFile
+    $encryptedHash = [BitConverter]::ToString($sha.ComputeHash($enc)).Replace('-', '')
+    if ($encryptedHash -ne $m.encryptedSha256) { throw 'encrypted backup hash mismatch' }
+    try {
+        $bytes = [System.Security.Cryptography.ProtectedData]::Unprotect($enc, $null, [System.Security.Cryptography.DataProtectionScope]::CurrentUser)
+    } catch { throw 'DPAPI decrypt failed (wrong user or corrupt file)' }
+    $h = [BitConverter]::ToString($sha.ComputeHash($bytes)).Replace('-', '')
+    if ($h -ne $m.zipSha256) { throw 'zip hash mismatch' }
+} finally { $sha.Dispose() }
+
+$destination = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($OutFile)
+$output = [System.IO.File]::Open($destination, [System.IO.FileMode]::CreateNew, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+try {
+    try {
+        $output.Write($bytes, 0, $bytes.Length)
+        $output.Flush()
+    } finally { $output.Dispose() }
+} catch {
+    Remove-Item -LiteralPath $destination -Force -ErrorAction SilentlyContinue
+    throw
+}
 Write-Host ('DECRYPTED ' + $OutFile + ' sha256=' + $h)
 exit 0
