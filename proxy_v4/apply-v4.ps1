@@ -4,7 +4,7 @@
 .DESCRIPTION
   -Init          migrate the current Clash profile into config\settings.json (once, under the lock)
   -Mode          strict (default) | resilient
-  -DryRun        generate + validate only, change nothing
+  -DryRun        generate + validate in temporary storage; no project or client writes
   -Repair        re-assert system-proxy ownership without touching configs
   Exit: 0 ok, 10 paths, 11 settings, 12 ACL, 20 first hop, 30 start timeout,
         31 chain verify, 32 system proxy, 33 lock busy, 34 unfinished transaction,
@@ -22,11 +22,12 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'lib\V4.ps1')
-$null = Enable-V4ProductionWrites
 $exit = 0
 $lock = $null
-$logOk = Start-V4Log 'apply'
-if (-not $logOk) { Write-Host 'WARN: evidence log could not be opened; continuing' -ForegroundColor Yellow }
+if (-not $DryRun) {
+    $null = Enable-V4ProductionWrites
+    if (-not (Start-V4Log 'apply')) { Write-Host 'WARN: evidence log could not be opened; continuing' -ForegroundColor Yellow }
+}
 
 function Fail([int]$c, [string]$m) { throw [pscustomobject]@{ code = $c; msg = $m } }
 
@@ -40,8 +41,10 @@ try {
     }
 
     # F09: the lock is acquired BEFORE any settings write, including -Init.
-    $lock = Enter-V4Lock
-    if (-not $lock) { Fail 33 'another apply/rollback holds the lock' }
+    if (-not $DryRun) {
+        $lock = Enter-V4Lock
+        if (-not $lock) { Fail 33 'another apply/rollback holds the lock' }
+    }
 
     # A-08: a previous process may have died after the first live write. Fail closed
     # instead of snapshotting a half-applied tree as the new baseline.
@@ -86,13 +89,24 @@ try {
     if ($Repair) {
         $prev = Get-V4SystemProxy
         $prevVal = if ($prev.enabled) { $prev.server } else { 'off' }
+        $target = '127.0.0.1:' + $s.mixedPort
         Write-V4Log ('repair: observed system proxy = {0}' -f $prevVal) -Level WARN
+        $got = Get-V4ExitIp -Proxy ('http://' + $target) -TimeoutSec 5
+        if ($got -ne $s.host) { Fail 31 'chain HTTPS exit did not match the configured static IPv4; nothing changed' }
+        $current = Get-V4SystemProxy
+        if ($current.enabled -ne $prev.enabled -or $current.server -ne $prev.server) {
+            Fail 32 'Windows proxy changed during the probe; retry after the other client settles'
+        }
+        if ($current.enabled -and $current.server -eq $target) {
+            Write-V4Log 'REPAIR OK: Windows proxy already targets the verified Clash HTTPS path' -Level OK
+            return
+        }
+        $didWrite = $false
         try {
-            $got = Get-V4ExitIp -Proxy ('socks5h://127.0.0.1:' + $s.mixedPort)
-            if ($got -ne $s.host) { Fail 31 ('chain unhealthy before repair: exit {0}' -f $got) }
-            Set-V4SystemProxy -Server ('127.0.0.1:' + $s.mixedPort)
+            Set-V4SystemProxy -Server $target
+            $didWrite = $true
             $px = Get-V4SystemProxy
-            if (-not $px.enabled -or $px.server -ne ('127.0.0.1:' + $s.mixedPort)) { Fail 32 'repair could not set system proxy' }
+            if (-not $px.enabled -or $px.server -ne $target) { Fail 32 'Windows proxy did not retain the requested target' }
             try { Set-V4Owner -Owner 'clash' -SystemProxy $px.server -Note ('repair; previous=' + $prevVal) }
             catch { Write-V4Log ('repair: owner record failed (proxy is still correct): ' + (Get-V4Redacted $_.Exception.Message)) -Level WARN }
             Write-V4Log ('REPAIR OK: {0} -> {1}; exit {2}' -f $prevVal, $px.server, $got) -Level OK
@@ -100,8 +114,13 @@ try {
         }
         catch {
             try {
-                if ($prev.enabled) { Set-V4SystemProxy -Server $prev.server } else { Clear-V4SystemProxy }
-                Write-V4Log ('repair failed; restored previous system proxy = {0}' -f $prevVal) -Level WARN
+                if ($didWrite) {
+                    $now = Get-V4SystemProxy
+                    if ($now.enabled -and $now.server -eq $target) {
+                        Write-V4SystemProxyRegistry -Enabled $prev.enabled -Server $prev.server
+                        Write-V4Log ('repair failed; restored previous system proxy = {0}' -f $prevVal) -Level WARN
+                    }
+                }
             }
             catch { Write-V4Log ('repair failed AND previous proxy could not be restored: ' + (Get-V4Redacted $_.Exception.Message)) -Level ERROR }
             throw
@@ -115,16 +134,31 @@ try {
     $rtYaml = Build-V4Runtime -S $s -Mode $Mode -Pipe $ctrl.pipe -Secret $ctrl.secret
 
     # ---------- validate BEFORE touching live files ----------
-    $stage = Join-Path $env:TEMP ('v4-' + [guid]::NewGuid().ToString('N'))
-    New-Item -ItemType Directory -Path $stage -Force | Out-Null
-    if (-not (Protect-V4Acl -Path $stage)) { Fail 12 'cannot harden staging directory ACL' }
+    $tempRoot = [IO.Path]::GetFullPath([IO.Path]::GetTempPath())
+    $stage = Join-Path $tempRoot ('v4-' + [guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $stage | Out-Null
     try {
+        if (-not (Protect-V4Acl -Path $stage)) { Fail 12 'cannot harden staging directory ACL' }
         Write-V4File -Path (Join-Path $stage 'p.yaml') -Content $profYaml
         Write-V4File -Path (Join-Path $stage 'r.yaml') -Content $rtYaml
-        Test-V4MihomoConfig -ConfigPath (Join-Path $stage 'p.yaml') -WorkDir $p.AppData | Out-Null
-        Test-V4MihomoConfig -ConfigPath (Join-Path $stage 'r.yaml') -WorkDir $p.AppData | Out-Null
+        $workDir = $p.AppData
+        if ($DryRun) {
+            $workDir = $stage
+            foreach ($asset in @('geoip.dat', 'geosite.dat', 'Country.mmdb', 'ASN.mmdb')) {
+                $source = Join-Path $p.AppData $asset
+                if (Test-Path -LiteralPath $source -PathType Leaf) { Copy-Item -LiteralPath $source -Destination $stage }
+            }
+        }
+        Test-V4MihomoConfig -ConfigPath (Join-Path $stage 'p.yaml') -WorkDir $workDir | Out-Null
+        Test-V4MihomoConfig -ConfigPath (Join-Path $stage 'r.yaml') -WorkDir $workDir | Out-Null
     }
-    finally { Remove-Item $stage -Recurse -Force -ErrorAction SilentlyContinue }
+    finally {
+        $resolvedStage = [IO.Path]::GetFullPath($stage)
+        $tempPrefix = $tempRoot.TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
+        if ($resolvedStage.StartsWith($tempPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+            Remove-Item -LiteralPath $resolvedStage -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
     Write-V4Log 'staged configs pass mihomo -t' -Level OK
 
     if ($DryRun) { Write-V4Log 'DRY RUN: nothing replaced' -Level OK; return }

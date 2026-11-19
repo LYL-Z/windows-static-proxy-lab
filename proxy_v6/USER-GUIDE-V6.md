@@ -1,10 +1,11 @@
 # USER-GUIDE — V6.0（中文）
 
-## 1. 当前生产状态
-- Windows 系统代理：**关闭**（ProxyEnable=0，ProxyServer 保留 127.0.0.1:7897）。
-- 直连验证：百度 HTTP/HTTPS、Google、ipify 均 200。
-- Clash 7897 仍监听；经 Clash 访问 Google/ipify 可用，百度返回 502（链路把国内也发往美国静态代理）。
-- 不要在未确认前重新开启系统代理；如需静态链，先加 `GEOIP,CN,DIRECT` 并验证。
+## 1. 查看当前状态
+
+在实际部署目录使用 Windows PowerShell 运行 `state-v4.ps1`。
+用 `windowsTargetsClash` 检查 Windows 手动代理是否指向预期监听端口，
+用 `chainStatus` 检查经该监听端口的 HTTPS 出口。即使 Windows 指向其他代理，也会独立验证链路。
+当仅验证了代理规则命中的 IPv4 HTTPS 流量时，应用自身网络、DNS、UDP 和 WebRTC 的覆盖范围需要分别核实。
 
 ## 2. 安全使用
 1. 本仓库脚本只用于用户自己的 Windows 主机；不要在生产网络未备份时运行 apply。
@@ -17,6 +18,7 @@
 
 ## 3. 常用命令（真实执行前先备份）
     powershell -NoProfile -ExecutionPolicy Bypass -File proxy_v4\apply-v4.ps1 -DryRun
+    powershell -NoProfile -ExecutionPolicy Bypass -File proxy_v4\state-v4.ps1 -Samples 4 -IntervalSeconds 5
     powershell -NoProfile -ExecutionPolicy Bypass -File proxy_v4\apply-v4.ps1 -Init
     powershell -NoProfile -ExecutionPolicy Bypass -File proxy_v4\apply-v4.ps1
     powershell -NoProfile -ExecutionPolicy Bypass -File proxy_v4\rollback-v4.ps1 -List
@@ -33,6 +35,9 @@
 - 如果浏览器 ERR_PROXY_CONNECTION_FAILED：先读 HKCU ProxyEnable/ProxyServer；若值异常，关闭系统代理即可恢复直连。
 - 如果 Clash 7897 无监听：关闭系统代理，检查 Clash 核心/端口，再决定是否重启。
 - 不要为修复代理而改路由、TUN、IPv6、StarSky 配置；先保留可上网状态。
+- 两个开关均开启时仍需校验代理目标。链路显示 `EXPECTED_EXIT` 且 Windows 目标不符时，可在备份和授权后运行 `apply-v4.ps1 -Repair`。它通过 HTTP(S) 入口复核静态 IPv4，仅在验证后尝试恢复当前用户的代理目标。复测实际浏览器的国内和国际访问以及出口。当前可用设置应作为失败时的恢复依据。
+- `-Samples` 在一次前台运行中有限次复核，适合观察依赖启动或节点变更。等待时间从上一轮结束计起。JSON 多样本模式每行一个对象，退出码代表末次采样；交付证据时应脱敏。
+- `-DryRun` 在受限临时目录生成候选文件并验证，不写项目日志或锁。它会探测首跳，核心也可能尝试下载缺失的地理数据。
 
 ## 6. 已知残余
 - 真实 apply/rollback/重启/睡眠/Wi-Fi 未执行（**WAITING-USER**）；24h/72h DEFERRED-BY-USER。

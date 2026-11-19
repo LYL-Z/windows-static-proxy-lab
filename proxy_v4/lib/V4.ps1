@@ -1046,15 +1046,19 @@ function Update-V4WinInet {
 
 function Get-V4ExitIp {
     param([string]$Proxy = '', [int]$TimeoutSec = 20)
+    if ($script:TestMode) { return $null }
     foreach ($t in @('https://api.ipify.org','https://ifconfig.me/ip','https://icanhazip.com')) {
-        $a = @('-sS','-m',"$TimeoutSec")
-        if ($Proxy) { $a += @('-x',$Proxy) } else { $a += @('--noproxy','*') }
+        $a = @('-q','-fsS','-m',"$TimeoutSec")
+        if ($Proxy) { $a += @('-x',$Proxy,'--noproxy','no-match.invalid') } else { $a += @('--noproxy','*') }
         $a += $t
         $prev = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
         try { $out = & curl.exe @a 2>&1; $rc = $LASTEXITCODE } finally { $ErrorActionPreference = $prev }
         if ($rc -ne 0) { continue }
         $txt = ($out -join '').Trim()
-        if ($txt -match '^\s*(\d{1,3}(\.\d{1,3}){3})\s*$') { return $Matches[1] }
+        [ipaddress]$address = $null
+        if ($txt -match '^\d{1,3}(\.\d{1,3}){3}$' -and [ipaddress]::TryParse($txt, [ref]$address)) {
+            return $address.ToString()
+        }
     }
     return $null
 }
@@ -1402,10 +1406,12 @@ function Get-V4StateCore {
         state = 'UNKNOWN'; mode = 'UNKNOWN'; reasons = @()
         clashRunning = (@($AppPids).Count -gt 0)
         mixedPort = [bool]$MixedPortOpen
-        systemProxy = $(if ($SystemProxy -and $SystemProxy.enabled) { $SystemProxy.server } else { 'off' })
+        systemProxy = $(if ($SystemProxy -and $SystemProxy.enabled) { Get-V4Redacted $SystemProxy.server } else { 'off' })
         owner = $(if ($Owner) { $Owner.owner } else { 'none' })
         firstHopOk = $false
         exitViaChain = $null
+        chainStatus = 'NOT_PROBED'
+        windowsTargetsClash = $false
         uiSystemProxy = $(if ($null -eq $UiSystemProxy) { 'unknown' } elseif ($UiSystemProxy) { 'enabled' } else { 'disabled' })
         udpProxied = $(if ($null -eq $UdpProxied) { 'unknown' } elseif ($UdpProxied) { 'enabled' } else { 'disabled' })
         pathScope = $(if ($UdpProxied -eq $false) { 'TCP_ONLY' } else { 'UNKNOWN' })
@@ -1429,6 +1435,11 @@ function Get-V4StateCore {
         $out.reasons += 'settings.json missing'
         return $out
     }
+    $expectedProxy = '127.0.0.1:' + $Settings.mixedPort
+    $out.windowsTargetsClash = ($actualProxyEnabled -and $SystemProxy.server -eq $expectedProxy)
+    if (-not $out.windowsTargetsClash) {
+        $out.reasons += ('Windows proxy is ' + $out.systemProxy + '; expected ' + $expectedProxy)
+    }
     if ($FirstHop) {
         $out.firstHopOk = [bool]$FirstHop.ok
         if (-not $out.firstHopOk) { $out.reasons += ('first hop down: ' + $FirstHop.detail) }
@@ -1438,15 +1449,21 @@ function Get-V4StateCore {
     elseif (-not $out.mixedPort) { $out.mode = 'NEXIP'; $out.state = 'FAILED'; $out.reasons += 'core not listening' }
     else {
         $out.mode = 'NEXIP'
-        if ($out.systemProxy -ne ('127.0.0.1:' + $Settings.mixedPort)) {
-            $out.state = 'DEGRADED'; $out.reasons += ('system proxy owned by ' + $out.systemProxy)
-        }
-        elseif (-not $out.firstHopOk) { $out.state = 'DEGRADED' }
+        if (-not $out.firstHopOk -or -not $GetExitIp) { $out.state = 'DEGRADED' }
         else {
-            if ($GetExitIp) { $out.exitViaChain = & $GetExitIp ('socks5h://127.0.0.1:' + $Settings.mixedPort) }
-            if ($out.exitViaChain -eq $Settings.host) { $out.state = 'HEALTHY' }
-            elseif ($out.exitViaChain) { $out.state = 'DEGRADED'; $out.reasons += ('exit ' + $out.exitViaChain + ' != ' + $Settings.host) }
-            else { $out.state = 'FAILED'; $out.reasons += 'no exit ip' }
+            $out.exitViaChain = & $GetExitIp ('http://' + $expectedProxy)
+            if ($out.exitViaChain -eq $Settings.host) {
+                $out.chainStatus = 'EXPECTED_EXIT'
+                $out.state = if ($out.windowsTargetsClash) { 'HEALTHY' } else { 'DEGRADED' }
+            }
+            elseif ($out.exitViaChain) {
+                $out.chainStatus = 'UNEXPECTED_EXIT'
+                $out.state = 'DEGRADED'; $out.reasons += 'Clash HTTPS exit differs from the configured static IPv4'
+            }
+            else {
+                $out.chainStatus = 'NO_EXIT'
+                $out.state = 'FAILED'; $out.reasons += 'Clash HTTPS probe returned no IPv4 exit'
+            }
         }
     }
     if ($uiMismatch -and $out.state -ne 'FAILED') { $out.state = 'DEGRADED' }
@@ -1470,7 +1487,7 @@ function Get-V4State {
         $mixed = Test-V4Port -Port $s.mixedPort
         $hop = Test-V4FirstHop -Port $s.hopPort
     }
-    $exitProbe = { param($proxy) Get-V4ExitIp -Proxy $proxy }
+    $exitProbe = { param($proxy) Get-V4ExitIp -Proxy $proxy -TimeoutSec 5 }
     $uiProxy = Get-V4UiSystemProxy
     $udpProxy = Get-V4UdpProxied
     return Get-V4StateCore -Settings $s -Owner $owner -SystemProxy $px -AppPids $pids -MixedPortOpen $mixed -FirstHop $hop -GetExitIp $exitProbe -SettingsError $settingsError -UiSystemProxy $uiProxy -UdpProxied $udpProxy

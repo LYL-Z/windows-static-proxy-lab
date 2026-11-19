@@ -337,14 +337,23 @@ try {
             Assert-Infra ($c.state -eq 'FAILED' -and $c.mode -eq 'NEXIP') 'not-listening state wrong'
             $d = Get-V4StateCore -Settings $settings -Owner $null -SystemProxy $proxyBad -AppPids @(1) -MixedPortOpen $true -FirstHop $hopOk -GetExitIp $exitOk -SettingsError ''
             Assert-Infra ($d.state -eq 'DEGRADED') 'proxy mismatch not DEGRADED'
+            Assert-Infra ($d.chainStatus -eq 'EXPECTED_EXIT' -and -not $d.windowsTargetsClash) 'Windows target mismatch suppressed the independent chain probe'
             $e = Get-V4StateCore -Settings $settings -Owner $null -SystemProxy $proxyOk -AppPids @(1) -MixedPortOpen $true -FirstHop $hopBad -GetExitIp $exitOk -SettingsError ''
             Assert-Infra ($e.state -eq 'DEGRADED') 'first-hop down not DEGRADED'
+            Assert-Infra ($e.chainStatus -eq 'NOT_PROBED') 'chain was promoted while dependency was down'
             $f = Get-V4StateCore -Settings $settings -Owner $null -SystemProxy $proxyOk -AppPids @(1) -MixedPortOpen $true -FirstHop $hopOk -GetExitIp $exitBad -SettingsError ''
             Assert-Infra ($f.state -eq 'DEGRADED') 'exit mismatch not DEGRADED'
+            Assert-Infra ($f.chainStatus -eq 'UNEXPECTED_EXIT' -and $f.windowsTargetsClash) 'open listeners masked changed exit'
             $g = Get-V4StateCore -Settings $settings -Owner $null -SystemProxy $proxyOk -AppPids @(1) -MixedPortOpen $true -FirstHop $hopOk -GetExitIp $exitNone -SettingsError ''
             Assert-Infra ($g.state -eq 'FAILED') 'no exit IP not FAILED'
-            $h = Get-V4StateCore -Settings $settings -Owner $null -SystemProxy $proxyOk -AppPids @(1) -MixedPortOpen $true -FirstHop $hopOk -GetExitIp $exitOk -SettingsError ''
+            $httpExit = {
+                param($proxy)
+                if ($proxy -ne 'http://127.0.0.1:7897') { throw 'state tested a different ingress from Windows HTTP(S)' }
+                '203.0.113.10'
+            }
+            $h = Get-V4StateCore -Settings $settings -Owner $null -SystemProxy $proxyOk -AppPids @(1) -MixedPortOpen $true -FirstHop $hopOk -GetExitIp $httpExit -SettingsError ''
             Assert-Infra ($h.state -eq 'HEALTHY') 'healthy state wrong'
+            Assert-Infra ($h.chainStatus -eq 'EXPECTED_EXIT' -and $h.windowsTargetsClash) 'recovered dependency was not verified'
             $i = Get-V4StateCore -Settings $settings -Owner $null -SystemProxy $proxyOk -AppPids @(1) -MixedPortOpen $true -FirstHop $hopOk -GetExitIp $exitOk -SettingsError 'bad settings'
             Assert-Infra ($i.state -eq 'FAILED' -and ($i.reasons -join ' ') -match 'settings invalid') 'settings error not reported'
             $script:Actual = '9 state-core branches matched'
@@ -508,7 +517,12 @@ try {
         'INF-DRYRUN-01' {
             $app = New-TestAppData
             $core = Join-Path $root 'fake-core.cmd'
-            Put-Text $core ('@echo off' + $CRLF + 'exit /b 0' + $CRLF)
+            Put-Text $core (@(
+                '@echo off'
+                'if not "%~4"=="-d" exit /b 20'
+                'echo synthetic core cache > "%~5\dryrun-cache"'
+                'exit /b 0'
+            ) -join $CRLF)
             $port = Get-FreePort
             $ready = Join-Path $root 'hop.ready'
             $hop = Start-FakeHop -Port $port -ReadyFile $ready
@@ -520,6 +534,7 @@ try {
                 $beforeProfiles = Get-Sha (Join-Path $app 'profiles.yaml')
                 $beforeRuntime = Get-Sha (Join-Path $app 'clash-verge.yaml')
                 $beforeSettings = Get-Sha $settingsPath
+                $beforeEvidence = @((Get-ChildItem -LiteralPath (Join-Path $root 'evidence') -File -ErrorAction SilentlyContinue).Name) -join '|'
                 $apply = Join-Path $repo 'proxy_v4\apply-v4.ps1'
                 $prevEap = $ErrorActionPreference
                 $ErrorActionPreference = 'Continue'
@@ -532,6 +547,9 @@ try {
                 Assert-Infra ((Get-Sha $settingsPath) -eq $beforeSettings) 'DryRun changed settings.json'
                 Assert-Infra (-not (Test-Path -LiteralPath (Join-Path $root 'backup'))) 'DryRun created a snapshot'
                 Assert-Infra (-not (Test-Path -LiteralPath (Join-Path $root 'config\.lock'))) 'DryRun left the lock behind'
+                Assert-Infra (-not (Test-Path -LiteralPath (Join-Path $app 'dryrun-cache'))) 'DryRun gave the core the live work directory'
+                $afterEvidence = @((Get-ChildItem -LiteralPath (Join-Path $root 'evidence') -File -ErrorAction SilentlyContinue).Name) -join '|'
+                Assert-Infra ($beforeEvidence -eq $afterEvidence) 'DryRun wrote an evidence log'
                 $script:Actual = 'real apply -DryRun reached validation and changed no config/settings/appdata'
             }
             finally {
