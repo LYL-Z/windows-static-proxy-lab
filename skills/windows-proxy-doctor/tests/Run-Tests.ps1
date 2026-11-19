@@ -34,6 +34,29 @@ try {
         $j = & (Join-Path $root 'scripts\Get-ProxyDoctorSnapshot.ps1') -TestFixture (Join-Path $testDir 'fixtures\state-proxy-off.json') -Json | ConvertFrom-Json
         Assert-True ($j.state -eq 'DEGRADED') ('state=' + $j.state)
     }
+    Check 'wrong-target-with-both-toggles-on' {
+        $f = Get-Content (Join-Path $testDir 'fixtures\state-healthy.json') -Raw | ConvertFrom-Json
+        $f.proxyServer = '127.0.0.1:11119'
+        $path = Join-Path $tmp 'wrong-target.json'
+        $f | ConvertTo-Json | Set-Content -LiteralPath $path
+        $j = & (Join-Path $root 'scripts\Get-ProxyDoctorSnapshot.ps1') -TestFixture $path -Json | ConvertFrom-Json
+        Assert-True ($j.state -eq 'DEGRADED' -and $j.proxyTargetsMixedPort -eq $false) 'wrong target accepted'
+        $j | ConvertTo-Json | Set-Content -LiteralPath $path
+        $out = & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'scripts\Test-ProxyConsistency.ps1') -SnapshotFile $path -Json
+        Assert-True ($LASTEXITCODE -eq 2) ('exit=' + $LASTEXITCODE)
+        Assert-True (($out -join ' ') -match 'points away') 'consistency missed target mismatch'
+    }
+    Check 'mapped-target-unverified-exit' {
+        $f = Get-Content (Join-Path $testDir 'fixtures\state-healthy.json') -Raw | ConvertFrom-Json
+        $f.proxyServer = 'http=127.0.0.1:7897; https=localhost:7897'
+        $f.exitMatches = $null
+        $path = Join-Path $tmp 'mapped-target.json'
+        $f | ConvertTo-Json | Set-Content -LiteralPath $path
+        $j = & (Join-Path $root 'scripts\Get-ProxyDoctorSnapshot.ps1') -TestFixture $path -Json | ConvertFrom-Json
+        Assert-True ($j.proxyTargetsMixedPort -eq $true) 'mapped HTTP(S) target was not recognized'
+        Assert-True ($j.state -eq 'UNKNOWN') 'unmeasured exit was promoted to healthy'
+        Assert-True ($j.proxyServer -eq '[redacted]') 'raw mapping was emitted'
+    }
     Check 'consistency-mismatch-exit2' {
         $out = & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'scripts\Test-ProxyConsistency.ps1') -SnapshotFile (Join-Path $testDir 'fixtures\state-mismatch.json') -Json 2>&1
         Assert-True ($LASTEXITCODE -eq 2) ('exit=' + $LASTEXITCODE)

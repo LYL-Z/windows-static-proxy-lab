@@ -8,10 +8,11 @@ it exists for isolated tests and never touches the real machine.
 param(
     [switch]$Json,
     [string]$TestFixture = '',
-    [int]$MixedPort = 7897,
-    [int]$FirstHopPort = 11119
+    [ValidateRange(1, 65535)][int]$MixedPort = 7897,
+    [ValidateRange(1, 65535)][int]$FirstHopPort = 11119
 )
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'ProxyTarget.ps1')
 
 function ConvertTo-Bool($v) { if ($null -eq $v) { return $false }; return [bool]$v }
 
@@ -60,6 +61,10 @@ if ($TestFixture) {
 }
 
 $reasons = New-Object System.Collections.Generic.List[string]
+$targetsMixed = if ($proxyEnabled) { Test-ProxyDoctorTarget -Server $proxyServer -Port $MixedPort } else { $false }
+if ($proxyEnabled -and $targetsMixed -eq $false) {
+    $reasons.Add(('Windows manual HTTP(S) proxy does not target the expected mixed port ' + $MixedPort))
+}
 if (-not $procRunning) { $reasons.Add('proxy client process not running') }
 if (-not $mixedOpen) { $reasons.Add(('mixed port ' + $MixedPort + ' not listening')) }
 if ($proxyEnabled -and -not $mixedOpen) { $reasons.Add('system proxy enabled but mixed port is down') }
@@ -68,19 +73,28 @@ if ($null -ne $uiEnabled -and ([bool]$uiEnabled -ne [bool]$proxyEnabled)) {
     $reasons.Add(('UI enable_system_proxy=' + $uiEnabled + ' but HKCU ProxyEnable=' + $proxyEnabled))
 }
 
-$state = 'HEALTHY'
+$state = 'UNKNOWN'
 if (-not $procRunning -or -not $mixedOpen) { $state = 'FAILED' }
+elseif ($proxyEnabled -and $targetsMixed -eq $false) { $state = 'DEGRADED' }
 elseif ($null -ne $uiEnabled -and ([bool]$uiEnabled -ne [bool]$proxyEnabled)) { $state = 'DEGRADED' }
 elseif (-not $proxyEnabled) { $state = 'DEGRADED'; $reasons.Add('proxy client is running but Windows proxy is off') }
 elseif (-not $firstHopOpen) { $state = 'DEGRADED'; $reasons.Add(('first hop port ' + $FirstHopPort + ' not listening')) }
 elseif ($null -ne $exitMatches -and -not $exitMatches) { $state = 'DEGRADED'; $reasons.Add('exit path does not match expected proxy') }
+elseif ($null -eq $targetsMixed -or $null -eq $uiEnabled) { $reasons.Add('manual proxy target or saved UI state could not be verified') }
+elseif ($null -eq $exitMatches) { $reasons.Add('HTTPS exit was not measured by this snapshot') }
+else { $state = 'HEALTHY' }
+
+$displayServer = if ($proxyServer -match '^(?:(?:http|https)://)?(?:127\.0\.0\.1|localhost|\[::1\]):\d{1,5}$') {
+    $proxyServer
+} elseif ($proxyServer) { '[redacted]' } else { '' }
 
 $out = [ordered]@{
     schema = 1
     ts = (Get-Date).ToString('o')
     source = $(if ($TestFixture) { 'test-fixture' } else { 'live-read-only' })
     proxyEnabled = [bool]$proxyEnabled
-    proxyServer = $proxyServer
+    proxyServer = $displayServer
+    proxyTargetsMixedPort = $targetsMixed
     uiEnabled = $uiEnabled
     processRunning = [bool]$procRunning
     mixedPort = $MixedPort

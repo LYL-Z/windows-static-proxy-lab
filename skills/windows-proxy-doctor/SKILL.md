@@ -3,7 +3,7 @@ name: windows-proxy-doctor
 description: Read-only Windows network and proxy diagnostics for state mismatches, competing proxy clients, TCP/DNS/UDP path differences, transactional backup/rollback design, test isolation, credentials, and startup lifecycle.
 license: MIT
 metadata:
-  version: "1.0.0"
+  version: "1.1.0"
   platforms: "Windows 10/11 PowerShell 5.1+"
 ---
 
@@ -27,6 +27,7 @@ Read-only. Do not modify HKCU, WinHTTP, adapters, routes, TUN, DNS, firewall, De
 
 1. Freeze the facts: record time, HKCU proxy values, WinHTTP, relevant process names/PIDs, listeners, Clash UI enable_system_proxy, and file hashes. Do not print credentials.
 2. Separate layers: application/UI state, OS proxy, local listener, first hop, DNS, TCP, UDP/WebRTC, and actual exit path are different layers. Never collapse them into one healthy flag.
+   Compare the Windows manual HTTP(S) proxy target with the expected listener even when both toggles are on. Test the Windows-selected path and the explicit mixed-port path independently when a target differs.
 3. Classify:
    - HEALTHY: actual OS proxy and UI agree, listener/process alive, required path probe passes.
    - DEGRADED: local service works but routing/UI/one layer disagrees.
@@ -39,8 +40,8 @@ Read-only. Do not modify HKCU, WinHTTP, adapters, routes, TUN, DNS, firewall, De
 
 | Script | Purpose |
 |---|---|
-| scripts/Get-ProxyDoctorSnapshot.ps1 | Read-only snapshot and classification. Use -TestFixture for isolated tests. |
-| scripts/Test-ProxyConsistency.ps1 | Compare UI, actual, listener, and process evidence. |
+| scripts/Get-ProxyDoctorSnapshot.ps1 | Read-only snapshot. It reports UNKNOWN when local settings agree and the HTTPS exit is unmeasured. Use -TestFixture for isolated tests. |
+| scripts/Test-ProxyConsistency.ps1 | Compare saved UI, Windows manual HTTP(S) target, and local socket/process facts. Exit 3 indicates insufficient evidence to establish consistency. |
 | scripts/Test-NetworkPath.ps1 | TCP/DNS/path probes; optional explicit proxy. |
 | scripts/Protect-Backup.ps1 | DPAPI-encrypt a backup zip; -Apply required. |
 | scripts/Unprotect-Backup.ps1 | Decrypt and verify; never overwrites. |

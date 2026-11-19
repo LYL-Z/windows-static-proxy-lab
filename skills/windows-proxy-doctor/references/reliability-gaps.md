@@ -26,6 +26,11 @@ Apply -Repair re-asserts the system proxy only after the chain exit probe is
 healthy. It does not restart StarSky or Clash and does not repair a down first hop.
 A successful detection is not an automatic repair.
 
+Two enabled toggles can still disagree about the HTTP(S) target. When Windows
+points to the first-hop listener while the intended mixed listener is up, test
+both paths with separate HTTPS requests before deciding whether a repair is
+appropriate. A working browser alone can hide this distinction.
+
 ## Windows login / startup
 
 - Clash Verge has a logon scheduled task.
