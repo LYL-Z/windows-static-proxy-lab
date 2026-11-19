@@ -117,6 +117,13 @@ datagram sent through that relay while the TCP association remains open.
 [RFC 1928](https://www.rfc-editor.org/rfc/rfc1928.html) ·
 [RFC 8828](https://www.rfc-editor.org/rfc/rfc8828.html)
 
+Record the page, time and measurement unit for a third-party score. A
+request-level bot score, a site's own IP reputation index and a challenge
+verification result answer different questions. Report differing IP labels or
+aggregate traffic ratios with their source and sample window when known.
+An edge TCP RTT measures a connection leg. For client-perceived latency,
+use the local request timing and note when it includes a proxy handshake.
+
 ## 6. Paired SOCKS5 checks
 
 Use the same public HTTPS URL, SOCKS5 endpoint and first hop for both
@@ -129,6 +136,13 @@ provider-documented HTTPS endpoint as a control. Success via IPv4 narrows the
 failure to what differs with domain addressing, such as remote DNS, policy or
 the selected destination address. Ask the provider which addresses and errors
 it observed at the test time.
+
+`Test-NetworkPath.ps1` reports the address resolution mode requested at the
+proxy it contacts. A listener can resolve or relay a destination differently
+on later hops. The `-IPv4` flag applies to curl's own lookups and connections.
+`proxy_handshake` reports curl's proxy negotiation error and leaves the exact
+SOCKS5 step unverified. `timeout_stage_unknown` records expiry without assigning
+it to DNS, CONNECT or TLS. See [curl error codes](https://curl.se/libcurl/c/libcurl-errors.html).
 
 For UDP, compare a known responding service over the OS UDP path and over the
 advertised SOCKS5 relay. Use the same resolved destination and port for the

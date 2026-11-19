@@ -9,14 +9,15 @@ param(
     [string[]]$Urls = @('https://www.baidu.com','https://www.google.com'),
     [string[]]$DnsNames = @('www.baidu.com','www.google.com'),
     [switch]$Json,
-    [switch]$Direct
+    [switch]$Direct,
+    [switch]$IPv4
 )
 $ErrorActionPreference = 'Continue'
 . (Join-Path $PSScriptRoot 'NetworkPathResult.ps1')
 if ($Direct -and $Proxy) { throw 'Use either -Direct or -Proxy.' }
+[uri]$proxyUri = $null
 if ($Proxy) {
     $given = if ($Proxy -match '^\w+://') { $Proxy } else { 'http://' + $Proxy }
-    [uri]$proxyUri = $null
     if (-not [uri]::TryCreate($given, [UriKind]::Absolute, [ref]$proxyUri) -or
         $proxyUri.Scheme -notin @('http','https','socks4','socks4a','socks5','socks5h') -or
         -not $proxyUri.Host -or $proxyUri.UserInfo -or $proxyUri.AbsolutePath -ne '/' -or
@@ -25,6 +26,8 @@ if ($Proxy) {
     }
 }
 $curl = Get-Command curl.exe -ErrorAction SilentlyContinue
+# The legacy Windows argument marshaller drops an empty string without quoting.
+$noProxyOverride = if ($PSVersionTable.PSVersion -lt [version]'7.3' -or $PSNativeCommandArgumentPassing -eq 'Legacy') { '""' } else { '' }
 $http = @()
 foreach ($u in $Urls) {
     [uri]$url = $null
@@ -35,7 +38,8 @@ foreach ($u in $Urls) {
     $label = $url.GetLeftPart([UriPartial]::Path)
     if (-not $curl) { $http += [ordered]@{ url=$label; status='skipped'; code=$null; detail='curl.exe not found' }; continue }
     $curlArgs = @('-q','-sS','--max-time','12','-o','NUL','-w','%{http_code} %{http_connect}')
-    if ($Proxy) { $curlArgs += @('-x',$Proxy,'--noproxy','no-match.invalid') }
+    if ($IPv4) { $curlArgs += '--ipv4' }
+    if ($Proxy) { $curlArgs += @('-x',$Proxy,'--noproxy',$noProxyOverride) }
     if ($Direct) { $curlArgs += @('--noproxy','*') }
     $raw = (& $curl.Source @curlArgs -- $u 2>$null) -join ''
     $measurement = ConvertFrom-ProxyDoctorCurlResult -Raw $raw -ExitCode $LASTEXITCODE
@@ -54,6 +58,12 @@ $out = [ordered]@{
     ts = (Get-Date).ToString('o')
     proxy = $Proxy
     transportSelection = $(if ($Proxy) { 'explicit_proxy' } elseif ($Direct) { 'direct' } else { 'curl_environment' })
+    socksDestinationResolution = switch ($proxyUri.Scheme) {
+        'socks5' { 'client' }
+        'socks5h' { 'proxy' }
+        default { $null }
+    }
+    clientIPv4Requested = [bool]$IPv4
     http = @($http)
     dns = @($dns)
     udp = 'not_probed'

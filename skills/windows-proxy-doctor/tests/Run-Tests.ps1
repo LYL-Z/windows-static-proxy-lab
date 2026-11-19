@@ -68,6 +68,38 @@ try {
         Assert-True ((ConvertFrom-ProxyDoctorCurlResult '502 200' 0).status -eq 'http_error') 'HTTP 502 counted as success'
         Assert-True ((ConvertFrom-ProxyDoctorCurlResult '000 502' 56).status -eq 'proxy_connect_error') 'CONNECT 502 conflated with origin 502'
         Assert-True ((ConvertFrom-ProxyDoctorCurlResult '000 200' 60).status -eq 'transport_error') 'TLS failure counted as success'
+        Assert-True ((ConvertFrom-ProxyDoctorCurlResult '000 302' 56).failureStage -eq 'http_connect') 'CONNECT rejection misclassified'
+        Assert-True ((ConvertFrom-ProxyDoctorCurlResult '502 200' 0).failureStage -eq 'http_response') 'origin response stage lost'
+        Assert-True ((ConvertFrom-ProxyDoctorCurlResult '000 000' 97).failureStage -eq 'proxy_handshake') 'SOCKS handshake not identified'
+        Assert-True ((ConvertFrom-ProxyDoctorCurlResult '000 000' 6).failureStage -eq 'destination_dns') 'destination DNS stage lost'
+        Assert-True ((ConvertFrom-ProxyDoctorCurlResult '000 200' 60).failureStage -eq 'tls_certificate') 'TLS certificate stage lost'
+        Assert-True ((ConvertFrom-ProxyDoctorCurlResult '000 200' 28).failureStage -eq 'timeout_stage_unknown') 'timeout stage was over-attributed'
+    }
+    Check 'socks-resolution-metadata' {
+        $probe = Join-Path $root 'scripts\Test-NetworkPath.ps1'
+        $local = & $probe -Proxy 'socks5://127.0.0.1:1' -IPv4 -Urls @() -DnsNames @() -Json | ConvertFrom-Json
+        $remote = & $probe -Proxy 'socks5h://127.0.0.1:1' -IPv4 -Urls @() -DnsNames @() -Json | ConvertFrom-Json
+        $direct = & $probe -Direct -Urls @() -DnsNames @() -Json | ConvertFrom-Json
+        Assert-True ($local.socksDestinationResolution -eq 'client' -and $local.clientIPv4Requested -and $local.http.Count -eq 0) 'client-resolved invocation metadata incorrect'
+        Assert-True ($remote.socksDestinationResolution -eq 'proxy' -and $remote.udp -eq 'not_probed') 'proxy-resolved invocation metadata incorrect'
+        Assert-True ($null -eq $direct.socksDestinationResolution -and -not $direct.clientIPv4Requested) 'direct invocation incorrectly labeled SOCKS'
+    }
+    Check 'explicit-socks-overrides-bypass' {
+        $probe = Join-Path $root 'scripts\Test-NetworkPath.ps1'
+        $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0)
+        $previous = [Environment]::GetEnvironmentVariable('NO_PROXY', 'Process')
+        $listener.Start()
+        try {
+            [Environment]::SetEnvironmentVariable('NO_PROXY', 'no-match.invalid', 'Process')
+            $port = ([Net.IPEndPoint]$listener.LocalEndpoint).Port
+            $listener.Stop()
+            $out = & $probe -Proxy "socks5h://127.0.0.1:$port" -Urls @('https://no-match.invalid/') -DnsNames @() -Json | ConvertFrom-Json
+            Assert-True ($out.http[0].curlExit -eq 7 -and $out.http[0].failureStage -eq 'connect') 'explicit proxy did not override the bypass list'
+        }
+        finally {
+            $listener.Stop()
+            [Environment]::SetEnvironmentVariable('NO_PROXY', $previous, 'Process')
+        }
     }
     Check 'backup-roundtrip' {
         $src = Join-Path $tmp 'backup'; New-Item -ItemType Directory -Path (Join-Path $src 'snap') -Force | Out-Null
