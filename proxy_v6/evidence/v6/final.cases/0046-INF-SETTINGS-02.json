@@ -1,0 +1,17 @@
+{
+    "id":  "INF-SETTINGS-02",
+    "requirement":  "PARAM-05",
+    "precondition":  "invalid settings JSON",
+    "injectedFault":  "corrupt settings",
+    "expected":  "code 11",
+    "actual":  "invalid settings rejected with code 11",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  882,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T07:02:26.033-08:00",
+    "finishedAt":  "2026-11-18T07:02:26.915-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0046-INF-SETTINGS-02.json",
+    "testOutput":  ""
+}

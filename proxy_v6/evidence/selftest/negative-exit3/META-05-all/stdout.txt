@@ -1,0 +1,14 @@
+
+== V6 TEST HARNESS 6.0.0 ==
+Run ID: 0c7e73047c0d449289504c828be40f23
+Git HEAD: 36222c92c829a2ef08b71af2a3a3ff9a3c44b396
+Git branch: v5/short-run-hardening
+Filter: *
+--------------------------------------------------------------
+[SKIP] FIX-SKIP-ONLY (META-05) 2ms
+       skipped at registration: fixture registration skip: only test skipped
+--------------------------------------------------------------
+Counts: registered=1 executed=0 passed=0 failed=0 skipped=1 available=1
+[NO-TESTS] no test executed; a green result is not permitted (exit 2).
+Evidence: C:\Users\Lenovo\AppData\Local\Temp\v6-tests\v6-selftest-20261118-050628-121-6078b2a5\META-05-all\evidence.json
+RESULT: NO_TESTS_EXECUTED EXIT 2

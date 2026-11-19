@@ -1,0 +1,17 @@
+{
+    "id":  "F07-10",
+    "requirement":  "F07",
+    "precondition":  "writes/start/proxy ok",
+    "injectedFault":  "owner write fails",
+    "expected":  "system proxy restored",
+    "actual":  "F07-10: proxy and owner restored on late failure",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 2",
+    "durationMs":  795,
+    "assertions":  2,
+    "startedAt":  "2026-11-18T07:02:14.348-08:00",
+    "finishedAt":  "2026-11-18T07:02:15.145-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0031-F07-10.json",
+    "testOutput":  ""
+}

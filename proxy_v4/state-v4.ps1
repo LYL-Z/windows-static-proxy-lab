@@ -4,61 +4,95 @@
 .DESCRIPTION
   Reports: five-state health, ownership, config integrity (marker + hash),
   first hop, real chain exit IP. Changes nothing.
-  Exit: 0 HEALTHY/RECOVERING, 2 DEGRADED, 3 FAILED/UNKNOWN.
+  With -Samples, emits one result per sample. JSON is compact per sample.
+  Exit describes the final sample: 0 HEALTHY/RECOVERING, 2 DEGRADED, 3 FAILED/UNKNOWN.
 #>
 [CmdletBinding()]
-param([switch]$Json)
+param(
+    [switch]$Json,
+    [ValidateRange(1, 12)][int]$Samples = 1,
+    [ValidateRange(5, 60)][int]$IntervalSeconds = 5
+)
 $ErrorActionPreference = 'Continue'
 . (Join-Path $PSScriptRoot 'lib\V4.ps1')
 
-$st = Get-V4State
-$integrity = [ordered]@{ profileExists = $false; markerOk = $false; runtimeMarkerOk = $false; profileHash = $null; ownerRecord = 'none' }
-try {
+function Get-StateResult {
+    $st = $null
+    $stateError = ''
+    try { $st = Get-V4State }
+    catch { $stateError = $_.Exception.Message }
+
+    if (-not $st) {
+        $st = [ordered]@{
+            state = 'FAILED'; mode = 'UNKNOWN'; reasons = @(('state probe failed: ' + $stateError))
+            clashRunning = $false; mixedPort = $false; systemProxy = 'unknown'
+            owner = 'unknown'; firstHopOk = $false; exitViaChain = $null; uiSystemProxy = 'unknown'
+            firstHopStatus = 'NOT_PROBED'; recoveryAction = 'REVIEW_SETTINGS_OR_PROBE'
+            udpProxied = 'unknown'; udpDataPlane = 'not_probed'; pathScope = 'UNKNOWN'; warnings = @()
+            chainStatus = 'NOT_PROBED'; windowsTargetsClash = $false
+        }
+    }
     $p = Get-V4Paths
-    $prof = Join-Path $p.ProfilesDir 'v4-managed.yaml'
-    if (Test-Path $prof) {
-        $integrity.profileExists = $true
-        $integrity.profileHash = (Get-FileHash $prof -Algorithm SHA256).Hash.Substring(0,16)
-        $t = Read-V4File $prof
-        if ($t -and $t.StartsWith($script:Marker)) { $integrity.markerOk = $true }
-    }
-    if ($p.RuntimeFile -and (Test-Path $p.RuntimeFile)) {
-        $t = Read-V4File $p.RuntimeFile
-        # the app regenerates the runtime file, so its marker is not preserved;
-        # verify the chain signature instead of the comment
-        if ($t -and $t -match 'dialer-proxy:\s*"?STAR-FIRSTHOP"?') { $integrity.runtimeMarkerOk = $true }
-    }
-    $o = Get-V4Owner
-    if ($o) { $integrity.ownerRecord = ('{0} @ {1}' -f $o.owner, $o.updatedAt) }
-}
-catch { }
+    $integrity = Get-V4Integrity -Paths $p
 
-$result = [ordered]@{
-    state = $st.state; mode = $st.mode; reasons = $st.reasons
-    clashRunning = $st.clashRunning; mixedPort = $st.mixedPort
-    systemProxy = $st.systemProxy; ownerRecorded = $st.owner
-    firstHopOk = $st.firstHopOk; exitViaChain = $st.exitViaChain
-    integrity = $integrity
+    $result = [ordered]@{
+        observedAt = [datetimeoffset]::Now.ToString('o')
+        state = $st.state; mode = $st.mode; reasons = @($st.reasons)
+        clashRunning = $st.clashRunning; mixedPort = $st.mixedPort
+        systemProxy = $st.systemProxy; ownerRecorded = $st.owner
+        uiSystemProxy = $st.uiSystemProxy
+        udpProxied = $st.udpProxied; udpDataPlane = $st.udpDataPlane; pathScope = $st.pathScope
+        warnings = @($st.warnings)
+        firstHopOk = $st.firstHopOk; firstHopStatus = $st.firstHopStatus; exitViaChain = $st.exitViaChain
+        chainStatus = $st.chainStatus; windowsTargetsClash = $st.windowsTargetsClash
+        integrity = $integrity
+    }
+    $markersOk = $integrity.markerOk -and $integrity.runtimeMarkerOk
+    if (-not $markersOk -and $st.mode -eq 'NEXIP') {
+        $result.reasons += 'managed profile or runtime marker could not be verified'
+    }
+    if (-not $markersOk -and $result.state -eq 'HEALTHY') { $result.state = 'DEGRADED' }
+    $result.recoveryAction = switch ($true) {
+        { [bool](Get-V4Journal) } { 'REVIEW_PENDING_TRANSACTION'; break }
+        { $st.mode -eq 'UNKNOWN' } { 'REVIEW_SETTINGS_OR_PROBE'; break }
+        { -not $st.clashRunning -or -not $st.mixedPort } { 'CHECK_CLASH_STARTUP'; break }
+        { -not $result.firstHopOk } { 'CHECK_FIRST_HOP'; break }
+        { -not $markersOk } { 'REVIEW_MANAGED_PROFILE'; break }
+        { $result.chainStatus -ne 'EXPECTED_EXIT' } { 'CHECK_HTTPS_CHAIN'; break }
+        { $result.systemProxy -eq 'unknown' -or $result.uiSystemProxy -ne 'enabled' } { 'REVIEW_PROXY_MODE'; break }
+        { -not $result.windowsTargetsClash } { 'CONSIDER_MANUAL_REPAIR'; break }
+        default { 'NO_PROXY_CHANGE_INDICATED' }
+    }
+    if ($result.recoveryAction -eq 'CONSIDER_MANUAL_REPAIR') {
+        $result.reasons += 'Clash HTTPS is usable while the Windows proxy differs. Review proxy ownership and obtain authorization before running apply-v4.ps1 -Repair.'
+    }
+    return $result
 }
-if (-not $integrity.markerOk -and $integrity.profileExists) {
-    $result.reasons += 'managed profile lost its marker (subscription/app overwrite?) - re-run apply-v4.ps1'
-}
-if (-not $integrity.markerOk -and $result.state -eq 'HEALTHY') { $result.state = 'DEGRADED' }
 
-if ($Json) { $result | ConvertTo-Json -Depth 5 }
-else {
+function Write-StateResult($result) {
     Write-Host ''
-    Write-Host ("  STATE {0}   mode={1}" -f $result.state, $result.mode) -ForegroundColor $(
+    Write-Host ('  STATE {0}   mode={1}' -f $result.state, $result.mode) -ForegroundColor $(
         switch ($result.state) { 'HEALTHY' {'Green'} 'DEGRADED' {'Yellow'} 'RECOVERING' {'Cyan'} default {'Red'} })
     Write-Host ('  ' + ('-'*60))
     'clashRunning   {0}' -f $result.clashRunning
     'mixedPort      {0}' -f $result.mixedPort
     'systemProxy    {0}   (owner record: {1})' -f $result.systemProxy, $result.ownerRecorded
-    'firstHopOk     {0}' -f $result.firstHopOk
+    'uiSystemProxy  {0}   pathScope {1}   UDP configured {2}   UDP data plane {3}' -f $result.uiSystemProxy, $result.pathScope, $result.udpProxied, $result.udpDataPlane
+    if ($result.warnings.Count) { Write-Host 'warnings:'; $result.warnings | ForEach-Object { '  - ' + $_ } }
+    'firstHopOk     {0}   firstHopStatus {1}' -f $result.firstHopOk, $result.firstHopStatus
+    'chainStatus    {0}   windowsTargetsClash {1}' -f $result.chainStatus, $result.windowsTargetsClash
+    'recoveryAction {0}' -f $result.recoveryAction
     'exitViaChain   {0}' -f $result.exitViaChain
     'profile marker {0}   runtime marker {1}' -f $integrity.markerOk, $integrity.runtimeMarkerOk
     if ($result.reasons.Count) { Write-Host 'reasons:'; $result.reasons | ForEach-Object { '  - ' + $_ } }
     Write-Host ''
+}
+
+for ($sample = 1; $sample -le $Samples; $sample++) {
+    if ($sample -gt 1) { Start-Sleep -Seconds $IntervalSeconds }
+    $result = Get-StateResult
+    if ($Json) { $result | ConvertTo-Json -Depth 5 -Compress:($Samples -gt 1) }
+    else { Write-StateResult $result }
 }
 switch ($result.state) {
     'HEALTHY' { exit 0 }

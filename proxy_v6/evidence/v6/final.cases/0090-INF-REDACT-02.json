@@ -1,0 +1,17 @@
+{
+    "id":  "INF-REDACT-02",
+    "requirement":  "SEC-03",
+    "precondition":  "non-registered secret forms",
+    "injectedFault":  "pass/secret/Bearer/short Basic/URL/user",
+    "expected":  "all redacted",
+    "actual":  "quoted/pass/secret/Bearer/short-Basic/URL/user fields redacted",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  627,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T07:03:31.936-08:00",
+    "finishedAt":  "2026-11-18T07:03:32.564-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0090-INF-REDACT-02.json",
+    "testOutput":  ""
+}

@@ -1,0 +1,39 @@
+# RELEASE-GATE-V6
+
+最后更新：2026-11-18T06:40-08:00
+结论：**SHORT_RUN_ACCEPTED（有条件）**；无条件生产发布 **NOT_READY**。条件：C-01/C-12 用户书面处置、V6 尚未部署到生产目录、真实 apply/rollback/boot 等 WAITING-USER；24h/72h DEFERRED。
+
+| # | Gate 条件 | 状态 | 证据 |
+|---|---|---|---|
+| 1 | 全部已确认 HIGH 软件安全缺陷关闭 | **PARTIAL** | C-02/F11/R2A-01 已确认关闭；C-01 快照明文凭据与 C-12 PII 待用户接受/决定 |
+| 2 | F01–F10 全部重新核验 | **PASS** | 97 用例；F07 16、F08 10、F09 套件、F10 10 |
+| 3 | F08/F09/F10 残余路径验证 | **PASS** | F08-09/10、F09-SUITE、F10-10、INF-APPLY-INIT-01 |
+| 4 | 多文件事务负向测试全部通过 | **PASS** | F07-01..16 |
+| 5 | 回滚与并发测试全部通过 | **PASS** | INF-ROLLBACK-01..04、LOCK-01..05、FT19 |
+| 6 | 日志故障不阻断必要恢复 | **PASS** | F10-01..10、LOG-01/02 |
+| 7 | 无关配置不会被误修改 | **PASS** | INF-DRYRUN-01、F07-03/04/09、DATA/ACL |
+| 8 | 测试框架退出码正确 | **PASS** | META-01..07；0/1/2/3/4 负控 |
+| 9 | 无虚假通过/未声明跳过 | **PASS** | 零断言判失败；97 executed/0 skipped；assertions>0 |
+| 10 | 连续两轮独立复审无新增 HIGH | **PASS** | round1+round2+round3+delta2：C-02 墓碑、F12、F11 均独立复核；无新增 HIGH |
+| 11 | 公开发布秘密扫描通过 | **PASS** | gitleaks 8.30.1 + .gitleaks.toml：工作树/历史 0；仅精确合成字面量 allowlist（R5-01 已收窄） |
+| — | 最终证据绑定 | **PASS** | 32d8abc: final.json head=79198fd, dirty=false, 97/97, 0 skipped, 0 zero-assertion；selftest head=79198fd, dirty=false, 7/7 |
+| 12 | 延期/阻塞项目明确披露 | **PASS** | 本文、ISSUE-LEDGER、TASK-STATE、TEST-MATRIX；F12 见专文 |
+| 13 | F12 UI/实际状态一致性 | **PASS** | INF-F12-01/02/03；state 输出 uiSystemProxy；settings 缺失时 FAILED 仍带 UI reason |
+
+## 独立闸门
+
+- SHORT_RUN_ACCEPTED：**CONDITIONAL（有条件）**（C-01/C-12 用户处置；V6 未部署生产；真实测试 WAITING-USER）
+- LONG_RUN：**DEFERRED-BY-USER**
+- SERVICE_ELIGIBILITY：**NOT_READY**（第三方资格不在本项目测试范围）
+- 真实环境 apply/rollback：**WAITING-USER**（未执行，不得用隔离测试冒充）
+
+## F11 专项门槛
+
+| 条件 | 状态 |
+|---|---|
+| 根因明确 | **PASS**（主代理临时探针，已记录时间/代码/输出） |
+| 责任代码修复 | **PASS**（生产写门闩 + test writer + FT16–21） |
+| 测试隔离独立复审 | **PASS**（round3 + delta2 独立验证；C-02/F12 修复后无新 HIGH） |
+| FT16–FT21 全部通过 | **PASS**（6/6） |
+| 未授权生产配置修改为零 | **PASS**（本次全量前后 HKCU/WinHTTP 一致） |
+| 不再造成网络中断 | **PASS（隔离证据）**；真实使用需用户观察 |

@@ -1,0 +1,17 @@
+{
+    "id":  "INF-REDACT-01",
+    "requirement":  "SEC-03",
+    "precondition":  "registered secret",
+    "injectedFault":  "password/username/Basic/SOCKS userinfo",
+    "expected":  "all redacted",
+    "actual":  "password/username/Basic/userinfo redacted",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  633,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T07:02:23.671-08:00",
+    "finishedAt":  "2026-11-18T07:02:24.304-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0043-INF-REDACT-01.json",
+    "testOutput":  ""
+}

@@ -1,0 +1,17 @@
+{
+    "id":  "F08-07",
+    "requirement":  "F08",
+    "precondition":  "uid appears under metadata, not as a list item",
+    "injectedFault":  "non-list-item uid",
+    "expected":  "fail closed, no blind append",
+    "actual":  "F08-07: non-entry rejected",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 2",
+    "durationMs":  689,
+    "assertions":  2,
+    "startedAt":  "2026-11-18T07:01:34.689-08:00",
+    "finishedAt":  "2026-11-18T07:01:35.379-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0007-F08-07.json",
+    "testOutput":  ""
+}

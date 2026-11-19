@@ -1,0 +1,17 @@
+{
+    "id":  "INF-DPAPI-01",
+    "requirement":  "SEC-01",
+    "precondition":  "plaintext fixture",
+    "injectedFault":  "none",
+    "expected":  "DPAPI roundtrip; ciphertext has no plaintext",
+    "actual":  "DPAPI roundtrip ok; ciphertext does not contain plaintext",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  757,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T07:02:24.307-08:00",
+    "finishedAt":  "2026-11-18T07:02:25.064-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0044-INF-DPAPI-01.json",
+    "testOutput":  ""
+}

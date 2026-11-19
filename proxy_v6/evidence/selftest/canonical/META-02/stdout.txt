@@ -1,0 +1,15 @@
+
+== V6 TEST HARNESS 6.0.0 ==
+Run ID: 89c2f50b612c41598e1be797d6b6fd07
+Git HEAD: 79198fd1046f08e17ca9ca819a464ca7a7a19921
+Git branch: HEAD
+Filter: *
+--------------------------------------------------------------
+[FAIL] FIX-FAIL-01 (META-02) 22ms
+       assertion failed: intentional failure one (expected: 1; actual: 2)
+[FAIL] FIX-FAIL-02 (META-02) 8ms
+       unexpected exception: intentional unexpected exception | stack: �� <ScriptBlock>��C:\Users\Lenovo\AppData\Local\Temp\v6-selftest-wt\proxy_v6\tests\self\fixtures\fail.ps1 ��: �� 18 �� | �� Invoke-HarnessCase��C:\Users\Lenovo\AppData\Local\Temp\v6-selftest-wt\proxy_v6\tests\Harness.ps1 ��: �� 434 �� | �� Invoke-TestRun��C:\Users\Lenovo\AppData\Local\Temp\v6-selftest-wt\proxy_v6\tests\Harness.ps1 ��: �� 619 �� | �� <ScriptBlock>��C:\Users\Lenovo\AppData\Local\Temp\v6-selftest-wt\proxy_v6\tests\self\fixtures\fail.ps1 ��: �� 21 �� | at: ����λ�� C:\Users\Lenovo\AppData\Local\Temp\v6-selftest-wt\proxy_v6\tests\self\fixtures\fail.ps1:18 �ַ�: 3 | +   throw 'intentional unexpected exception' | +   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--------------------------------------------------------------
+Counts: registered=2 executed=2 passed=0 failed=2 skipped=0 available=2
+Evidence: C:\Users\Lenovo\AppData\Local\Temp\v6-tests\v6-selftest-20261118-063333-906-8e782058\META-02\evidence.json
+RESULT: FAIL EXIT 1

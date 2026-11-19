@@ -1,0 +1,17 @@
+{
+    "id":  "INF-SNAP-08",
+    "requirement":  "SEC-02",
+    "precondition":  "credential file deleted before restore",
+    "injectedFault":  "recreated file inherits ACL",
+    "expected":  "restored file is ACL-hardened",
+    "actual":  "recreated credential-bearing file was ACL-hardened after restore",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  868,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T07:03:31.065-08:00",
+    "finishedAt":  "2026-11-18T07:03:31.934-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0089-INF-SNAP-08.json",
+    "testOutput":  ""
+}

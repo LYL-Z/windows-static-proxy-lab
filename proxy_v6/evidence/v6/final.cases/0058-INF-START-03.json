@@ -1,0 +1,17 @@
+{
+    "id":  "INF-START-03",
+    "requirement":  "LIFE-01",
+    "precondition":  "nothing listening",
+    "injectedFault":  "timeout",
+    "expected":  "false after one launch",
+    "actual":  "timeout returned false after one launch",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  1678,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T07:02:34.938-08:00",
+    "finishedAt":  "2026-11-18T07:02:36.616-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0058-INF-START-03.json",
+    "testOutput":  ""
+}

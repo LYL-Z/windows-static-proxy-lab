@@ -1,0 +1,17 @@
+{
+    "id":  "F10-02",
+    "requirement":  "F10",
+    "precondition":  "restore ok; start and log fail",
+    "injectedFault":  "start throws; log throws",
+    "expected":  "returns 40 without throwing",
+    "actual":  "F10-02: returned 40",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 2",
+    "durationMs":  699,
+    "assertions":  2,
+    "startedAt":  "2026-11-18T07:02:00.903-08:00",
+    "finishedAt":  "2026-11-18T07:02:01.627-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0013-F10-02.json",
+    "testOutput":  ""
+}

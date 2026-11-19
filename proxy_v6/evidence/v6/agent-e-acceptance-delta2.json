@@ -1,0 +1,129 @@
+{
+  "schema": "agent-e-final-acceptance-delta2/v1",
+  "generatedAt": "2026-11-18T14:36:32.122Z",
+  "reviewer": "final-acceptance (Agent E)",
+  "exactTarget": {
+    "codeCommit": "79198fd1046f08e17ca9ca819a464ca7a7a19921",
+    "evidenceCommit": "32d8abc",
+    "finalJsonHead": "79198fd1046f08e17ca9ca819a464ca7a7a19921",
+    "finalJsonDirty": false,
+    "selfTestHead": "79198fd1046f08e17ca9ca819a464ca7a7a19921",
+    "docsCommit": "103f707",
+    "gitleaksAllowlistCommit": "dbbd259d0f73e7465f07e6b925a55c897d2109e1",
+    "repoHeadAtReport": "dbbd259d0f73e7465f07e6b925a55c897d2109e1",
+    "origin": "dbbd259d0f73e7465f07e6b925a55c897d2109e1",
+    "worktreeClean": true
+  },
+  "independentRuns": {
+    "tombstoneStaticPassWithSameNamedFile": {
+      "exitCode": 11,
+      "settingsWritten": false,
+      "message": "-StaticPass was removed; use -CredentialFile <protected file>"
+    },
+    "tombstoneStaticPassFile": {
+      "exitCode": 11,
+      "settingsWritten": false,
+      "message": "-StaticPassFile was removed; use -CredentialFile <protected file>"
+    },
+    "credentialFileHardened": {
+      "exitCode": 10,
+      "settingsWritten": true,
+      "note": "then fails at missing appdata paths, expected"
+    },
+    "infApplyInit": {
+      "head": "dbbd259d0f73e7465f07e6b925a55c897d2109e1",
+      "dirty": false,
+      "counts": {
+        "registered": 3,
+        "executed": 3,
+        "passed": 3,
+        "failed": 0,
+        "skipped": 0,
+        "available": 97
+      },
+      "exitCode": 0
+    },
+    "infF12": {
+      "head": "dbbd259d0f73e7465f07e6b925a55c897d2109e1",
+      "dirty": false,
+      "counts": {
+        "registered": 3,
+        "executed": 3,
+        "passed": 3,
+        "failed": 0,
+        "skipped": 0,
+        "available": 97
+      },
+      "exitCode": 0
+    },
+    "selfTest": {
+      "head": "dbbd259d0f73e7465f07e6b925a55c897d2109e1",
+      "dirty": false,
+      "counts": {
+        "selected": 7,
+        "checks": 7,
+        "passed": 7,
+        "failed": 0
+      },
+      "exitCode": 0
+    },
+    "f12MissingSettings": {
+      "state": "FAILED",
+      "uiSystemProxy": "enabled",
+      "reasons": [
+        "UI reports system proxy enabled, actual HKCU is disabled",
+        "settings invalid: settings.json missing"
+      ],
+      "note": "not DEGRADED, not HEALTHY"
+    },
+    "gitleaks": {
+      "dirFindings": 0,
+      "gitHistoryFindings": 0,
+      "allowlistScope": "proxy_v6/tests/cases/fixtures/Run-InfraCase.ps1 + abcdef123456 only"
+    }
+  },
+  "committedEvidence": {
+    "finalJson": {
+      "head": "79198fd1046f08e17ca9ca819a464ca7a7a19921",
+      "dirty": false,
+      "cases": 97,
+      "passed": 97,
+      "skipped": 0,
+      "zeroAssertions": 0,
+      "sumAssertions": 133,
+      "perCaseFiles": 97,
+      "missingEvidenceFiles": 0
+    },
+    "selfTest": {
+      "head": "79198fd1046f08e17ca9ca819a464ca7a7a19921",
+      "dirty": false,
+      "checks": 7,
+      "passed": 7,
+      "exitCode": 0
+    }
+  },
+  "deltaConfirmations": {
+    "c02Closed": true,
+    "c02PrefixFalsePositiveGone": true,
+    "c02Residual": "LOW: old spelling typed by user still appears in command line/history before rejection; tool rejects and does not store; new docs use -CredentialFile",
+    "f12Correct": true,
+    "f12CurrentProduction": "settings missing -> FAILED + UI mismatch reason (not DEGRADED, not HEALTHY)",
+    "f12Residual": "LOW: quoted enable_system_proxy remains unknown (reporting fail-open, no false HEALTHY)",
+    "newHigh": false
+  },
+  "remainingResiduals": [
+    "C-01 plaintext snapshots and C-12 PII require user acceptance/decision",
+    "R3-01 legacy proxy_diag/proxy_v2/proxy_v3 direct HKCU writes remain OPEN MED",
+    "R3-02 compensation only in-process; not cross-process atomic; no failure test",
+    "C-04 inheritance-flag residual; R2A-06 journal commit phase OPEN",
+    "Gate/ISSUE-LEDGER/TASK-STATE still stale (Gate 10 FAIL/F11 PENDING/old HEAD)"
+  ],
+  "deltaVerdict": "SHORT_RUN_ACCEPTED_CONDITIONAL",
+  "conditions": [
+    "C-01/C-12 user written acceptance",
+    "Update Gate/ISSUE-LEDGER/TASK-STATE to 79198fd/32d8abc/dbbd259, C-02 closed, F11 round3 confirmed, 97/97",
+    "R3-01/R3-02/C-04/R2A-06 fix or accept/disclose",
+    "Real production apply/rollback/boot/24h/72h remain deferred; no production claim"
+  ],
+  "boundary": "No real apply/rollback/state; no HKCU/system proxy/Clash/appdata/network/task/credential modifications by Agent E; no module install."
+}

@@ -1,0 +1,17 @@
+{
+    "id":  "F07-06",
+    "requirement":  "F07",
+    "precondition":  "second write fails",
+    "injectedFault":  "restore and log fail",
+    "expected":  "exit 40 without throw",
+    "actual":  "F07-06: reported 40 without throwing",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 2",
+    "durationMs":  794,
+    "assertions":  2,
+    "startedAt":  "2026-11-18T07:02:11.189-08:00",
+    "finishedAt":  "2026-11-18T07:02:11.983-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0027-F07-06.json",
+    "testOutput":  ""
+}

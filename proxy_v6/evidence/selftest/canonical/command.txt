@@ -1,0 +1,8 @@
+powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "D:\claude防封\publish\proxy_v6\tests\self\SelfTest.ps1" -OutDir "D:\claude防封\publish\proxy_v6\evidence\selftest\canonical"
+EXIT=0
+
+powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "D:\claude防封\publish\proxy_v6\tests\Run-Tests.ps1" -OutFile "C:\Users\Lenovo\AppData\Local\Temp\v6-empty-0b53c9081fa8404096efb15cc6724fea\evidence.json" -EvidenceDir "C:\Users\Lenovo\AppData\Local\Temp\v6-empty-0b53c9081fa8404096efb15cc6724fea\cases"
+EXIT=2
+
+powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "D:\claude防封\publish\proxy_v6\tests\self\SelfTest.ps1" -OutDir "D:\claude防封\publish\proxy_v6\evidence\selftest\canonical"
+EXIT=0

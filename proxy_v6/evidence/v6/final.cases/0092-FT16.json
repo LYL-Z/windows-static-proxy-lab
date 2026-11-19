@@ -1,0 +1,17 @@
+{
+    "id":  "FT16",
+    "requirement":  "F11",
+    "precondition":  "test mode + mock registry writer",
+    "injectedFault":  "attempt to write ProxyServer=x",
+    "expected":  "x only in mock; real HKCU unchanged",
+    "actual":  "x was written only to the mock registry; real HKCU unchanged",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  905,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T07:03:33.224-08:00",
+    "finishedAt":  "2026-11-18T07:03:34.130-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0092-FT16.json",
+    "testOutput":  ""
+}

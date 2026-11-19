@@ -1,0 +1,293 @@
+{
+  "schema": 1,
+  "tool": "proxy_v6/reviews/ROUND2-TRANSACTION-REVIEW.md",
+  "reviewer": "round2-transaction",
+  "target": {
+    "repo": "D:\\claude防封\\publish",
+    "branch": "v5/short-run-hardening",
+    "commit": "abe0eaa4b29f9d40b8157420d96fa09013d165da",
+    "baseline": "36222c92c829a2ef08b71af2a3a3ff9a3c44b396"
+  },
+  "isolation": {
+    "tempOnly": true,
+    "v4TestMode": true,
+    "realApplyRollbackState": false,
+    "systemProxy": false,
+    "clashProcesses": false,
+    "registry": false,
+    "network": false
+  },
+  "suite": {
+    "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File proxy_v6\\tests\\Run-Tests.ps1 -OutFile %TEMP%\\r2-full-20261118-052936.json",
+    "runId": "c65ff255edf94d948715a1be04a7a375",
+    "gitHead": "abe0eaa4b29f9d40b8157420d96fa09013d165da",
+    "dirty": true,
+    "dirtyReason": "concurrent modifications of proxy_v6/evidence/v6 by another agent (no proxy_v4 change)",
+    "counts": {
+      "registered": 75,
+      "executed": 75,
+      "passed": 75,
+      "failed": 0,
+      "skipped": 0
+    },
+    "exitCode": 0,
+    "zeroAssertionCases": 75
+  },
+  "committedEvidence": {
+    "path": "proxy_v6/evidence/v6/full.json",
+    "gitHead": "36222c92c829a2ef08b71af2a3a3ff9a3c44b396",
+    "dirty": true,
+    "counts": {
+      "registered": 75,
+      "executed": 75,
+      "passed": 75,
+      "failed": 0,
+      "skipped": 0
+    },
+    "zeroAssertionCases": 75,
+    "note": "green evidence inside abe0eaa is anchored to 36222c9 + dirty worktree; cannot serve as commit-anchored acceptance evidence"
+  },
+  "probes": {
+    "productionWiringTransaction": {
+      "path": "%TEMP%\\r2probe.ps1",
+      "mode": "V4_TEST_MODE=1; real Invoke-V4ApplyTransaction/New-V4Snapshot/Restore-V4Snapshot/Set-V4Atomic/Write-V4Journal; 4 system delegates stubbed",
+      "total": 9,
+      "passed": 9,
+      "cases": [
+        {
+          "id": "P1-success",
+          "pass": true,
+          "note": "journal cleared; files+proxy+owner written; app started"
+        },
+        {
+          "id": "P2-third-write-fails",
+          "pass": true,
+          "note": "all three files rolled back; proxy+owner restored; app restarted; journal cleared; exit=1"
+        },
+        {
+          "id": "P3-restore-double-failure",
+          "pass": true,
+          "note": "exit 40; journal retained; proxy restored; app start attempted"
+        },
+        {
+          "id": "P3b-snapshot-failure-real",
+          "pass": true,
+          "note": "no journal; no orphan snapshot dir; files untouched; app reconciled"
+        },
+        {
+          "id": "P4-empty-manifest-restore",
+          "pass": true,
+          "note": "zero-entry manifest accepted as successful restore (R2A-03)"
+        },
+        {
+          "id": "P5-replace-preserves-acl",
+          "pass": true,
+          "note": "File.Replace keeps hardened ACL; new-file Move does not"
+        },
+        {
+          "id": "P5b-restore-recreated-acl",
+          "pass": true,
+          "note": "restored credential file is not hardened (R2A-04)"
+        },
+        {
+          "id": "P6-lock-live-holder-not-stolen",
+          "pass": true,
+          "note": "live holder protected; wrong token ignored"
+        },
+        {
+          "id": "P7-journal-blocks-apply-file",
+          "pass": true,
+          "note": "journal roundtrip + WhatIf"
+        }
+      ]
+    },
+    "rollbackScript": {
+      "path": "%TEMP%\\r2probeB.ps1",
+      "mode": "real rollback-v4.ps1 child processes with V4_TEST_MODE=1; V4_TEST_ROOT=%TEMP%",
+      "total": 4,
+      "passed": 4,
+      "cases": [
+        {
+          "id": "B1-no-snapshot-triggers-app-start",
+          "pass": true,
+          "note": "exit 40; failure path attempts a real Start-V4Clash (R2A-01)"
+        },
+        {
+          "id": "B2-lock-busy-reports-40-and-starts-app",
+          "pass": true,
+          "note": "waits 20s; exit 40 (no 33); still attempts real Start-V4Clash (R2A-01)"
+        },
+        {
+          "id": "B3-restore-with-empty-manifest-claims-success",
+          "pass": true,
+          "note": "R2A-03"
+        },
+        {
+          "id": "B4-restore-drops-acl-on-recreated-file",
+          "pass": true,
+          "note": "R2A-04; inherited ACL identities redacted"
+        }
+      ]
+    },
+    "mutations": [
+      {
+        "id": "MUT-F10-recovery-always-claims-success",
+        "target": "proxy_v4/lib/V4.ps1 copy in %TEMP%",
+        "change": "Invoke-V4Recovery: return $Code unconditionally",
+        "suite": "Repro-F10.ps1",
+        "passed": 4,
+        "total": 10,
+        "verdict": "falsifiable"
+      },
+      {
+        "id": "MUT-F07-disable-recovery",
+        "target": "copy",
+        "change": "if ($snap -or $applied -or ($null -ne $wasRunning)) -> if ($false)",
+        "suite": "Repro-F07.ps1",
+        "passed": 6,
+        "total": 15,
+        "verdict": "falsifiable; F07-09 stays green (R2A-09)"
+      },
+      {
+        "id": "MUT-F07-no-proxy-restore-no-journal-clear",
+        "target": "copy",
+        "change": "if ($beforeProxy) -> if ($false); success journal clear -> if ($false)",
+        "suite": "Repro-F07.ps1",
+        "passed": 13,
+        "total": 15,
+        "failed": [
+          "F07-10",
+          "F07-12"
+        ],
+        "note": "F07-05 stays green -> vacuous (R2A-09)"
+      },
+      {
+        "id": "MUT-F08-block-end",
+        "target": "copy",
+        "change": "profile block end detection disabled",
+        "suite": "Repro-F08.ps1",
+        "passed": 5,
+        "total": 10,
+        "verdict": "falsifiable"
+      }
+    ],
+    "envIsolationLab": {
+      "method": "copy proxy_v4/{apply-v4.ps1,lib/V4.ps1} to %TEMP%\\lab, clear V4_TEST_MODE/ROOT/APPDATA, run apply",
+      "result": "exit 11; creates <lab>\\proxy_v4\\config and evidence\\apply-*.log",
+      "finding": "real-script test cases are isolated only by inherited env (R2A-08)"
+    }
+  },
+  "findings": [
+    {
+      "id": "R2A-01",
+      "severity": "HIGH",
+      "title": "rollback failure path starts Clash without the lock; lock-busy exits 40",
+      "introducedBy": "V6",
+      "status": "open"
+    },
+    {
+      "id": "R2A-02",
+      "severity": "MED",
+      "title": "rollback hardcodes mixed port 7897",
+      "introducedBy": "baseline",
+      "status": "open"
+    },
+    {
+      "id": "R2A-03",
+      "severity": "MED",
+      "title": "empty/partial snapshot manifest accepted as success; journal cleared",
+      "introducedBy": "V6 (residual)",
+      "status": "open"
+    },
+    {
+      "id": "R2A-04",
+      "severity": "MED",
+      "title": "restore does not re-harden ACL of re-created credential files",
+      "introducedBy": "baseline",
+      "status": "open"
+    },
+    {
+      "id": "R2A-05",
+      "severity": "MED",
+      "title": "profiles.yaml read-before-stop ordering regression",
+      "introducedBy": "V6",
+      "status": "open"
+    },
+    {
+      "id": "R2A-06",
+      "severity": "MED",
+      "title": "journal has no commit phase; clear failure drives a rollback of a good state",
+      "introducedBy": "V6 (residual)",
+      "status": "open"
+    },
+    {
+      "id": "R2A-07",
+      "severity": "MED",
+      "title": "green evidence anchored to 36222c9+dirty; assertions=0 for all cases; child evidence deleted",
+      "introducedBy": "V6",
+      "status": "open"
+    },
+    {
+      "id": "R2A-08",
+      "severity": "MED",
+      "title": "real-script cases isolated only via inherited environment",
+      "introducedBy": "V6",
+      "status": "open"
+    },
+    {
+      "id": "R2A-09",
+      "severity": "MED",
+      "title": "F07-05 / F07-09 are not falsifiable for their claimed behaviour",
+      "introducedBy": "V6 (test quality)",
+      "status": "open"
+    },
+    {
+      "id": "R2A-10",
+      "severity": "LOW",
+      "title": "lock is path-based; read-check-delete TOCTOU/ABA remains",
+      "status": "open"
+    },
+    {
+      "id": "R2A-11",
+      "severity": "LOW",
+      "title": "null processStart + reused PID => unreclaimable lock (permanent 33)",
+      "status": "open"
+    },
+    {
+      "id": "R2A-12",
+      "severity": "LOW",
+      "title": "manifest without systemProxy makes rollback clear the user proxy",
+      "status": "open"
+    },
+    {
+      "id": "R2A-13",
+      "severity": "LOW",
+      "title": "Set-V4Atomic leaves .v4stage/.bak (plaintext credential) after hard kill; no startup sweep",
+      "status": "open"
+    },
+    {
+      "id": "R2A-14",
+      "severity": "LOW",
+      "title": "DryRun runs mihomo -t against the live appdata",
+      "status": "open"
+    },
+    {
+      "id": "R2A-15",
+      "severity": "LOW",
+      "title": "recovery treats a missing proxy/owner delegate as restored",
+      "status": "open"
+    }
+  ],
+  "verdict": {
+    "F07": "main path closed (residual R2A-05/R2A-06/R2A-09)",
+    "F08": "closed",
+    "F09": "closed (residual: Init overwrite not reversible; isolation R2A-08)",
+    "F10": "closed (residual: rollback catch overwrites 41->40; R2A-15)",
+    "counts": {
+      "high": 1,
+      "med": 8,
+      "low": 6
+    },
+    "acceptance": "not accepted without reservation; fix R2A-01/R2A-03/R2A-04/R2A-05 and re-anchor evidence before round 3"
+  }
+}

@@ -1,0 +1,17 @@
+{
+    "id":  "F07-07",
+    "requirement":  "F07",
+    "precondition":  "second write fails",
+    "injectedFault":  "restore fails",
+    "expected":  "app reconciliation still attempted",
+    "actual":  "F07-07: start attempted",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 2",
+    "durationMs":  803,
+    "assertions":  2,
+    "startedAt":  "2026-11-18T07:02:11.989-08:00",
+    "finishedAt":  "2026-11-18T07:02:12.793-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0028-F07-07.json",
+    "testOutput":  ""
+}

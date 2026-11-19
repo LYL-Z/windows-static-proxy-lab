@@ -1,0 +1,145 @@
+{
+  "schema": "agent-e-final-acceptance/v1",
+  "generatedAt": "2026-11-18T13:36:32.527Z",
+  "reviewer": "final-acceptance (Agent E)",
+  "target": {
+    "commit": "abe0eaa4b29f9d40b8157420d96fa09013d165da",
+    "branch": "v5/short-run-hardening",
+    "worktreeDirty": true,
+    "originBranchStillAt": "36222c92c829a2ef08b71af2a3a3ff9a3c44b396",
+    "note": "dirty=true is caused by concurrent deletion of tracked evidence files, not uncommitted production source; test code read from the abe0eaa worktree"
+  },
+  "independentFullRun": {
+    "runId": "889c8faf96754f8c9db9e4ad82bfde57",
+    "startedAt": "2026-11-18T05:28:08.991-08:00",
+    "finishedAt": "2026-11-18T05:29:25.447-08:00",
+    "durationMs": 76260,
+    "exitCode": 0,
+    "outcome": "PASS",
+    "counts": {
+      "registered": 75,
+      "executed": 75,
+      "passed": 75,
+      "failed": 0,
+      "skipped": 0,
+      "available": 75
+    },
+    "harnessErrors": 0,
+    "evidenceErrors": 0,
+    "requirements": {
+      "F08": 10,
+      "F09": 6,
+      "F10": 10,
+      "F07": 15,
+      "SEC-02": 2,
+      "LOG-01": 1,
+      "LOG-02": 1,
+      "S07": 1,
+      "P4": 1,
+      "SEC-03": 2,
+      "SEC-01": 1,
+      "PARAM-05": 1,
+      "PARAM-04": 1,
+      "LOCK-04": 2,
+      "LOCK-02": 1,
+      "LOCK-05": 1,
+      "LIFE-05": 1,
+      "LIFE-02": 1,
+      "LIFE-01": 1,
+      "LIFE-03": 1,
+      "LIFE-08": 1,
+      "TX-11": 2,
+      "DATA-04": 2,
+      "TX-08": 1,
+      "TX-02": 2,
+      "TX-06": 1,
+      "PARAM-01": 1,
+      "PARAM-06": 1,
+      "PARAM-07": 1,
+      "LIFE-04": 1,
+      "TX-05": 1,
+      "DATA-02": 1
+    },
+    "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File proxy_v6\\tests\\Run-Tests.ps1 -Filter '*' -OutFile %TEMP%\\e-final-full.json"
+  },
+  "harnessSelfTest": {
+    "canonical": {
+      "checks": 7,
+      "passed": 7,
+      "exitCode": 0,
+      "outcome": "SELFTEST_PASS"
+    },
+    "negativeControls": [
+      {
+        "case": "filter META-99",
+        "expectedExit": 2,
+        "actualExit": 2
+      },
+      {
+        "case": "InjectCheckFailure META-01",
+        "expectedExit": 1,
+        "actualExit": 1
+      },
+      {
+        "case": "InjectHarnessError",
+        "expectedExit": 3,
+        "actualExit": 3
+      },
+      {
+        "case": "OutDir blocked by file",
+        "expectedExit": 4,
+        "actualExit": 4
+      }
+    ]
+  },
+  "zeroTestFilter": {
+    "filter": "NO-SUCH-TEST-*",
+    "expectedExit": 2,
+    "actualExit": 2,
+    "available": 75,
+    "registered": 0,
+    "executed": 0
+  },
+  "secretScan": {
+    "tool": "gitleaks 8.30.1",
+    "gitHistoryFindings": 0,
+    "worktreeFindings": 0,
+    "redacted": true
+  },
+  "committedEvidenceAtTarget": {
+    "fullJsonHead": "36222c9",
+    "dirty": true,
+    "fullJsonCases": 75,
+    "selftestHead": "36222c9"
+  },
+  "uncommittedHeadEvidence": {
+    "file": "proxy_v6/evidence/v6/final.json",
+    "head": "abe0eaa",
+    "dirty": true,
+    "cases": 75,
+    "passed": 75,
+    "skipped": 0
+  },
+  "findings": {
+    "openHigh": [
+      "C-02: -StaticPass command-line password + SECURITY-AUDIT overclaim (apply-v4.ps1:19; SECURITY-AUDIT-V4.md:7)"
+    ],
+    "partialGates": [
+      1,
+      5
+    ],
+    "unprovenGates": [
+      10
+    ],
+    "blockers": [
+      "B1 round2 reviews pending",
+      "B2 gate/ledger/matrix/task-state stale at target commit",
+      "B3 evidence provenance + dirty worktree + unpushed commit",
+      "B4 rollback-v4.ps1 has zero isolated tests",
+      "B5 C-02 open; C-01 plaintext snapshot residual user sign-off",
+      "B6 production proxy incident unresolved (see proxy_v6/INCIDENT-2026-11-18.md)"
+    ]
+  },
+  "verdict": "NOT_READY",
+  "boundary": "No real apply/rollback/state; no HKCU/system proxy/Clash/appdata/registry/network/task/credential modifications by Agent E; no module install."
+}

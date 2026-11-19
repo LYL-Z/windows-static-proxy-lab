@@ -1,0 +1,14 @@
+
+== V6 TEST HARNESS 6.0.0 ==
+Run ID: 7a968ac141044f6c874be040477179e1
+Git HEAD: 36222c92c829a2ef08b71af2a3a3ff9a3c44b396
+Git branch: v5/short-run-hardening
+Filter: *
+--------------------------------------------------------------
+[PASS] FIX-SKIP-PASS (META-05) 8ms
+[SKIP] FIX-SKIP-ONE (META-05) 0ms
+       skipped at registration: fixture registration skip: dependency not present
+--------------------------------------------------------------
+Counts: registered=2 executed=1 passed=1 failed=0 skipped=1 available=2
+Evidence: C:\Users\Lenovo\AppData\Local\Temp\v6-tests\v6-selftest-20261118-050628-121-6078b2a5\META-05-mixed\evidence.json
+RESULT: PASS EXIT 0
