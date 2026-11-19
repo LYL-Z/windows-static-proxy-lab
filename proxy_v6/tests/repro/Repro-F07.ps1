@@ -284,6 +284,28 @@ Check 'F07-15' 'journal write failure aborts before the first live write' {
     'exit 34 before first write'
 }
 
+Check 'F07-17' 'post-start proxy drift makes recovery incomplete' {
+    foreach ($drift in @(
+        @{ enabled = $false; server = 'old:8080' },
+        @{ enabled = $true; server = 'other:8081' }
+    )) {
+        Reset-Case @{ failAt = 2 }
+        $ctx = New-Context
+        $ctx.Ops.StartApp = {
+            param($timeout, $port)
+            $started = Op-StartApp $timeout $port
+            $global:St.proxyEnabled = $drift.enabled
+            $global:St.proxyServer = $drift.server
+            return $started
+        }.GetNewClosure()
+        $res = Invoke-V4ApplyTransaction -Context $ctx
+        AssertTrue ($global:St.startCalls -eq 1) 'did not exercise the recovery start'
+        AssertTrue ($res.exitCode -eq 40 -and -not $res.restored -and $global:St.journal) (
+            'drift incorrectly accepted: exit={0} restored={1} journal={2}' -f $res.exitCode, $res.restored, $global:St.journal)
+    }
+    'recovery detected enabled and server drift after startup, retained the journal and reported exit 40'
+}
+
 $passed = @($script:Results | Where-Object { $_.pass }).Count
 if ($OutFile) {
     $payload = [ordered]@{ ts = (Get-Date).ToString('s'); only = $Only; passed = $passed; total = $script:Results.Count; cases = @($script:Results) }

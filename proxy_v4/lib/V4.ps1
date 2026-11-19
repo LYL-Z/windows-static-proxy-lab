@@ -121,6 +121,7 @@ function Invoke-V4Recovery {
         [scriptblock]$StopApp,
         [scriptblock]$Restore,
         [scriptblock]$RestoreProxy,
+        [scriptblock]$VerifyProxy,
         [scriptblock]$RestoreOwner,
         [scriptblock]$StartApp,
         [scriptblock]$Log
@@ -164,6 +165,11 @@ function Invoke-V4Recovery {
                 }
             }
             catch { $processOk = $false; Write-V4RecoveryNote $Log ('recovery process step failed: ' + $_.Exception.Message) 'ERROR' }
+        }
+        if ($VerifyProxy) {
+            try { $proxyOk = [bool](& $VerifyProxy) -and $proxyOk }
+            catch { $proxyOk = $false }
+            if (-not $proxyOk) { Write-V4RecoveryNote $Log 'recovery: Windows proxy did not retain its previous state after the process step' 'ERROR' }
         }
         if ($restoreOk -and $processOk -and $proxyOk) { return $Code }
         return 40
@@ -274,12 +280,14 @@ function Invoke-V4ApplyTransaction {
         if ($Context.Redact) { try { $msg = & $Context.Redact $msg } catch { } }
         if ($snap -or $applied -or ($null -ne $wasRunning)) {
             $restoreProxy = $null
+            $verifyProxy = $null
             if ($beforeProxy) {
                 $bp = $beforeProxy
                 $restoreProxy = {
                     if ($bp.enabled) { & $ops.SetSystemProxy $bp.server }
                     elseif ($ops.ClearSystemProxy) { & $ops.ClearSystemProxy }
                 }
+                $verifyProxy = { Test-V4SystemProxyMatch -Expected $bp -Actual (& $ops.GetSystemProxy) }
             }
             $recoverStart = { & $ops.StartApp 30 $Context.Settings.mixedPort }
             $recoverStop = { & $ops.StopApp $Context.Settings.mixedPort }
@@ -288,7 +296,7 @@ function Invoke-V4ApplyTransaction {
                 $ob = $ownerBefore
                 $recoverOwner = { & $ops.RestoreOwner $ob }
             }
-            $recoverCode = Invoke-V4Recovery -SnapshotDir $snap -Code $code -AppWasRunning $wasRunning -StopApp $recoverStop -Restore $ops.Restore -RestoreProxy $restoreProxy -RestoreOwner $recoverOwner -StartApp $recoverStart -Log $ops.Log
+            $recoverCode = Invoke-V4Recovery -SnapshotDir $snap -Code $code -AppWasRunning $wasRunning -StopApp $recoverStop -Restore $ops.Restore -RestoreProxy $restoreProxy -VerifyProxy $verifyProxy -RestoreOwner $recoverOwner -StartApp $recoverStart -Log $ops.Log
             $code = $recoverCode
             if ($journalWritten -and $code -ne 40 -and $ops.ClearJournal) {
                 try { if (-not (& $ops.ClearJournal)) { Write-V4RecoveryNote $ops.Log 'recovery succeeded but the journal could not be cleared' 'WARN' } }
@@ -609,6 +617,33 @@ function Get-V4ProcessStartToken {
     catch { return $null }
 }
 
+function Remove-V4StaleLock {
+    param([AllowNull()][string]$Observed)
+    # Serialize stale-file removal. The lock file itself is still acquired
+    # with CreateNew, so live owners and legacy lock files remain recognized.
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try {
+        $pathBytes = [Text.Encoding]::UTF8.GetBytes([IO.Path]::GetFullPath($script:LockPath).ToUpperInvariant())
+        $name = 'Global\V4LockReap-' + [BitConverter]::ToString($sha.ComputeHash($pathBytes)).Replace('-','')
+    }
+    finally { $sha.Dispose() }
+    $mutex = $null
+    $ownsMutex = $false
+    try {
+        $mutex = [Threading.Mutex]::new($false, $name)
+        try { $ownsMutex = $mutex.WaitOne(0) }
+        catch [Threading.AbandonedMutexException] { $ownsMutex = $true }
+        if ($ownsMutex -and (Read-V4File $script:LockPath) -ceq $Observed) {
+            Remove-Item -LiteralPath $script:LockPath -Force -ErrorAction Stop
+        }
+    }
+    catch { }  # A busy or unreadable lock is never reaped.
+    finally {
+        if ($ownsMutex) { $mutex.ReleaseMutex() }
+        if ($mutex) { $mutex.Dispose() }
+    }
+}
+
 function Enter-V4Lock {
     param([int]$TimeoutSec = 20)
     Ensure-V4Dir $script:ConfigDir
@@ -633,7 +668,8 @@ function Enter-V4Lock {
             return [pscustomobject]@{ token = $token; path = $script:LockPath; pid = $PID }
         }
         catch {
-            $txt = Read-V4File $script:LockPath
+            try { $txt = Read-V4File $script:LockPath }
+            catch { Start-Sleep -Milliseconds 400; continue }
             $stale = $false
             if (-not $txt -or -not $txt.Trim()) {
                 try {
@@ -647,7 +683,10 @@ function Enter-V4Lock {
                     if ($j.pid -and $j.token) {
                         $proc = Get-Process -Id ([int]$j.pid) -ErrorAction SilentlyContinue
                         if (-not $proc) { $stale = $true }
-                        elseif ($j.processStart -and (Get-V4ProcessStartToken -ProcessId ([int]$j.pid)) -ne $j.processStart) { $stale = $true }
+                        elseif ($j.processStart) {
+                            $seenStart = Get-V4ProcessStartToken -ProcessId ([int]$j.pid)
+                            if ($seenStart -and $seenStart -ne $j.processStart) { $stale = $true }
+                        }
                     }
                     else { $stale = $true }
                 }
@@ -664,8 +703,7 @@ function Enter-V4Lock {
                 }
             }
             if ($stale) {
-                $again = Read-V4File $script:LockPath
-                if ($again -eq $txt) { Remove-Item -LiteralPath $script:LockPath -Force -ErrorAction SilentlyContinue }
+                Remove-V4StaleLock -Observed $txt
                 if (-not (Test-Path -LiteralPath $script:LockPath)) { continue }
             }
             Start-Sleep -Milliseconds 400
@@ -750,7 +788,10 @@ function Start-V4ClashCore {
     $deadline = (Get-Date).AddSeconds($TimeoutSec)
     while ((Get-Date) -lt $deadline) {
         & $Sleep 600
-        if (& $IsListening) { & $Sleep 2000; return $true }
+        if (& $IsListening) {
+            & $Sleep 2000
+            if (& $IsListening) { return $true }
+        }
     }
     return $false
 }
@@ -767,7 +808,23 @@ function Start-V4Clash {
     $p = Get-V4Paths
     if (-not $p.Exe) { throw 'clash-verge.exe not found' }
     $exe = $p.Exe
-    return Start-V4ClashCore -TimeoutSec $TimeoutSec -Port $Port -IsListening { Test-V4Port -Port $Port } -IsRunning { (Get-V4AppPids).Count -gt 0 } -Launch { Start-Process -FilePath $exe | Out-Null } -Sleep { param($ms) Start-Sleep -Milliseconds $ms }
+    return Start-V4ClashCore -TimeoutSec $TimeoutSec -Port $Port -IsListening { Test-V4ClashListener -Port $Port -ExpectedCore $p.Core } -IsRunning { (Get-V4AppPids).Count -gt 0 } -Launch { Start-Process -FilePath $exe | Out-Null } -Sleep { param($ms) Start-Sleep -Milliseconds $ms }
+}
+
+function Test-V4ClashListener {
+    param([int]$Port, [string]$ExpectedCore)
+    if (-not $ExpectedCore) { return $false }
+    $listeners = @(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue)
+    $onLoopback = @($listeners | Where-Object LocalAddress -in @('127.0.0.1','0.0.0.0'))
+    if (-not $onLoopback) { $onLoopback = @($listeners | Where-Object LocalAddress -eq '::') }
+    $expectedName = [IO.Path]::GetFileNameWithoutExtension($ExpectedCore)
+    foreach ($listener in $onLoopback) {
+        $process = Get-Process -Id $listener.OwningProcess -ErrorAction SilentlyContinue
+        if ($process.ProcessName -eq $expectedName -and (-not $process.Path -or $process.Path -eq $ExpectedCore)) {
+            return (Test-V4Port -Port $Port)
+        }
+    }
+    return $false
 }
 
 # ------------------------------------------------------------------- snapshot --
@@ -910,10 +967,10 @@ function Restore-V4Files {
     foreach ($e in $v.entries) {
         $target = Get-V4SnapshotTarget -Name $e.name -AppData $AppData -ProfilesDir $ProfilesDir
         try {
-            $content = [System.IO.File]::ReadAllText((Join-Path $SnapshotDir $e.name), [System.Text.Encoding]::UTF8)
+            $content = [System.IO.File]::ReadAllBytes((Join-Path $SnapshotDir $e.name))
             $expected = $e.sha256
             $validator = ({ param($f) if ((Get-FileHash -LiteralPath $f -Algorithm SHA256).Hash.ToLowerInvariant() -ne $expected.ToLowerInvariant()) { throw 'restored hash mismatch' } }).GetNewClosure()
-            Set-V4Atomic -TargetPath $target -Content $content -Validator $validator | Out-Null
+            Set-V4Atomic -TargetPath $target -Bytes $content -Validator $validator | Out-Null
             if (-not (Protect-V4Acl -Path $target)) { throw 'restored file ACL could not be hardened' }
             $restored += $e.name
         }
@@ -946,13 +1003,14 @@ function Restore-V4Snapshot {
 
 # ---------------------------------------------------------------- atomic write --
 function Set-V4Atomic {
-    param([string]$TargetPath, [string]$Content, [scriptblock]$Validator)
+    param([string]$TargetPath, [string]$Content, [scriptblock]$Validator, [byte[]]$Bytes)
     $dir = Split-Path -Parent $TargetPath
     Ensure-V4Dir $dir
     $tmp = Join-Path $dir ('.v4stage-' + [guid]::NewGuid().ToString('N').Substring(0,10) + '.tmp')
     $bak = '{0}.{1}.bak' -f $TargetPath, [guid]::NewGuid().ToString('N').Substring(0,10)
     try {
-        Write-V4File -Path $tmp -Content $Content
+        if ($PSBoundParameters.ContainsKey('Bytes')) { [IO.File]::WriteAllBytes($tmp, $Bytes) }
+        else { Write-V4File -Path $tmp -Content $Content }
         if ($Validator) { & $Validator $tmp }
         if (Test-Path -LiteralPath $TargetPath) {
             [System.IO.File]::Replace($tmp, $TargetPath, $bak, $true)
@@ -1000,6 +1058,12 @@ function Get-V4SystemProxy {
     $k = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings'
     $v = Get-ItemProperty -LiteralPath $k -ErrorAction Stop
     return [pscustomobject]@{ enabled = [bool]$v.ProxyEnable; server = $v.ProxyServer }
+}
+
+function Test-V4SystemProxyMatch {
+    param($Expected, $Actual)
+    if ($null -eq $Expected -or $null -eq $Actual -or [bool]$Expected.enabled -ne [bool]$Actual.enabled) { return $false }
+    return (-not $Expected.enabled -or $Expected.server -eq $Actual.server)
 }
 
 function Write-V4SystemProxyRegistry {
@@ -1446,7 +1510,7 @@ function Get-V4StateCore {
     $out = [ordered]@{
         ts = (Get-Date).ToString('s')
         state = 'UNKNOWN'; mode = 'UNKNOWN'; reasons = @()
-        clashRunning = (@($AppPids).Count -gt 0)
+        clashRunning = (@($AppPids | Where-Object { $_ -gt 0 }).Count -gt 0)
         mixedPort = [bool]$MixedPortOpen
         systemProxy = $(if ($null -eq $SystemProxy) { 'unknown' } elseif ($SystemProxy.enabled) { Get-V4Redacted $SystemProxy.server } else { 'off' })
         owner = $(if ($Owner) { $Owner.owner } else { 'none' })
@@ -1534,7 +1598,7 @@ function Get-V4State {
     $mixed = $false
     $hop = $null
     if ($s) {
-        $mixed = Test-V4Port -Port $s.mixedPort
+        $mixed = Test-V4ClashListener -Port $s.mixedPort -ExpectedCore $p.Core
         $hop = Test-V4FirstHop -Port $s.hopPort
     }
     $exitProbe = { param($proxy) Get-V4ExitIp -Proxy $proxy -TimeoutSec 5 }

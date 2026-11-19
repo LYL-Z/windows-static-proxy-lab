@@ -307,6 +307,37 @@ try {
             }
             $script:Actual = 'loopback TCP, complete fragmented status, malformed line and timeout classified independently'
         }
+        'INF-START-04' {
+            $global:ReadyPolls = 0
+            $global:LaunchCount = 0
+            $ok = Start-V4ClashCore -TimeoutSec 1 -Port 1 -IsRunning { $true } -Launch { $global:LaunchCount++ } -Sleep { param($ms) Start-Sleep -Milliseconds 2 } -IsListening {
+                $global:ReadyPolls++
+                return ($global:ReadyPolls -eq 2)
+            }
+            Assert-Infra (-not $ok -and $global:ReadyPolls -ge 3 -and $global:LaunchCount -eq 0) ('transient listener accepted or duplicate process launched: ready=' + $ok + ', polls=' + $global:ReadyPolls + ', launches=' + $global:LaunchCount)
+            $script:Actual = 'transient listener was rejected after the settle recheck without a duplicate launch'
+        }
+        'INF-START-05' {
+            $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0)
+            $listener.Start()
+            try {
+                $port = $listener.LocalEndpoint.Port
+                $owner = (Get-Process -Id $PID -ErrorAction Stop).Path
+                $other = Join-Path $env:WINDIR 'System32\cmd.exe'
+                Assert-Infra (-not (Test-V4ClashListener -Port $port -ExpectedCore $other)) 'another owned socket was identified as the expected core'
+                Assert-Infra (Test-V4ClashListener -Port $port -ExpectedCore $owner) 'listener using the expected executable was not identified'
+            }
+            finally { $listener.Stop() }
+            $script:Actual = 'real loopback socket was matched to the expected owning executable'
+        }
+        'INF-STATE-CORE-02' {
+            $settings = [pscustomobject]@{ host='203.0.113.10'; mixedPort=7897; hopPort=11119 }
+            $proxy = [pscustomobject]@{ enabled=$true; server='127.0.0.1:7897' }
+            $hop = [pscustomobject]@{ ok=$true; detail='200' }
+            $r = Get-V4StateCore -Settings $settings -Owner $null -SystemProxy $proxy -AppPids $null -MixedPortOpen $true -FirstHop $hop -GetExitIp { throw 'unexpected probe without Clash PID' } -UiSystemProxy $true
+            Assert-Infra (-not $r.clashRunning -and $r.mode -eq 'RAW' -and $r.chainStatus -eq 'NOT_PROBED') 'null process result was not classified as absent'
+            $script:Actual = 'state reports no Clash PID and declines to probe an unrelated listener'
+        }
         'INF-REPAIR-GUARD-01' {
             $app = New-TestAppData
             $core = Join-Path $root 'fake-core.cmd'
@@ -721,16 +752,19 @@ try {
             Write-V4Journal -SnapshotDir $fx.snap -Reason 'rollback-test'
             Put-Text (Join-Path $fx.app 'profiles.yaml') 'changed-live'
             Put-Text (Join-Path $fx.app 'clash-verge.yaml') 'changed-runtime'
+            $newer = Join-Path $script:BackupDir 'newer-fallback'
+            $null = New-V4SnapshotFiles -AppData $fx.app -ProfilesDir (Join-Path $fx.app 'profiles') -Dir $newer -SystemProxy $null -ClashRunningBefore $false -Reason 'test newer fallback'
+            Assert-Infra ((Get-Sha (Join-Path $newer 'profiles.yaml')) -ne $expected) 'fallback fixture unexpectedly matches journal'
             $env:V4_TEST_APPDATA = $fx.app
             try {
                 $rollback = Join-Path $repo 'proxy_v4\rollback-v4.ps1'
-                $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $rollback -SnapshotDir $fx.snap -KeepSystemProxy 2>&1
+                $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $rollback -KeepSystemProxy 2>&1
                 $c = $LASTEXITCODE
                 Assert-Infra ($c -eq 0) ('rollback exit=' + $c + ' out=' + (($out | Select-Object -Last 5) -join ' | '))
                 Assert-Infra ((Get-Sha (Join-Path $fx.app 'profiles.yaml')) -eq $expected) 'rollback did not restore profiles.yaml'
                 Assert-Infra ($null -eq (Get-V4Journal)) 'rollback did not clear the journal'
                 Assert-Infra (-not (Test-Path -LiteralPath (Join-Path $root 'config\.lock'))) 'rollback left the lock behind'
-                $script:Actual = 'real rollback script restored files, cleared journal and lock'
+                $script:Actual = 'default rollback selected the journal snapshot over the newer valid fallback, restored files and cleared journal and lock'
             }
             finally { Remove-Item Env:V4_TEST_APPDATA -ErrorAction SilentlyContinue }
         }
@@ -795,6 +829,66 @@ try {
                 Remove-Item Env:V4_TEST_START_LOG -ErrorAction SilentlyContinue
             }
         }
+        { $_ -in @('INF-ROLLBACK-05', 'INF-ROLLBACK-06', 'INF-ROLLBACK-07') } {
+            $fx = New-SnapshotFixture
+            Write-V4Journal -SnapshotDir $fx.snap -Reason 'rollback-test'
+            Put-Text (Join-Path $fx.app 'profiles.yaml') 'changed-live'
+            $env:V4_TEST_APPDATA = $fx.app
+            $env:V4_FIXTURE_START_FAILURE = if ($Case -eq 'INF-ROLLBACK-05') { '1' } else { '0' }
+            $keep = $Case -eq 'INF-ROLLBACK-07'
+            $env:V4_TEST_PROXY_ENABLE = '1'
+            $env:V4_TEST_PROXY_SERVER = 'old:8080'
+            $env:V4_FIXTURE_PROXY_WRITE_LOG = Join-Path $root 'proxy-write.log'
+            $rollback = Join-Path $root 'rollback-v4.ps1'
+            Copy-Item -LiteralPath (Join-Path $repo 'proxy_v4\rollback-v4.ps1') -Destination $rollback
+            $stubs = @'
+if (-not $script:TestMode) { throw 'rollback fixture requires V4_TEST_MODE' }
+Set-V4TestRegistryWriter {
+    param($enabled, $server)
+    Add-Content -LiteralPath $env:V4_FIXTURE_PROXY_WRITE_LOG -Value 'write'
+    $env:V4_TEST_PROXY_ENABLE = if ($enabled) { '1' } else { '0' }
+    $env:V4_TEST_PROXY_SERVER = $server
+}
+function Start-V4Clash {
+    param($TimeoutSec, $Port)
+    if ($env:V4_FIXTURE_START_FAILURE -eq '1') { return $false }
+    $env:V4_TEST_PROXY_ENABLE = '0'
+    return $true
+}
+'@
+            Add-Content -LiteralPath (Join-Path $root 'lib\V4.ps1') -Value ($LF + $stubs)
+            try {
+                $savedPreference = $ErrorActionPreference
+                $ErrorActionPreference = 'Continue'
+                $argsForRollback = @('-SnapshotDir', $fx.snap)
+                if ($keep) { $argsForRollback += '-KeepSystemProxy' }
+                try { $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $rollback @argsForRollback 2>&1 }
+                finally { $ErrorActionPreference = $savedPreference }
+                $code = $LASTEXITCODE
+                $expected = if ($env:V4_FIXTURE_START_FAILURE -eq '1') { 40 } else { 41 }
+                $journalRetained = $null -ne (Get-V4Journal)
+                Assert-Infra ($code -eq $expected -and $journalRetained) (
+                    'rollback exit={0}, expected={1}, journal retained={2}, out={3}' -f $code, $expected, $journalRetained, (($out | Select-Object -Last 4) -join ' | '))
+                Assert-Infra ((Get-Sha (Join-Path $fx.app 'profiles.yaml')) -eq (Get-Sha (Join-Path $fx.snap 'profiles.yaml'))) 'rollback did not restore profiles.yaml'
+                Assert-Infra (-not (Test-Path -LiteralPath (Join-Path $root 'config\.lock'))) 'rollback left the lock behind'
+                if ($keep) { Assert-Infra (-not (Test-Path -LiteralPath $env:V4_FIXTURE_PROXY_WRITE_LOG)) '-KeepSystemProxy unexpectedly performed a proxy write' }
+                $script:Actual = 'real rollback script reported incomplete recovery, retained the journal and released the lock'
+            }
+            finally { Remove-Item Env:V4_TEST_APPDATA,Env:V4_FIXTURE_START_FAILURE,Env:V4_FIXTURE_PROXY_WRITE_LOG,Env:V4_TEST_PROXY_ENABLE,Env:V4_TEST_PROXY_SERVER -ErrorAction SilentlyContinue }
+        }
+        'INF-SNAP-09' {
+            $app = New-TestAppData
+            $target = Join-Path $app 'profiles.yaml'
+            $encoding = [Text.UTF8Encoding]::new($true)
+            [IO.File]::WriteAllText($target, (Get-Text $target), $encoding)
+            $initialSha = Get-Sha $target
+            $snap = Join-Path $root 'bom-snapshot'
+            $null = New-V4SnapshotFiles -AppData $app -ProfilesDir (Join-Path $app 'profiles') -Dir $snap -SystemProxy $null -ClashRunningBefore $false
+            Put-Text $target 'modified'
+            $restored = Restore-V4Files -SnapshotDir $snap -AppData $app -ProfilesDir (Join-Path $app 'profiles')
+            Assert-Infra ($restored.ok -and (Get-Sha $target) -eq $initialSha) ('snapshot bytes changed when restored: ' + (($restored.failures | ForEach-Object { $_.error }) -join ', '))
+            $script:Actual = 'UTF-8 BOM snapshot restored with exact SHA-256'
+        }
         'INF-LOCK-05' {
             Ensure-V4Dir (Join-Path $root 'config')
             $lp = Join-Path $root 'config\.lock'
@@ -804,6 +898,60 @@ try {
             Assert-Infra ($null -ne $l) 'zero-byte stale lock was never reclaimed'
             Assert-Infra (Exit-V4Lock $l) 'lock release failed'
             $script:Actual = 'zero-byte stale lock reclaimed after the grace period'
+        }
+        'INF-LOCK-06' {
+            Ensure-V4Dir (Join-Path $root 'config')
+            $lp = Join-Path $root 'config\.lock'
+            $held = [IO.File]::Open($lp, 'CreateNew', 'Write', 'None')
+            try {
+                $timer = [Diagnostics.Stopwatch]::StartNew()
+                $l = Enter-V4Lock -TimeoutSec 1
+                Assert-Infra ($null -eq $l) 'lock acquired while an exclusive file handle was held'
+                Assert-Infra ($timer.Elapsed.TotalSeconds -lt 4) 'sharing violation exceeded the bounded wait'
+                Assert-Infra (Test-Path -LiteralPath $lp) 'loser removed the held lock'
+            }
+            finally { $held.Dispose() }
+            $script:Actual = 'exclusive lock creation was treated as bounded lock contention'
+        }
+        'INF-LOCK-07' {
+            Ensure-V4Dir (Join-Path $root 'config')
+            $lp = Join-Path $root 'config\.lock'
+            Put-Text $lp ''
+            (Get-Item -LiteralPath $lp).LastWriteTime = (Get-Date).AddSeconds(-10)
+            $sha = [Security.Cryptography.SHA256]::Create()
+            try {
+                $pathBytes = [Text.Encoding]::UTF8.GetBytes($lp.ToUpperInvariant())
+                $name = 'Global\V4LockReap-' + [BitConverter]::ToString($sha.ComputeHash($pathBytes)).Replace('-','')
+            }
+            finally { $sha.Dispose() }
+            $mutex = New-Object Threading.Mutex($false, $name)
+            $ownsMutex = $false
+            try {
+                $ownsMutex = $mutex.WaitOne(0)
+                Assert-Infra $ownsMutex 'could not hold the synthetic reaper mutex'
+                $child = @'
+if ($env:V4_TEST_MODE -ne '1') { exit 3 }
+. (Join-Path $env:V4_TEST_ROOT 'lib\V4.ps1')
+$lock = Enter-V4Lock -TimeoutSec 1
+if ($lock) {
+    $null = Exit-V4Lock $lock
+    exit 2
+}
+exit 0
+'@
+                $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($child))
+                & powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand $encoded
+                $rc = $LASTEXITCODE
+                Assert-Infra ($rc -eq 0 -and (Test-Path -LiteralPath $lp)) (
+                    'second process ignored the reaping mutex: exit=' + $rc)
+            }
+            finally {
+                if ($ownsMutex) { $mutex.ReleaseMutex() }
+                $mutex.Dispose()
+            }
+            $lock = Enter-V4Lock -TimeoutSec 2
+            Assert-Infra ($null -ne $lock -and (Exit-V4Lock $lock)) 'released reaper did not allow normal stale lock recovery'
+            $script:Actual = 'second process respected stale removal serialization; released reaper allowed reacquisition'
         }
         'INF-JOURNAL-01' {
             $snap = Join-Path $root 'journal-snap'
