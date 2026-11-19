@@ -26,6 +26,7 @@ function ConvertFrom-ProxyDoctorCurlResult {
                 default { 'transport_stage_unknown' }
             }
         }
+        default { $null }
     }
     $code = if ($null -ne $origin) { $origin.ToString('000') } else { $null }
     return [ordered]@{ status=$status; code=$code; connectCode=$connect; curlExit=$ExitCode; failureStage=$failureStage }

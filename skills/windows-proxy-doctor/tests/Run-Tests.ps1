@@ -133,6 +133,35 @@ try {
             [Environment]::SetEnvironmentVariable('NO_PROXY', $previous, 'Process')
         }
     }
+    Check 'lifecycle-debounce-and-recovery-are-read-only' {
+        $ready = @{ts='2026-01-01T00:00:00Z';source='fixture';uiEnabled=$true;proxyEnabled=$true
+            proxyServer='127.0.0.1:7897';proxyTargetsMixedPort=$true;pacConfigured=$false;coreRunning=$true
+            mixedPortOpen=$true;mixedIPv4CoreOwned=$true;firstHopOpen=$true;healthProbe=@{status='ok'}}
+        $timeout = $ready.Clone(); $timeout.healthProbe = @{status='transport_error';failureStage='timeout_stage_unknown'}
+        $hopDown = $ready.Clone(); $hopDown.firstHopOpen = $false; $hopDown.healthProbe = $null
+        $drift = $ready.Clone(); $drift.proxyServer = '127.0.0.1:11119'; $drift.proxyTargetsMixedPort = $false
+        $otherProxy = $drift.Clone(); $otherProxy.uiEnabled = $false
+        $appDown = $ready.Clone(); $appDown.applicationProbe = @{status='http_error';code='503'}
+        $fixturePath = Join-Path $tmp 'lifecycle.json'
+        ConvertTo-Json -InputObject @($ready,$ready,$timeout,$ready,$hopDown,$hopDown,$appDown,$appDown,$drift,$drift,$otherProxy,$otherProxy,$ready,$ready) -Depth 5 |
+            Set-Content -LiteralPath $fixturePath
+        $monitor = Join-Path $root 'scripts\Watch-ProxyLifecycle.ps1'
+        $records = @(& $monitor -FirstHopPort 11119 -TestFixture $fixturePath -Json | ForEach-Object { ConvertFrom-Json $_ })
+        Assert-True ($records.Count -eq 14) 'monitor did not terminate after the fixture length'
+        Assert-True ($records[2].level -eq 'sample' -and $records[2].confirmed -eq 'HTTPS_PROBE_OK') 'one timeout caused an alert'
+        Assert-True ($records[5].transition.to -eq 'FIRST_HOP_LISTENER_MISSING' -and $records[7].transition.to -eq 'APPLICATION_PROBE_FAILED') 'listener return was treated as application recovery'
+        Assert-True ($records[8].proxyChange.actor -eq 'unknown' -and $records[8].proxyChange.before.server -eq '127.0.0.1:7897' -and $records[9].level -eq 'warning') 'proxy drift evidence or alert missing'
+        Assert-True ($records[11].confirmed -eq 'OTHER_PROXY_SELECTED' -and $records[11].level -eq 'info') 'alternative proxy selection elicited a repair warning'
+        Assert-True ($records[13].transition.to -eq 'HTTPS_PROBE_OK') 'repeated successful measurements did not confirm recovery'
+    }
+    Check 'unavailable-listener-data-remains-unknown' {
+        $snapshot = Get-Content -LiteralPath (Join-Path $testDir 'fixtures\state-healthy.json') -Raw | ConvertFrom-Json
+        $snapshot.mixedPortOpen = $null
+        $path = Join-Path $tmp 'unavailable-listener.json'
+        $snapshot | ConvertTo-Json | Set-Content -LiteralPath $path
+        $result = & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'scripts\Test-ProxyConsistency.ps1') -SnapshotFile $path -Json
+        Assert-True ($LASTEXITCODE -eq 3 -and $null -eq ($result | ConvertFrom-Json).consistent) 'unavailable listener state was promoted to a known result'
+    }
     Check 'backup-roundtrip' {
         $src = Join-Path $tmp 'backup'; New-Item -ItemType Directory -Path (Join-Path $src 'snap') -Force | Out-Null
         Set-Content (Join-Path $src 'snap\manifest.json') '{"schema":2,"files":[]}' -Encoding UTF8

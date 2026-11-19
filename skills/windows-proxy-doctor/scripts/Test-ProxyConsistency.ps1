@@ -14,11 +14,15 @@ if ($null -ne $s.proxyEnabled -and $null -ne $s.uiEnabled -and [bool]$s.proxyEna
 $target = if ($s.PSObject.Properties['proxyTargetsMixedPort']) { $s.proxyTargetsMixedPort }
     else { Test-ProxyDoctorTarget -Server $s.proxyServer -Port $s.mixedPort }
 if ([bool]$s.proxyEnabled -and $target -eq $false) { $issues.Add('Windows manual HTTP(S) proxy points away from the expected mixed port') }
-if ([bool]$s.proxyEnabled -and -not [bool]$s.mixedPortOpen) { $issues.Add('system proxy is on but mixed port is closed') }
-if (-not [bool]$s.processRunning) { $issues.Add('proxy client process is not running') }
-if ([bool]$s.mixedPortOpen -and -not [bool]$s.processRunning) { $issues.Add('mixed port is open but no known proxy process') }
-if ([bool]$s.proxyEnabled -and -not [bool]$s.firstHopOpen) { $issues.Add('system proxy is on but first hop is closed') }
-$verified = ($null -ne $s.proxyEnabled -and $null -ne $s.uiEnabled -and -not $s.pacConfigured -and (-not [bool]$s.proxyEnabled -or $null -ne $target))
+if ($s.proxyEnabled -eq $true -and $s.mixedPortOpen -eq $false) { $issues.Add('system proxy is on but mixed port is closed') }
+if ($s.processRunning -eq $false) { $issues.Add('proxy client process is not running') }
+if ($s.proxyEnabled -eq $true -and $s.mixedPortOpen -eq $true -and $s.mixedIPv4CoreOwned -eq $false) { $issues.Add('the expected core does not own an IPv4 listener on the mixed port') }
+if ($s.proxyEnabled -eq $true -and $s.firstHopOpen -eq $false) { $issues.Add('system proxy is on but first hop is closed') }
+$firstHopMeasured = $s.firstHopPort -eq 0 -or $null -ne $s.firstHopOpen
+$coreMeasured = -not $s.PSObject.Properties['mixedIPv4CoreOwned'] -or $null -ne $s.mixedIPv4CoreOwned
+$verified = ($null -ne $s.proxyEnabled -and $null -ne $s.uiEnabled -and -not $s.pacConfigured -and
+    $null -ne $s.processRunning -and $null -ne $s.mixedPortOpen -and $coreMeasured -and
+    ($s.proxyEnabled -eq $false -or ($null -ne $target -and $firstHopMeasured)))
 $consistent = if ($issues.Count -gt 0) { $false } elseif ($verified) { $true } else { $null }
 $out = [ordered]@{ consistent = $consistent; issues = @($issues); state = [string]$s.state }
 if ($Json) { $out | ConvertTo-Json -Depth 4 } else { Write-Host ('CONSISTENT=' + $consistent); $issues | ForEach-Object { Write-Host ('  - ' + $_) } }

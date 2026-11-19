@@ -3,7 +3,7 @@ name: windows-proxy-doctor
 description: Read-only Windows network and proxy diagnostics for state mismatches, competing proxy clients, TCP/DNS/UDP path differences, transactional backup/rollback design, test isolation, credentials, and startup lifecycle.
 license: MIT
 metadata:
-  version: "1.5.0"
+  version: "1.6.0"
   platforms: "Windows 10/11 PowerShell 5.1+"
 ---
 
@@ -43,6 +43,7 @@ Read-only. Do not modify HKCU, WinHTTP, adapters, routes, TUN, DNS, firewall, De
 | Script | Purpose |
 |---|---|
 | scripts/Get-ProxyDoctorSnapshot.ps1 | Read-only snapshot and opt-in registry event lookup. It reports UNKNOWN when the local settings agree and the HTTPS exit is unmeasured. Use -TestFixture for isolated tests. |
+| scripts/Watch-ProxyLifecycle.ps1 | Bounded foreground observation of client, socket, and proxy setting changes. Optional HTTPS and existing registry-event evidence. Two equal samples confirm a lifecycle state. |
 | scripts/Test-ProxyConsistency.ps1 | Compare saved UI, Windows manual HTTP(S) target, and local socket/process facts. Exit 3 indicates insufficient evidence to establish consistency. |
 | scripts/Test-NetworkPath.ps1 | HTTP(S) and Windows DNS samples. For paired SOCKS5 probes, use `-IPv4` with `socks5://` to resolve locally and compare with `socks5h://` for proxy resolution on the same listener. Reports CONNECT and origin HTTP status, and a failure stage when curl exposes it. |
 | scripts/Protect-Backup.ps1 | DPAPI-encrypt a backup zip; -Apply required. |
