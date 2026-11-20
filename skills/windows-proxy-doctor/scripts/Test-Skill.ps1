@@ -8,7 +8,9 @@ param([switch]$Json)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $issues = New-Object System.Collections.Generic.List[string]
-$required = @('SKILL.md','README.md','SECURITY.md','scripts','references','tests','examples')
+$required = @('SKILL.md','README.md','SECURITY.md','CHANGELOG.md','LICENSE','examples',
+    'scripts/Start-ProxyDoctor.ps1','scripts/Get-ProxyDoctorEnvironment.ps1','scripts/Test-ProxyDoctorInstaller.ps1',
+    'tests/Run-Tests.ps1','tests/Run-OnboardingTests.ps1','templates/onboarding-checkpoint.json')
 foreach ($r in $required) { if (-not (Test-Path -LiteralPath (Join-Path $root $r))) { $issues.Add('missing ' + $r) } }
 $skill = Join-Path $root 'SKILL.md'
 if (Test-Path $skill) {
@@ -25,6 +27,12 @@ if (Test-Path $skill) { $refs += [regex]::Matches((Get-Content $skill -Raw), 're
 foreach ($r in ($refs | Select-Object -Unique)) { if (-not (Test-Path -LiteralPath (Join-Path $root ('references/' + $r)))) { $issues.Add('broken reference: ' + $r) } }
 $scan = Get-ChildItem -LiteralPath $root -Recurse -File | Where-Object { $_.FullName -notmatch '\\.git\\' }
 foreach ($f in $scan) {
+    if ($f.Extension -eq '.ps1') {
+        $tokens = $null
+        $parseErrors = $null
+        $null = [System.Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$tokens, [ref]$parseErrors)
+        if ($parseErrors.Count) { $issues.Add('PowerShell parse error in ' + $f.Name) }
+    }
     $txt = Get-Content -LiteralPath $f.FullName -Raw -ErrorAction SilentlyContinue
     if (-not $txt) { continue }
     if ($txt -match '(?i)(password|passwd|secret|token)\s*[:=]\s*["''][^"'']{6,}') { $issues.Add('possible secret in ' + $f.Name) }

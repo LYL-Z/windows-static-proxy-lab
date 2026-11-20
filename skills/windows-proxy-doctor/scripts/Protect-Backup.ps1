@@ -17,26 +17,63 @@ if (-not $Apply) {
     Write-Host 'Re-run with -Apply. No files changed.'
     exit 0
 }
-if (Test-Path -LiteralPath $OutFile) { Write-Error 'output already exists; refusing overwrite'; exit 3 }
-Add-Type -AssemblyName System.Security
-$tmp = Join-Path ([System.IO.Path]::GetTempPath()) ('wpdoctor-' + [guid]::NewGuid().ToString('N') + '.zip')
-try {
-    Compress-Archive -Path (Join-Path $Path '*') -DestinationPath $tmp -CompressionLevel Optimal
-    $zipHash = (Get-FileHash -LiteralPath $tmp -Algorithm SHA256).Hash
-    $bytes = [System.IO.File]::ReadAllBytes($tmp)
-    $enc = [System.Security.Cryptography.ProtectedData]::Protect($bytes, $null, [System.Security.Cryptography.DataProtectionScope]::CurrentUser)
-    [System.IO.File]::WriteAllBytes($OutFile, $enc)
-    $manifest = [ordered]@{
-        schema = 1
-        ts = (Get-Date).ToString('o')
-        source = (Resolve-Path -LiteralPath $Path).Path
-        zipSha256 = $zipHash
-        encryptedSha256 = (Get-FileHash -LiteralPath $OutFile -Algorithm SHA256).Hash
-        scope = 'CurrentUser-DPAPI'
-        note = 'Plaintext originals are not deleted.'
-    }
-    [System.IO.File]::WriteAllText(($OutFile + '.json'), ($manifest | ConvertTo-Json -Depth 4), (New-Object System.Text.UTF8Encoding($false)))
-    Write-Host ('ENCRYPTED ' + $OutFile + ' zipSha256=' + $zipHash)
-    exit 0
+if ((Test-Path -LiteralPath $OutFile) -or (Test-Path -LiteralPath ($OutFile + '.json'))) {
+    throw 'backup output or manifest already exists; choose a new name'
 }
-finally { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }
+Add-Type -AssemblyName System.Security, System.IO.Compression, System.IO.Compression.FileSystem
+$source = [IO.DirectoryInfo]::new((Get-Item -LiteralPath $Path).FullName)
+$destination = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($OutFile)
+$sidecar = $destination + '.json'
+
+function Add-BackupEntries($Directory, $Archive, [string]$Prefix) {
+    if ($Directory.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'backup input contains a linked directory' }
+    foreach ($item in $Directory.EnumerateFileSystemInfos()) {
+        if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) { throw 'backup input contains a linked item' }
+        $name = $Prefix + $item.Name
+        if ($item -is [IO.DirectoryInfo]) {
+            [void]$Archive.CreateEntry($name + '/')
+            Add-BackupEntries $item $Archive ($name + '/')
+        } else {
+            [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile($Archive, $item.FullName, $name, [IO.Compression.CompressionLevel]::Optimal)
+        }
+    }
+}
+
+$memory = [IO.MemoryStream]::new()
+try {
+    $archive = [IO.Compression.ZipArchive]::new($memory, [IO.Compression.ZipArchiveMode]::Create, $true)
+    try { Add-BackupEntries $source $archive '' } finally { $archive.Dispose() }
+    $bytes = $memory.ToArray()
+} finally { $memory.Dispose() }
+$enc = [Security.Cryptography.ProtectedData]::Protect($bytes, $null, [Security.Cryptography.DataProtectionScope]::CurrentUser)
+$sha = [Security.Cryptography.SHA256]::Create()
+try {
+    $zipHash = [BitConverter]::ToString($sha.ComputeHash($bytes)).Replace('-', '')
+    $encryptedHash = [BitConverter]::ToString($sha.ComputeHash($enc)).Replace('-', '')
+} finally { $sha.Dispose() }
+$manifest = [ordered]@{
+    schema = 1; ts = (Get-Date).ToString('o'); zipSha256 = $zipHash
+    encryptedSha256 = $encryptedHash; scope = 'CurrentUser-DPAPI'
+}
+$metadata = [Text.Encoding]::UTF8.GetBytes(($manifest | ConvertTo-Json -Depth 3))
+$archiveFile = $null
+$manifestFile = $null
+try {
+    try {
+        $archiveFile = [IO.File]::Open($destination, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+        $manifestFile = [IO.File]::Open($sidecar, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+        $archiveFile.Write($enc, 0, $enc.Length)
+        $archiveFile.Flush()
+        $manifestFile.Write($metadata, 0, $metadata.Length)
+        $manifestFile.Flush()
+    } finally {
+        try { if ($manifestFile) { $manifestFile.Dispose() } }
+        finally { if ($archiveFile) { $archiveFile.Dispose() } }
+    }
+} catch {
+    if ($manifestFile) { Remove-Item -LiteralPath $sidecar -Force -ErrorAction SilentlyContinue }
+    if ($archiveFile) { Remove-Item -LiteralPath $destination -Force -ErrorAction SilentlyContinue }
+    throw
+}
+Write-Host ('ENCRYPTED zipSha256=' + $zipHash)
+exit 0

@@ -1,74 +1,36 @@
 ---
 name: windows-proxy-doctor
-description: Read-only Windows network and proxy diagnostics for state mismatches, competing proxy clients, TCP/DNS/UDP path differences, transactional backup/rollback design, test isolation, credentials, and startup lifecycle.
+description: Guide Windows users through proxy software discovery, first-time setup, scoped authorization, connectivity diagnosis, and recovery. Use for installation readiness, mismatched proxy settings, competing clients, no traffic, port conflicts, or reconnect and routing problems.
 license: MIT
 metadata:
-  version: "1.6.1"
-  platforms: "Windows 10/11 PowerShell 5.1+"
+  version: "2.0.0"
+  release-channel: "release-candidate"
 ---
 
 # Windows Proxy Doctor
 
-## When to use
+Designed for Windows 10 and 11 with Windows PowerShell 5.1 or a later PowerShell host. A compatible agent can run local PowerShell or guide the user manually.
 
-Use this skill when the user reports any of:
+## Start here
 
-- Browser works but a proxy client shows no traffic, or the reverse.
-- Windows proxy / WinHTTP / Clash / StarSky / UI states disagree.
-- A proxy change caused a network outage, or recovery is unclear.
-- A backup, transaction, rollback, or test-isolation plan needs review.
-- Startup, sleep, Wi-Fi reconnect, DNS, TCP, or UDP path behavior is suspect.
+1. Respond in the user's language. Ask whether they want help getting started or fixing a problem only if their request leaves the goal unclear. Start the safe local inventory immediately if you have a Windows shell.
+2. Run `scripts/Start-ProxyDoctor.ps1 -Goal Auto -Json` with the user's current permissions. Use `Setup` for onboarding and `Diagnose` for an existing setup or fault. Check the actual availability of shell, desktop and browser tools before offering assistance. Use manual page and button instructions when the relevant tool is unavailable.
+3. Give the user the current step, the result in plain language, and the next action. `UNKNOWN` means evidence was unavailable. A healthy socket confirms a listener. A successful HTTPS probe confirms the tested endpoint and path. Treat saved client settings, UI toggles, effective Windows settings and actual application access as separate evidence.
+4. If the user needs to act, use `templates/user-action-request.md`. Explain the change, scope, expected impact and rollback. Download, install, access privileges, start/stop and modify network settings only within fresh, action-specific permission. For a downloaded installer, run `scripts/Test-ProxyDoctorInstaller.ps1` with a digest or signing certificate thumbprint independently obtained from the official source. Keep account registration, payments, identity checks, and entry of credentials with the user. Continue inventory and diagnosis when the user declines a change.
+5. Before a scoped configuration change, record the verified starting state and recovery plan. Prefer native client controls. If multiple clients manage the same Windows settings, establish which client should own them and verify the others' listeners separately. On failure, follow the approved rollback and recheck the same path.
+6. To resume, load the explicit local checkpoint, re-run discovery, and verify any milestones the user reports. Reconfirm risky actions against the live state and current request. Label isolated tests, user observations, live observations and unknowns separately in the report.
 
-## Default posture
+The default guide reads local state. Keep active HTTPS/DNS probes explicit and scoped to the user's request. Keep authenticated account actions and secret values out of the diagnosis, command arguments, checkpoints and reports. Use the Skill for network setup and troubleshooting within the user's service terms and eligibility.
 
-Read-only. Do not modify HKCU, WinHTTP, adapters, routes, TUN, DNS, firewall, Defender, certificates, proxy client configs, or credentials. Any production write requires separate explicit user authorization. This skill does not provide platform-account evasion, identity spoofing, CAPTCHA optimization, or region/account restriction bypass.
+## Load only the relevant reference
 
-## Workflow
+| Task | Reference |
+| --- | --- |
+| First launch, installation choices and resuming | [Getting started](references/getting-started.md) |
+| Inventory, alternate installations and ambiguous results | [Environment discovery](references/environment-discovery.md) |
+| User decisions, trust checks, commercial disclosure and checkpoints | [User interaction](references/user-interaction.md) |
+| Symptom to evidence, recovery and verification | [Troubleshooting](references/troubleshooting.md) |
+| Startup, switching and observed lifecycle limits | [Lifecycle observations](references/lifecycle-observations.md) and [reliability gaps](references/reliability-gaps.md) |
+| Technical evidence and publication | [Architecture](references/architecture.md), [targeted findings](references/targeted-findings.md), [safety](references/safety.md), [V1–V6 lessons](references/v1-v6-lessons.md) |
 
-1. Record time, current-user manual proxy, PAC presence, listening processes, and saved Clash system-proxy intent. Collect WinHTTP separately with `netsh winhttp show proxy` when relevant. Share file hashes or redacted metadata instead of raw configuration.
-2. Separate layers: application/UI state, OS proxy, local listener, first hop, DNS, TCP, UDP/WebRTC, and actual exit path are different layers. Never collapse them into one healthy flag.
-   Compare the Windows manual HTTP(S) proxy target with the expected listener even when both toggles are on. Test the Windows-selected path and the explicit mixed-port path independently when a target differs.
-   For startup incidents, record when the listener, first-hop CONNECT and verified HTTPS path become ready. Use `-IncludeWriterEvidence` to query existing registry events when a writer is in question. A socket owner identifies the listener. A matching write event identifies the process recorded for the registry operation.
-   For SOCKS5 compatibility, compare client-resolved IPv4 and proxy-resolved domain CONNECT with certificate validation intact. For UDP, record the association reply and a separately verified datagram round trip. See references/targeted-findings.md.
-3. Classify:
-   - HEALTHY: actual OS proxy and UI agree, listener/process alive, required path probe passes.
-   - DEGRADED: local service works but routing/UI/one layer disagrees.
-   - FAILED: required proxy/listener/process is absent or path fails.
-   - UNKNOWN: insufficient evidence; do not guess.
-4. Report evidence, confidence, and what was not tested.
-5. When considering a manual recovery, verify saved proxy intent, the active managed profile and the expected HTTPS path. Resolve pending transactions and conflicting writers before requesting a change. Record an actual lifecycle run before claiming automatic recovery.
-   When two clients share Windows proxy settings, look for a native option that leaves one client as the settings owner while the other keeps its listener. Record each client's saved setting, listening process and protocol, Windows selection for the test URLs, and actual application results. Change one setting in an authorized window. Validate save, stop, restart, and exit separately. Record the original setting and verify the original path after any rollback.
-
-## Scripts
-
-| Script | Purpose |
-|---|---|
-| scripts/Get-ProxyDoctorSnapshot.ps1 | Read-only snapshot and opt-in registry event lookup. It reports UNKNOWN when the local settings agree and the HTTPS exit is unmeasured. Use -TestFixture for isolated tests. |
-| scripts/Watch-ProxyLifecycle.ps1 | Bounded foreground observation of client, socket, and proxy setting changes. Optional HTTPS and existing registry-event evidence. Two equal samples confirm a lifecycle state. |
-| scripts/Test-ProxyConsistency.ps1 | Compare saved UI, Windows manual HTTP(S) target, and local socket/process facts. Exit 3 indicates insufficient evidence to establish consistency. |
-| scripts/Test-NetworkPath.ps1 | HTTP(S) and Windows DNS samples. For paired SOCKS5 probes, use `-IPv4` with `socks5://` to resolve locally and compare with `socks5h://` for proxy resolution on the same listener. Reports CONNECT and origin HTTP status, and a failure stage when curl exposes it. |
-| scripts/Protect-Backup.ps1 | DPAPI-encrypt a backup zip; -Apply required. |
-| scripts/Unprotect-Backup.ps1 | Decrypt and verify; never overwrites. |
-| scripts/Test-Skill.ps1 | Validate format, references, fixtures, and secret hygiene. |
-
-Run from the skill directory:
-
-    powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\Get-ProxyDoctorSnapshot.ps1 -Json
-    powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\Run-Tests.ps1
-
-## References (load only when needed)
-
-- references/v1-v6-lessons.md: failures, wrong assumptions, corrections, and reusable rules from V1-V6.
-- references/architecture.md: layered model and state classification.
-- references/safety.md: authorization, backup, test isolation, credential/publication rules.
-- references/targeted-findings.md: GEOIP/CN rule diff, Baidu 502 attribution, SOCKS5 UDP ASSOCIATE result, WebRTC split-path explanation, candidate options.
-- references/reliability-gaps.md: StarSky/first-hop behavior, startup ordering, fail-closed coverage, TCP-only scope, manual Repair vs automatic recovery.
-- examples/: synthetic snapshots and commands.
-
-## Non-negotiable rules
-
-- Never use an isolated test as proof of production deployment.
-- Never use an exit IP or third-party score as proof of account/service eligibility.
-- Never store credentials in argv, shell history, logs, examples, or public files.
-- Never delete the only valid backup to clean up.
-- If evidence is missing, report UNKNOWN, not a guess.
+The [README](README.md) lists the existing diagnostics, watcher and backup commands. The [security guide](SECURITY.md) describes their operational boundaries.

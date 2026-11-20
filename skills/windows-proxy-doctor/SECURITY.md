@@ -2,17 +2,21 @@
 
 ## Default
 
-The default snapshot reads the current user's Internet Settings, process and listener metadata, and the saved Clash Verge system-proxy setting. `-IncludeWriterEvidence` reads existing event logs with the current shell's permissions. Output excludes raw registry values from events, full executable paths, and command lines. There is no extension, service, or driver to install with the Skill. `Test-NetworkPath.ps1` sends active HTTP(S) or DNS probes when requested. Backup protection and extraction write output files when explicitly invoked.
+The default guide and inventory read local state with current permissions. The snapshot reads the current user's Internet Settings, process and listener metadata, and the saved Clash Verge system-proxy setting. `-IncludeWriterEvidence` reads existing event logs. Reports omit raw event values, full executable paths and command lines. Active HTTPS or DNS probes are explicit. A checkpoint writes only to an explicitly selected local path. Backup protection and extraction also write files when invoked for that purpose. Stop foreground sampling with Ctrl+C.
 
 ## Production writes
 
-Any change to system proxy, WinHTTP, proxy client configs, routes, TUN, DNS, adapters, firewall, Defender, certificates, credentials, or startup entries requires separate explicit user authorization. The Skill must not perform such writes autonomously.
+Production changes to system proxy, WinHTTP, proxy client configs, routes, TUN, DNS, adapters, credentials or startup entries require separate, current authorization. The guide plans changes and records outcomes. An authorized operator uses native client controls or another user-approved implementation. A checkpoint or decision flag records workflow state and cannot authorize a change. Preserve firewall, Defender, SmartScreen and certificate protections.
+
+## Installers and services
+
+Use verified official sources. Check HTTPS through redirects, the expected publisher on a valid digital signature or the official SHA-256 for those exact bytes. Stop and review if provenance or integrity is uncertain. Ask for permission at the actual download or installation step. Users handle account registration, fees, identity verification and local credential entry. Neutral official entry points come first. Optional referral benefits and terms are disclosed before the user chooses a link. [Interaction details](references/user-interaction.md)
 
 ## Backups
 
-- Protect-Backup.ps1 creates a DPAPI CurrentUser encrypted copy. Plaintext originals and extracted files require restrictive ACLs, local storage, and a separate retention decision.
+- Protect-Backup.ps1 creates a DPAPI CurrentUser encrypted copy. Use a small, approved configuration snapshot and keep the output in a private local directory. The archive is built in memory and linked items are rejected. Plaintext originals and extracted files require restrictive ACLs and their own retention decision.
 - Unprotect-Backup.ps1 verifies the encrypted and decrypted hashes before creating the requested plaintext file. Use a private output directory. An interrupted write can leave a partial output at that path.
-- Protect-Backup.ps1 still creates a temporary plaintext ZIP during encryption. Normal cleanup removes it. If protection is interrupted, check the private Windows temporary directory for the residual `wpdoctor-*.zip` and verify the correct copy before any cleanup.
+- Keep the encrypted file and adjacent manifest together. The manifest holds hashes and scope, without the original source path. An interrupted write can leave an incomplete pair. Keep the last verified backup until the new pair has passed a private restore test.
 - Verify the SHA-256 of the zip before and after encryption/decryption.
 - Never delete the only valid backup.
 
