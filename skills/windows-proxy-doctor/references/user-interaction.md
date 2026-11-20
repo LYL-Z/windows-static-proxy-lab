@@ -1,0 +1,42 @@
+# 人工交接和权限
+
+在一步只需要用户做一件事时，按照 [用户操作请求模板](../templates/user-action-request.md)说明当前步骤、原因、按钮或文件、可能费用与权限、成功信号和回退方式。说明 Agent 具备什么工具，指出用户本人要完成的部分。把原先的只读发现结果保留下来，用户拒绝改动时继续适用范围内的检查。缺失必需的服务或权限时，明确当前配置或验收步骤为何尚无法执行。
+
+| 操作 | 所需信息和权限 |
+| --- | --- |
+| 默认本地发现和快照 | 直接运行。说明实际收集到哪些信息。 |
+| 浏览器或桌面辅助 | 先验证本会话工具存在。无工具时指导用户按可见控件操作。敏感输入、验证、账户条款和交易由用户完成。 |
+| 下载和安装 | 分别说明来源、兼容性、是否需要管理员和操作影响。得到对应许可后才下载。确认可信来源和完整性后，再请求实际运行安装包。保留 Windows 和浏览器的安全保护。 |
+| 代理、配置文件、路由、DNS、启动项或适配器 | 列出一个具体改动、当前值、预期结果、安全退出及回退。变更和可能的重启需各自明确授权。先保留已核验的回退点。 |
+| 现场验收和事件采集 | 选择普通、公开且经用户同意的测试地址。事件采集可读权限各异。访问追加审计或启用工具前，需要对应范围的授权。 |
+| 商业入口 | 优先提供普通官方入口和现有服务路径。只有用户主动选择邀请方式时，披露受益方、可能的奖励和条件，并提供对应入口。费用、套餐和退款向厂商核实。 [可选入口](providers.md) |
+
+## 建议的交互顺序
+
+先报告用户现在位于哪一步。观察到缺失或未知时说明对当前目标的影响。让用户决定使用现有软件、补充软件或跳过。配置方案中分别列出负责 Windows 代理的组件和提供本地连接的组件。只调整当前有证据且获得授权的一项，完成后检查有效设置、监听归属和应用结果。网络退化时按已授权的回退步骤恢复，然后使用原先相同的检查验证。
+
+## 将进度留在本地
+
+向导可在已存在的私人本地目录通过 `-CheckpointPath` 读写名为 `windows-proxy-doctor-checkpoint.json` 的检查点。省略参数时保持为单次运行。检查点描述已完成的步骤和后续操作，不是改动授权、网络配置备份或真实验收凭证。恢复时重新发现环境，验证用户报告的完成情况。不要把检查点放入公开项目、分享文件夹或浏览器上传表单。密码、Cookie、令牌、代理账号、配置正文和付款资料留在各自受控的位置。
+
+历史状态、用户口述和合成测试各自有适用范围。等待用户、可审核、核验中、需要回退、部分通过或未知，都可以在事实变化后重新判断。 [诊断报告模板](../templates/diagnostic-report.md) · [验收报告模板](../templates/acceptance-report.md)
+
+如果进度显示 `WRITE_FAILED`，当前会话可以继续核对。确认目标目录可写且文件未被占用后重试保存。受限 Agent 无法原子替换已有文件时，请选用经用户确认的私人可写位置，或由用户在正常 PowerShell 会话中运行向导。通过向导保存进度，原文件保留待核对。
+
+### Agent 的向导参数
+
+| 参数 | 何时使用 |
+| --- | --- |
+| `-Goal Auto`、`Setup` 或 `Diagnose` | `Auto` 优先接续原检查点。首次配置使用 `Setup`。可用 `Diagnose` 临时检查正在配置的环境，后续 `Auto` 仍接续首次配置。 |
+| `-NetworkStatus Unknown`、`Working` 或 `Broken` | 记录用户当前描述，仍需对相应应用核验。 |
+| `-Decision UseCurrentSoftware`、`InstallationDeclined` 或 `InstallationReported` | 用户选择使用现有软件、拒绝安装或报告安装完成时，记录该选择。 |
+| `-Decision UseExistingService` 或 `SkipService` | 用户选择使用已有服务或跳过服务准备时，记录该选择。 |
+| `-Decision ConfigurationDeclined`、`ChangeReported`、`RollbackRequested` 或 `RollbackReported` | 用户拒绝改动、报告改动、请求安排回退或报告回退后，继续审核或重新测量。用同一检查点按准备、报告变更、请求回退和报告回退的顺序记录。 |
+| `-BrowserTool`、`-DesktopTool` | 可填 `AVAILABLE`、`UNAVAILABLE` 或 `UNKNOWN`。以 Agent 已核对的会话能力为依据。 |
+| `-VerifyUrl` | 仅用一至两个经确认的公开 HTTPS 目标。地址应去除用户信息、查询参数和片段。该请求覆盖测得的 Windows 代理选择。 |
+| `-ApplicationObservation` | 根据本次实际应用测试填 `UserPassed`、`UserFailed`、`AgentPassed` 或 `AgentFailed`。默认 `NotTested`。 |
+| `-ConfigurationObservation` | 对照已约定的配置、监听及路径，基于本次实际核对填 `AgentMatched` 或 `AgentMismatch`。默认 `NotTested`。 |
+
+先检查工具和用户许可。`InstallationReported` 与 `RollbackReported` 分别记录人工操作后的陈述，随后应复核安装证据、已恢复的配置及应用访问。
+
+`DIAGNOSIS_COMPLETE` 表示只读本地检查完成。`HTTPS_REACHABLE` 来自该次探测。应用结果保留观察者。变更或回退后，仅当本地证据完整、HTTPS 与实际应用通过，且所见配置符合先前约定时，才显示 `CONFIGURATION_VERIFIED` 或 `ROLLBACK_VERIFIED`。这些状态仅覆盖当次已测范围。每次重新提交观察结果，检查点不会持久化这些结果。生命周期验收须观察相应事件。
