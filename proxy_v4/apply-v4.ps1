@@ -82,6 +82,7 @@ try {
 
     if ($Repair) {
         if ((Get-V4UiSystemProxy) -ne $true) { Fail 32 'saved Clash system proxy is disabled or unknown; review the intended mode before repair' }
+        if ((Get-V4AutomaticProxyStatus) -ne 'NOT_OBSERVED') { Fail 32 'automatic proxy is present or unverified; review Windows proxy selection before repair' }
         $integrity = Get-V4Integrity -Paths $p
         if (-not $integrity.markerOk -or -not $integrity.runtimeMarkerOk) {
             Fail 32 'managed profile or runtime marker could not be verified; review the active profile before repair'
@@ -98,19 +99,26 @@ try {
         $prev = Get-V4SystemProxy
         $prevVal = if ($prev.enabled) { $prev.server } else { 'off' }
         $target = '127.0.0.1:' + $s.mixedPort
+        if (-not (Test-V4ClashListener -Port $s.mixedPort -ExpectedCore $p.Core)) {
+            Fail 32 'expected IPv4 Clash core listener could not be verified; nothing changed'
+        }
         Write-V4Log ('repair: observed system proxy = {0}' -f $prevVal) -Level WARN
         $got = Get-V4ExitIp -Proxy ('http://' + $target) -TimeoutSec 5
         if ($got -ne $s.host) { Fail 31 'chain HTTPS exit did not match the configured static IPv4; nothing changed' }
         $current = Get-V4SystemProxy
-        if ((Get-V4UiSystemProxy) -ne $true -or $current.enabled -ne $prev.enabled -or $current.server -ne $prev.server) {
+        if ((Get-V4UiSystemProxy) -ne $true -or (Get-V4AutomaticProxyStatus) -ne 'NOT_OBSERVED' -or
+            $current.enabled -ne $prev.enabled -or $current.server -ne $prev.server) {
             Fail 32 'saved Clash mode or Windows proxy changed during the probe; review the current state before retrying'
+        }
+        if (-not (Test-V4ClashListener -Port $s.mixedPort -ExpectedCore $p.Core)) {
+            Fail 32 'expected IPv4 Clash core listener changed during the probe; nothing changed'
         }
         $currentIntegrity = Get-V4Integrity -Paths $p
         if (-not $currentIntegrity.markerOk -or -not $currentIntegrity.runtimeMarkerOk -or $currentIntegrity.profileHash -ne $integrity.profileHash) {
             Fail 32 'managed profile changed or could not be verified after the probe; review the active profile before repair'
         }
         if ($current.enabled -and $current.server -eq $target) {
-            Write-V4Log 'REPAIR OK: Windows proxy already targets the verified Clash HTTPS path' -Level OK
+            Write-V4Log 'Windows proxy already targets the sampled Clash HTTPS path. Application paths are untested.' -Level OK
             return
         }
         $didWrite = $false
@@ -118,10 +126,14 @@ try {
             Set-V4SystemProxy -Server $target
             $didWrite = $true
             $px = Get-V4SystemProxy
-            if (-not $px.enabled -or $px.server -ne $target) { Fail 32 'Windows proxy did not retain the requested target' }
+            if (-not $px.enabled -or $px.server -ne $target -or (Get-V4UiSystemProxy) -ne $true -or
+                (Get-V4AutomaticProxyStatus) -ne 'NOT_OBSERVED' -or
+                -not (Test-V4ClashListener -Port $s.mixedPort -ExpectedCore $p.Core)) {
+                Fail 32 'Windows proxy selection or expected core could not be reverified after the write'
+            }
             try { Set-V4Owner -Owner 'clash' -SystemProxy $px.server -Note ('repair; previous=' + $prevVal) }
             catch { Write-V4Log ('repair: owner record failed (proxy is still correct): ' + (Get-V4Redacted $_.Exception.Message)) -Level WARN }
-            Write-V4Log ('REPAIR OK: {0} -> {1}; exit {2}' -f $prevVal, $px.server, $got) -Level OK
+            Write-V4Log ('Windows proxy target verified: {0} -> {1}. Application paths are untested.' -f $prevVal, $px.server) -Level OK
             return
         }
         catch {
@@ -130,11 +142,20 @@ try {
                     $now = Get-V4SystemProxy
                     if ($now.enabled -and $now.server -eq $target) {
                         Write-V4SystemProxyRegistry -Enabled $prev.enabled -Server $prev.server
+                        $restored = Get-V4SystemProxy
+                        if ($restored.enabled -ne $prev.enabled -or $restored.server -ne $prev.server) {
+                            throw 'previous Windows proxy values did not match after restore'
+                        }
                         Write-V4Log ('repair failed; restored previous system proxy = {0}' -f $prevVal) -Level WARN
+                    } else {
+                        Write-V4Log 'repair failed; Windows proxy changed independently and was left as observed' -Level WARN
                     }
                 }
             }
-            catch { Write-V4Log ('repair failed AND previous proxy could not be restored: ' + (Get-V4Redacted $_.Exception.Message)) -Level ERROR }
+            catch {
+                Write-V4Log ('repair failed and previous proxy could not be verified after restore: ' + (Get-V4Redacted $_.Exception.Message)) -Level ERROR
+                Fail 40 'proxy repair failed, and restore of previous settings could not be verified'
+            }
             throw
         }
     }

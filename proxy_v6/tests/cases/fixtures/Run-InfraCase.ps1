@@ -365,6 +365,67 @@ try {
             }
             $script:Actual = 'manual repair declined a saved disabled mode and unverified markers before first-hop probing'
         }
+        'INF-REPAIR-GUARD-02' {
+            $apply = Join-Path $root 'apply-v4.ps1'
+            Copy-Item -LiteralPath (Join-Path $repo 'proxy_v4\apply-v4.ps1') -Destination $apply
+            Put-Text (Join-Path $root 'config\settings.json') '{}'
+            $fixtureLib = Join-Path $root 'lib\V4.ps1'
+            Add-Content -LiteralPath $fixtureLib -Encoding ASCII -Value @'
+if (-not $script:TestMode) { throw 'fixture requires test mode' }
+$script:listenerReads = 0
+$script:proxyValue = 'old:1234'
+function Get-V4Settings { [pscustomobject]@{host='203.0.113.10';hopPort=19321;mixedPort=19322} }
+function Get-V4Paths { @{AppData=$script:Root;Core='fixture.exe'} }
+function Get-V4UiSystemProxy { $true }
+function Get-V4Integrity { @{markerOk=$true;runtimeMarkerOk=$true;profileHash='fixture'} }
+function Get-V4AutomaticProxyStatus {
+    if ($env:V68_CASE -eq 'Pac') { 'PRESENT' } else { 'NOT_OBSERVED' }
+}
+function Test-V4FirstHop { param($Port) @{ok=$true;detail='fixture'} }
+function Get-V4SystemProxy { @{enabled=$true;server=$script:proxyValue} }
+function Test-V4ClashListener {
+    param($Port,$ExpectedCore)
+    $script:listenerReads++
+    switch ($env:V68_CASE) {
+        'NoOwner' { return $false }
+        'CoreChanged' { return ($script:listenerReads -lt 2) }
+        'CoreLostAfterWrite' { return ($script:listenerReads -lt 3) }
+        'RestoreFails' { return ($script:listenerReads -lt 3) }
+        default { return $true }
+    }
+}
+function Get-V4ExitIp {
+    param($Proxy,$TimeoutSec)
+    if ($env:V68_CASE -eq 'WrongExit') { '198.51.100.9' } else { '203.0.113.10' }
+}
+Set-V4TestRegistryWriter {
+    param($Enabled,$Server)
+    [IO.File]::AppendAllText($env:V68_WRITE_LOG, $Server + [Environment]::NewLine)
+    if ($env:V68_CASE -eq 'RestoreFails' -and $Server -eq 'old:1234') { throw 'fixture restore failure' }
+    $script:proxyValue = $Server
+}
+'@
+            $env:V68_WRITE_LOG = Join-Path $root 'writes.txt'
+            try {
+                foreach ($variant in @(
+                    @{name='Pac';code=32;writes='';message='automatic proxy is present or unverified'},
+                    @{name='NoOwner';code=32;writes='';message='listener could not be verified'},
+                    @{name='CoreChanged';code=32;writes='';message='listener changed during the probe'},
+                    @{name='WrongExit';code=31;writes='';message='nothing changed'},
+                    @{name='CoreLostAfterWrite';code=32;writes='127.0.0.1:19322,old:1234';message='restored previous system proxy'},
+                    @{name='RestoreFails';code=40;writes='127.0.0.1:19322,old:1234';message='restore of previous settings could not be verified'}
+                )) {
+                    $env:V68_CASE = $variant.name
+                    [IO.File]::WriteAllText($env:V68_WRITE_LOG, '')
+                    $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $apply -Repair 2>&1
+                    $rc = $LASTEXITCODE
+                    $writes = (Get-Content -LiteralPath $env:V68_WRITE_LOG) -join ','
+                    Assert-Infra ($rc -eq $variant.code -and ($out -join ' ') -match $variant.message) ($variant.name + ' unexpected exit or message: ' + $rc + ' ' + ($out -join ' '))
+                    Assert-Infra ($writes -eq $variant.writes) ($variant.name + ' unexpected repair writes: ' + $writes)
+                }
+            } finally { Remove-Item Env:V68_CASE,Env:V68_WRITE_LOG -ErrorAction SilentlyContinue }
+            $script:Actual = 'six isolated CLI variants distinguished repair refusal, verified rollback and failed restore'
+        }
         'INF-F12-01' {
             $settings = [pscustomobject]@{ host='203.0.113.10'; mixedPort=7897; hopPort=11119 }
             $off = [pscustomobject]@{ enabled=$false; server='127.0.0.1:7897' }
@@ -440,11 +501,22 @@ try {
                 if ($proxy -ne 'http://127.0.0.1:7897') { throw 'state tested a different ingress from Windows HTTP(S)' }
                 '203.0.113.10'
             }
-            $h = Get-V4StateCore -Settings $settings -Owner $null -SystemProxy $proxyOk -AppPids @(1) -MixedPortOpen $true -FirstHop $hopOk -GetExitIp $httpExit -SettingsError ''
-            Assert-Infra ($h.state -eq 'HEALTHY') 'healthy state wrong'
+            $h = Get-V4StateCore -Settings $settings -Owner $null -SystemProxy $proxyOk -AppPids @(1) -MixedPortOpen $true -FirstHop $hopOk -GetExitIp $httpExit -SettingsError '' -UiSystemProxy $true -AutomaticProxyStatus NOT_OBSERVED
+            Assert-Infra ($h.state -eq 'CHAIN_VERIFIED' -and $h.applicationPath -eq 'NOT_TESTED') 'proxy sample was not separated from application acceptance'
             Assert-Infra ($h.chainStatus -eq 'EXPECTED_EXIT' -and $h.windowsTargetsClash) 'recovered dependency was not verified'
             $i = Get-V4StateCore -Settings $settings -Owner $null -SystemProxy $proxyOk -AppPids @(1) -MixedPortOpen $true -FirstHop $hopOk -GetExitIp $exitOk -SettingsError 'bad settings'
             Assert-Infra ($i.state -eq 'FAILED' -and ($i.reasons -join ' ') -match 'settings invalid') 'settings error not reported'
+            $known = @{Settings=$settings; SystemProxy=$proxyOk; AppPids=@(1); MixedPortOpen=$true; FirstHop=$hopOk; GetExitIp=$httpExit; UiSystemProxy=$true }
+            $withPac = Get-V4StateCore @known -AutomaticProxyStatus PRESENT
+            Assert-Infra ($withPac.state -eq 'DEGRADED' -and 'AUTOMATIC_PROXY_UNVERIFIED' -in $withPac.faults) 'automatic proxy was ignored'
+            $unreadablePac = Get-V4StateCore @known
+            Assert-Infra ($unreadablePac.state -eq 'DEGRADED' -and 'AUTOMATIC_PROXY_UNVERIFIED' -in $unreadablePac.faults) 'unknown proxy selection was treated as verified'
+            $known.GetExitIp = { throw 'fixture provider/chain failure' }
+            $thrownExit = Get-V4StateCore @known -AutomaticProxyStatus NOT_OBSERVED
+            Assert-Infra ($thrownExit.state -eq 'FAILED' -and 'CHAIN_EXIT_UNVERIFIED' -in $thrownExit.faults) 'an exit probe exception was suppressed'
+            $known.GetExitIp = { '203.0.113.10'; '198.51.100.9' }
+            $ambiguousExit = Get-V4StateCore @known -AutomaticProxyStatus NOT_OBSERVED
+            Assert-Infra ($ambiguousExit.chainStatus -eq 'NO_EXIT') 'an ambiguous exit observation was accepted'
             $app = New-TestAppData
             $runtime = Join-Path $app 'clash-verge.yaml'
             $env:V4_TEST_APPDATA = $app
@@ -709,6 +781,7 @@ try {
             $text = ($out -join [Environment]::NewLine)
             $j = $text | ConvertFrom-Json
             Assert-Infra ($j.state -eq 'FAILED') ('state=' + $j.state)
+            Assert-Infra ($j.alert -eq 'PAUSE_APPLICATIONS' -and $j.coverage.applicationPath -eq 'NOT_TESTED') 'fault did not produce an explicit application warning'
             Assert-Infra ($j.recoveryAction -eq 'REVIEW_SETTINGS_OR_PROBE') 'corrupt settings did not prompt state review'
             Assert-Infra (($j.reasons -join ' ') -match 'settings') 'state reasons do not mention settings'
             Put-Text (Join-Path $root 'config\transaction.json') '{ not json'
@@ -717,6 +790,31 @@ try {
             $j = ($out -join [Environment]::NewLine) | ConvertFrom-Json
             Assert-Infra ($c -eq 3 -and $j.recoveryAction -eq 'REVIEW_PENDING_TRANSACTION') 'existing transaction did not take priority'
             $script:Actual = 'corrupt settings produce FAILED and exit 3; a remaining journal takes priority in recovery guidance'
+        }
+        'INF-STATE-SCRIPT-02' {
+            $state = Join-Path $root 'state-v4.ps1'
+            Copy-Item -LiteralPath (Join-Path $repo 'proxy_v4\state-v4.ps1') -Destination $state
+            Add-Content -LiteralPath (Join-Path $root 'lib\V4.ps1') -Encoding ASCII -Value @'
+if (-not $script:TestMode) { throw 'fixture requires test mode' }
+$script:sampleIndex = 0
+function Start-Sleep { param($Seconds) }
+function Get-V4Integrity { @{markerOk=$true;runtimeMarkerOk=$true} }
+function Get-V4State {
+    $script:sampleIndex++
+    $hop = if ($script:sampleIndex -lt 3) { @{ok=$false;detail='fixture stopped'} } else { @{ok=$true;detail='fixture returned'} }
+    Get-V4StateCore -Settings @{host='203.0.113.10';mixedPort=19322} -AppPids @(1) -MixedPortOpen $true `
+        -SystemProxy @{enabled=$true;server='127.0.0.1:19322'} -FirstHop ([pscustomobject]$hop) `
+        -GetExitIp { '203.0.113.10' } -UiSystemProxy $true -AutomaticProxyStatus NOT_OBSERVED
+}
+'@
+            $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $state -Json -Samples 3 2>&1
+            $rc = $LASTEXITCODE
+            $records = @($out | ForEach-Object { $_ | ConvertFrom-Json })
+            Assert-Infra ($rc -eq 2 -and $records.Count -eq 3) 'chain recovery unexpectedly returned full success'
+            $alerts = @($records | ForEach-Object alert) -join ','
+            Assert-Infra ($alerts -eq 'PAUSE_APPLICATIONS,NONE,CHAIN_REVERIFIED_APPLICATION_PENDING') ('unexpected alert sequence: ' + $alerts)
+            Assert-Infra ($records[2].coverage.applicationPath -eq 'NOT_TESTED') 'the CLI promoted chain recovery to application recovery'
+            $script:Actual = $alerts
         }
         'INF-SETTINGS-04' {
             Save-V4Settings -Host_ '203.0.113.10' -Port 1080 -Username 'fixture-user' -Password 'fixture-pass' -HopHost '127.0.0.1' -HopPort 11119 -MixedPort 7897

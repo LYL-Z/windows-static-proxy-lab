@@ -382,6 +382,7 @@ function Assert-V4SettingsInput {
 }
 
 function Get-V4Settings {
+    param([switch]$StatusOnly)
     if (-not (Test-Path -LiteralPath $script:SettingsPath)) { throw (New-V4Fault 11 'settings.json missing; run with -Init first') }
     if (-not (Test-V4AclHardened -Path $script:ConfigDir -Allowed (Get-V4AllowedSidSet))) { throw (New-V4Fault 12 'config directory ACL is not hardened; re-run -Init under the lock') }
     if (-not (Test-V4AclHardened -Path $script:SettingsPath -Allowed (Get-V4AllowedSidSet))) { throw (New-V4Fault 12 'settings.json ACL is not hardened; re-run -Init under the lock') }
@@ -391,6 +392,13 @@ function Get-V4Settings {
     try { Assert-V4SettingsInput -Host_ $j.staticProxy.host -Port ([int]$j.staticProxy.port) -Username $j.staticProxy.username -Password 'present' -HopHost $j.firstHop.host -HopPort ([int]$j.firstHop.port) -MixedPort ([int]$j.mixedPort) }
     catch { throw (New-V4Fault 11 ('settings.json values invalid: ' + $_.Exception.Message)) }
     if (-not $j.staticProxy.passwordDpapi) { throw (New-V4Fault 11 'settings.json has no DPAPI credential') }
+    if ($StatusOnly) {
+        return [pscustomobject]@{
+            host = $j.staticProxy.host
+            hopPort = [int]$j.firstHop.port
+            mixedPort = [int]$j.mixedPort
+        }
+    }
     try { $pw = Unprotect-V4Secret $j.staticProxy.passwordDpapi }
     catch { throw (New-V4Fault 11 'stored credential cannot be decrypted for this user') }
     Register-V4Secret $pw
@@ -1061,6 +1069,25 @@ function Get-V4SystemProxy {
     return [pscustomobject]@{ enabled = [bool]$v.ProxyEnable; server = $v.ProxyServer }
 }
 
+function Get-V4AutomaticProxyStatus {
+    if ($script:TestMode) { return 'NOT_OBSERVED' }
+    try {
+        $key = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings'
+        $settings = Get-ItemProperty -LiteralPath $key -ErrorAction Stop
+        if ($settings.PSObject.Properties['AutoConfigURL'] -and
+            -not [string]::IsNullOrWhiteSpace($settings.AutoConfigURL)) { return 'PRESENT' }
+        $connections = Get-ItemProperty -LiteralPath "$key\Connections" -ErrorAction Stop
+        if (-not $connections.PSObject.Properties['DefaultConnectionSettings']) { return 'UNKNOWN' }
+        $bytes = $connections.DefaultConnectionSettings
+        if ($bytes -isnot [byte[]] -or $bytes.Length -lt 12) { return 'UNKNOWN' }
+        # Default connection flags: 0x04 is an automatic URL and 0x08 is auto-detect.
+        $flags = [BitConverter]::ToUInt32($bytes, 8)
+        if ($flags -band 12) { return 'PRESENT' }
+        if (-not $flags -or ($flags -band 15) -ne $flags) { return 'UNKNOWN' }
+        return 'NOT_OBSERVED'
+    } catch { return 'UNKNOWN' }
+}
+
 function Test-V4SystemProxyMatch {
     param($Expected, $Actual)
     if ($null -eq $Expected -or $null -eq $Actual -or [bool]$Expected.enabled -ne [bool]$Actual.enabled) { return $false }
@@ -1506,11 +1533,12 @@ function Get-V4StateCore {
         [scriptblock]$GetExitIp,
         [string]$SettingsError = '',
         [object]$UiSystemProxy = $null,
-        [object]$UdpProxied = $null
+        [object]$UdpProxied = $null,
+        [ValidateSet('NOT_OBSERVED','PRESENT','UNKNOWN')][string]$AutomaticProxyStatus = 'UNKNOWN'
     )
     $out = [ordered]@{
         ts = (Get-Date).ToString('s')
-        state = 'UNKNOWN'; mode = 'UNKNOWN'; reasons = @()
+        state = 'UNKNOWN'; mode = 'UNKNOWN'; reasons = @(); faults = @()
         clashRunning = (@($AppPids | Where-Object { $_ -gt 0 }).Count -gt 0)
         mixedPort = [bool]$MixedPortOpen
         systemProxy = $(if ($null -eq $SystemProxy) { 'unknown' } elseif ($SystemProxy.enabled) { Get-V4Redacted $SystemProxy.server } else { 'off' })
@@ -1520,6 +1548,8 @@ function Get-V4StateCore {
         exitViaChain = $null
         chainStatus = 'NOT_PROBED'
         windowsTargetsClash = $false
+        automaticProxy = $AutomaticProxyStatus
+        applicationPath = 'NOT_TESTED'
         uiSystemProxy = $(if ($null -eq $UiSystemProxy) { 'unknown' } elseif ($UiSystemProxy) { 'enabled' } else { 'disabled' })
         udpProxied = $(if ($null -eq $UdpProxied) { 'unknown' } elseif ($UdpProxied) { 'enabled' } else { 'disabled' })
         udpDataPlane = 'not_probed'
@@ -1529,6 +1559,7 @@ function Get-V4StateCore {
     $actualProxyEnabled = [bool]($SystemProxy -and $SystemProxy.enabled)
     $uiMismatch = ($null -ne $SystemProxy -and $null -ne $UiSystemProxy -and [bool]$UiSystemProxy -ne $actualProxyEnabled)
     if ($uiMismatch) {
+        $out.faults += 'PROXY_INTENT_MISMATCH'
         $out.reasons += ('UI reports system proxy ' + $(if ($UiSystemProxy) { 'enabled' } else { 'disabled' }) + ', actual HKCU is ' + $(if ($actualProxyEnabled) { 'enabled' } else { 'disabled' }))
     }
     if ($UdpProxied -eq $false) {
@@ -1538,51 +1569,77 @@ function Get-V4StateCore {
     }
     if ($SettingsError) {
         $out.state = 'FAILED'; $out.mode = 'UNKNOWN'
+        $out.faults += 'SETTINGS_UNAVAILABLE'
         $out.reasons += ('settings invalid: ' + $SettingsError)
         return $out
     }
     if (-not $Settings) {
         $out.state = 'FAILED'; $out.mode = 'UNKNOWN'
+        $out.faults += 'SETTINGS_UNAVAILABLE'
         $out.reasons += 'settings.json missing'
         return $out
     }
     $expectedProxy = '127.0.0.1:' + $Settings.mixedPort
     $out.windowsTargetsClash = ($actualProxyEnabled -and $SystemProxy.server -eq $expectedProxy)
     if ($null -eq $SystemProxy) {
+        $out.faults += 'SYSTEM_PROXY_UNVERIFIED'
         $out.reasons += 'Windows proxy state could not be read'
     } elseif (-not $out.windowsTargetsClash) {
+        $out.faults += 'SYSTEM_PROXY_DRIFT'
         $out.reasons += ('Windows proxy is ' + $out.systemProxy + '; expected ' + $expectedProxy)
+    }
+    if ($AutomaticProxyStatus -ne 'NOT_OBSERVED') {
+        $out.faults += 'AUTOMATIC_PROXY_UNVERIFIED'
+        $out.reasons += 'Default LAN automatic proxy is present or could not be read.'
+    }
+    if ($null -eq $UiSystemProxy) {
+        $out.faults += 'CLIENT_INTENT_UNVERIFIED'
+        $out.reasons += 'Saved client proxy mode could not be read.'
     }
     if ($FirstHop) {
         $out.firstHopOk = [bool]$FirstHop.ok
         $out.firstHopStatus = if ($FirstHop.PSObject.Properties['status']) { $FirstHop.status }
             elseif ($out.firstHopOk) { 'CONNECT_OK' } else { 'UNAVAILABLE' }
-        if (-not $out.firstHopOk) { $out.reasons += ('first-hop check failed: ' + $FirstHop.detail) }
+        if (-not $out.firstHopOk) {
+            $out.faults += $(if ($out.firstHopStatus -eq 'TCP_UNAVAILABLE') { 'FIRST_HOP_TCP_UNAVAILABLE' } else { 'FIRST_HOP_CONNECT_FAILED' })
+            $out.reasons += ('first-hop check failed: ' + $FirstHop.detail)
+        }
     }
-    else { $out.reasons += 'first hop probe unavailable' }
-    if (-not $out.clashRunning) { $out.mode = 'RAW'; $out.state = 'FAILED'; $out.reasons += 'clash not running' }
-    elseif (-not $out.mixedPort) { $out.mode = 'NEXIP'; $out.state = 'FAILED'; $out.reasons += 'core not listening' }
+    else { $out.faults += 'FIRST_HOP_NOT_VERIFIED'; $out.reasons += 'first hop probe unavailable' }
+    if (-not $out.clashRunning) {
+        $out.mode = 'RAW'; $out.state = 'FAILED'; $out.faults += 'CLASH_PROCESS_NOT_OBSERVED'
+        $out.reasons += 'no Clash application or core process observed'
+    }
+    elseif (-not $out.mixedPort) {
+        $out.mode = 'NEXIP'; $out.state = 'FAILED'; $out.faults += 'CORE_LISTENER_UNVERIFIED'
+        $out.reasons += 'expected IPv4 core listener could not be verified'
+    }
     else {
         $out.mode = 'NEXIP'
-        if (-not $out.firstHopOk -or -not $GetExitIp) { $out.state = 'DEGRADED' }
+        if (-not $out.firstHopOk -or -not $GetExitIp) {
+            $out.state = 'DEGRADED'
+            if ($out.firstHopOk) { $out.faults += 'CHAIN_EXIT_NOT_TESTED' }
+        }
         else {
-            $out.exitViaChain = & $GetExitIp ('http://' + $expectedProxy)
-            if ($out.exitViaChain -eq $Settings.host) {
+            try { $out.exitViaChain = & $GetExitIp ('http://' + $expectedProxy) }
+            catch { $out.exitViaChain = $null }
+            if ($out.exitViaChain -isnot [string]) { $out.exitViaChain = $null }
+            if ($out.exitViaChain -and $out.exitViaChain -eq $Settings.host) {
                 $out.chainStatus = 'EXPECTED_EXIT'
-                $out.state = if ($out.windowsTargetsClash) { 'HEALTHY' } else { 'DEGRADED' }
+                $out.state = if ($out.faults.Count -eq 0) { 'CHAIN_VERIFIED' } else { 'DEGRADED' }
             }
             elseif ($out.exitViaChain) {
                 $out.chainStatus = 'UNEXPECTED_EXIT'
+                $out.faults += 'EXIT_MISMATCH'
                 $out.state = 'DEGRADED'; $out.reasons += 'Clash HTTPS exit differs from the configured static IPv4'
             }
             else {
                 $out.chainStatus = 'NO_EXIT'
+                $out.faults += 'CHAIN_EXIT_UNVERIFIED'
                 $out.state = 'FAILED'; $out.reasons += 'Clash HTTPS probe returned no IPv4 exit'
             }
         }
     }
-    if ($uiMismatch -and $out.state -ne 'FAILED') { $out.state = 'DEGRADED' }
-    if ($UdpProxied -eq $false -and $out.state -eq 'HEALTHY') { $out.state = 'DEGRADED' }
     return $out
 }
 
@@ -1590,7 +1647,7 @@ function Get-V4State {
     $p = Get-V4Paths
     $s = $null
     $settingsError = ''
-    try { $s = Get-V4Settings }
+    try { $s = Get-V4Settings -StatusOnly }
     catch { $settingsError = Get-V4FaultMessage $_ }
     $owner = Get-V4Owner
     try { $px = Get-V4SystemProxy }
@@ -1598,14 +1655,14 @@ function Get-V4State {
     $pids = Get-V4AppPids
     $mixed = $false
     $hop = $null
-    if ($s) {
+    if ($s -and -not $script:TestMode) {
         $mixed = Test-V4ClashListener -Port $s.mixedPort -ExpectedCore $p.Core
         $hop = Test-V4FirstHop -Port $s.hopPort
     }
     $exitProbe = { param($proxy) Get-V4ExitIp -Proxy $proxy -TimeoutSec 5 }
     $uiProxy = Get-V4UiSystemProxy
     $udpProxy = Get-V4UdpProxied
-    return Get-V4StateCore -Settings $s -Owner $owner -SystemProxy $px -AppPids $pids -MixedPortOpen $mixed -FirstHop $hop -GetExitIp $exitProbe -SettingsError $settingsError -UiSystemProxy $uiProxy -UdpProxied $udpProxy
+    return Get-V4StateCore -Settings $s -Owner $owner -SystemProxy $px -AppPids $pids -MixedPortOpen $mixed -FirstHop $hop -GetExitIp $exitProbe -SettingsError $settingsError -UiSystemProxy $uiProxy -UdpProxied $udpProxy -AutomaticProxyStatus (Get-V4AutomaticProxyStatus)
 }
 
 function Get-V4Integrity {
