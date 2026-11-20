@@ -59,7 +59,7 @@ flowchart LR
 | --- | --- |
 | 双客户端共享代理 | 历史现场曾观察到 Windows 指向首跳，Clash 路径仍可用。在授权窗口关闭首跳客户端的自动系统代理后，三个本地入口和两站 HTTPS 均通过当前会话验收。 |
 | 节点切换、自停与重连 | 用户观察到正常换节点时 Clash 继续工作。另一次 StarSky 自停后，重新加速后仍需重启 Clash 才恢复。开机样本伴随人工重新激活订阅。 [详细现场记录](skills/windows-proxy-doctor/references/lifecycle-observations.md) |
-| 2.0.0 向导 | Release Candidate。代码、安装说明和回归随 [Draft PR #2](https://github.com/LYL-Z/windows-static-proxy-lab/pull/2) 更新，另一台真实新设备尚待验收。 |
+| 2.0.0 RC2 向导 | 可逐项验证软件准备、断点接续与应用验收。代码和实测状态随 [Draft PR #2](https://github.com/LYL-Z/windows-static-proxy-lab/pull/2) 更新，独立新设备尚待验收。 [发布门槛](skills/windows-proxy-doctor/RELEASE-GATE.md) |
 
 ## 仓库入口
 

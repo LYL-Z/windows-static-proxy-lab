@@ -8,8 +8,9 @@ param([switch]$Json)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $issues = New-Object System.Collections.Generic.List[string]
-$required = @('SKILL.md','README.md','SECURITY.md','CHANGELOG.md','LICENSE','examples',
+$required = @('SKILL.md','README.md','SECURITY.md','CHANGELOG.md','LICENSE','RELEASE-GATE.md','examples',
     'scripts/Start-ProxyDoctor.ps1','scripts/Get-ProxyDoctorEnvironment.ps1','scripts/Test-ProxyDoctorInstaller.ps1',
+    'scripts/ProxyDoctorVerification.ps1',
     'tests/Run-Tests.ps1','tests/Run-OnboardingTests.ps1','templates/onboarding-checkpoint.json')
 foreach ($r in $required) { if (-not (Test-Path -LiteralPath (Join-Path $root $r))) { $issues.Add('missing ' + $r) } }
 $skill = Join-Path $root 'SKILL.md'

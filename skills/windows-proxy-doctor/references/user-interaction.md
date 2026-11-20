@@ -25,12 +25,16 @@
 
 | 参数 | 何时使用 |
 | --- | --- |
-| `-Goal Auto`、`Setup` 或 `Diagnose` | 根据用户目标进入自动判断、设置准备或已有环境诊断。 |
+| `-Goal Auto`、`Setup` 或 `Diagnose` | `Auto` 优先接续原检查点。首次配置使用 `Setup`。可用 `Diagnose` 临时检查正在配置的环境，后续 `Auto` 仍接续首次配置。 |
 | `-NetworkStatus Unknown`、`Working` 或 `Broken` | 记录用户当前描述，仍需对相应应用核验。 |
 | `-Decision UseCurrentSoftware`、`InstallationDeclined` 或 `InstallationReported` | 用户选择使用现有软件、拒绝安装或报告安装完成时，记录该选择。 |
 | `-Decision UseExistingService` 或 `SkipService` | 用户选择使用已有服务或跳过服务准备时，记录该选择。 |
 | `-Decision ConfigurationDeclined`、`ChangeReported`、`RollbackRequested` 或 `RollbackReported` | 用户拒绝改动、报告改动、请求安排回退或报告回退后，继续审核或重新测量。用同一检查点按准备、报告变更、请求回退和报告回退的顺序记录。 |
 | `-BrowserTool`、`-DesktopTool` | 可填 `AVAILABLE`、`UNAVAILABLE` 或 `UNKNOWN`。以 Agent 已核对的会话能力为依据。 |
 | `-VerifyUrl` | 仅用一至两个经确认的公开 HTTPS 目标。地址应去除用户信息、查询参数和片段。该请求覆盖测得的 Windows 代理选择。 |
+| `-ApplicationObservation` | 根据本次实际应用测试填 `UserPassed`、`UserFailed`、`AgentPassed` 或 `AgentFailed`。默认 `NotTested`。 |
+| `-ConfigurationObservation` | 对照已约定的配置、监听及路径，基于本次实际核对填 `AgentMatched` 或 `AgentMismatch`。默认 `NotTested`。 |
 
 先检查工具和用户许可。`InstallationReported` 与 `RollbackReported` 分别记录人工操作后的陈述，随后应复核安装证据、已恢复的配置及应用访问。
+
+`DIAGNOSIS_COMPLETE` 表示只读本地检查完成。`HTTPS_REACHABLE` 来自该次探测。应用结果保留观察者。变更或回退后，仅当本地证据完整、HTTPS 与实际应用通过，且所见配置符合先前约定时，才显示 `CONFIGURATION_VERIFIED` 或 `ROLLBACK_VERIFIED`。这些状态仅覆盖当次已测范围。每次重新提交观察结果，检查点不会持久化这些结果。生命周期验收须观察相应事件。

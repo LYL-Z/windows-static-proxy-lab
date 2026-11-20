@@ -1,10 +1,10 @@
-# Windows Proxy Doctor 2.0.0
+# Windows Proxy Doctor 2.0.0 RC2
 
-Windows 10/11 的新手设置向导和网络故障诊断 Skill。当前为 **Release Candidate**，跨设备和完整网络生命周期仍待验收。
+Windows 10/11 的新手设置向导和网络故障诊断 Skill。RC2 的证据范围及剩余发布门槛见 [验收清单](RELEASE-GATE.md)。
 
 ## 第一次使用
 
-1. 解压经核验的发布包，把内层 `windows-proxy-doctor` 整个文件夹复制到你的 Agent 客户端文档指定的 Skill 目录。若客户端支持直接加载文件夹，也可选择该目录。确认目录内直接包含 `SKILL.md` 和 `scripts/`。可按客户端要求重新加载 Skill。 [Agent Skills 目录规范](https://agentskills.io/specification)
+1. 对照随包提供的 SHA-256，再解压。把内层 `windows-proxy-doctor` 整个文件夹复制到 Codex 项目的 `.agents/skills/` 或客户端文档指定的 Skill 目录。确认文件夹内直接包含 `SKILL.md` 和 `scripts/`。重新打开 Codex 会话即可检查发现结果。 [Codex Skills 文档](https://developers.openai.com/codex/skills) · [Agent Skills 目录规范](https://agentskills.io/specification)
 2. 对 Agent 说「用 Windows Proxy Doctor 检查我的网络」或「帮我准备代理设置」。说明现有网络是否有故障即可。Agent 会先用当前权限读取环境，不需要购买软件或服务。
 3. 看到需要你操作的步骤时，核对改动、涉及的费用或权限、预期结果和回退方式。拒绝安装或改动后仍可继续诊断。账号、支付和凭据留在服务或客户端自己的界面中处理。 [新手指南](references/getting-started.md)
 

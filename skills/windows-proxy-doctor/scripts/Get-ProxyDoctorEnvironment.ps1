@@ -160,14 +160,26 @@ function Get-LocalBinding([string]$Address) {
 }
 
 function Get-LoopbackProxyEndpoint([string]$Server) {
-    $candidate = [regex]::Match($Server.Trim(), '(?i)(?:^|=)(?:(https?)://)?(127\.0\.0\.1|localhost|\[::1\]):(\d{1,5})(?:;|$)')
+    $endpointPattern = '(?i)(?:(https?)://)?(127\.0\.0\.1|localhost|\[::1\]):(\d{1,5})'
+    $mapped = $Server.Contains('=')
+    $pairs = @(if ($mapped) {
+        foreach ($entry in $Server.Split(';')) {
+            $pair = $entry.Split('=', 2)
+            if ($pair.Count -eq 2 -and $pair[0].Trim() -in @('http','https')) { $pair[1].Trim() }
+        }
+    } else { $Server.Trim() })
+    $candidate = [regex]::Match([string]($pairs | Select-Object -First 1), "^$endpointPattern$")
     if (-not $candidate.Success) { return $null }
     $port = [int]$candidate.Groups[3].Value
-    if (Test-ProxyDoctorTarget -Server $Server -Port $port) {
+    if ((Test-ProxyDoctorTarget -Server $Server -Port $port)) {
+        $hosts = @(foreach ($endpoint in $pairs) {
+            [regex]::Match($endpoint, "^$endpointPattern$").Groups[2].Value.ToLowerInvariant()
+        })
+        if (@($hosts | Sort-Object -Unique).Count -ne 1) { return $null }
         return @{
             port = $port
-            host = $(if (-not $Server.Contains('=')) { $candidate.Groups[2].Value.ToLowerInvariant() } else { $null })
-            scheme = $(if (-not $Server.Contains('=') -and $candidate.Groups[1].Success) { $candidate.Groups[1].Value.ToLowerInvariant() } else { $null })
+            host = $hosts[0]
+            scheme = $(if (-not $mapped -and $candidate.Groups[1].Success) { $candidate.Groups[1].Value.ToLowerInvariant() } else { $null })
         }
     }
     return $null
@@ -259,7 +271,7 @@ $portRows = @(foreach ($listener in $facts.listeners) {
     $owner = if ([int]::TryParse([string]$listener.pid, [ref]$ownerId)) { $byPid[$ownerId] }
     if ($owner.client -in $browsers.Keys) { $owner = @{ name = 'OTHER_PROCESS'; client = $null } }
     if ($port -eq $targetPort -and (Test-ProxyListeningAddress $proxyEndpoint.host $listener.address)) {
-        $targetOwners.Add([string]$owner.client)
+        $targetOwners.Add($(if ($owner.name -eq 'OTHER_PROCESS') { 'OTHER_PROCESS' } else { [string]$owner.client }))
     }
     if ($port -in $watched -or $owner.client) {
         [pscustomobject]@{ port = $port; binding = $binding; owner = $(if ($owner) { $owner.name } else { 'UNKNOWN' }); client = $owner.client }
@@ -293,7 +305,8 @@ $out = [ordered]@{
         host = $proxyEndpoint.host
         targetPort = $targetPort
         targetListenerObserved = $(if ($targetPort -and $facts.listenerQueryOk -eq $true) { $targetOwners.Count -gt 0 } else { $null })
-        targetClient = $(if ($distinctOwners.Count -eq 1 -and $distinctOwners[0]) { $distinctOwners[0] } else { $null })
+        targetClient = $(if ($distinctOwners.Count -eq 1 -and $distinctOwners[0] -in $products.Keys) { $distinctOwners[0] } else { $null })
+        targetIsOtherProcess = ($distinctOwners.Count -eq 1 -and $distinctOwners[0] -eq 'OTHER_PROCESS')
         pacConfigured = $(if ($facts.proxy.pacConfigured -is [bool]) { $facts.proxy.pacConfigured } else { $null })
         clashSavedEnabled = $(if ($facts.proxy.uiEnabled -is [bool]) { $facts.proxy.uiEnabled } else { $null })
         winHttp = $winHttp

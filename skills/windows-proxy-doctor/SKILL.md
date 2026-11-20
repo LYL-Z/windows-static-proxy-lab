@@ -5,6 +5,7 @@ license: MIT
 metadata:
   version: "2.0.0"
   release-channel: "release-candidate"
+  iteration: "rc2"
 ---
 
 # Windows Proxy Doctor
@@ -14,11 +15,11 @@ Designed for Windows 10 and 11 with Windows PowerShell 5.1 or a later PowerShell
 ## Start here
 
 1. Respond in the user's language. Ask whether they want help getting started or fixing a problem only if their request leaves the goal unclear. Start the safe local inventory immediately if you have a Windows shell.
-2. Run `scripts/Start-ProxyDoctor.ps1 -Goal Auto -Json` with the user's current permissions. Use `Setup` for onboarding and `Diagnose` for an existing setup or fault. Check the actual availability of shell, desktop and browser tools before offering assistance. Use manual page and button instructions when the relevant tool is unavailable.
-3. Give the user the current step, the result in plain language, and the next action. `UNKNOWN` means evidence was unavailable. A healthy socket confirms a listener. A successful HTTPS probe confirms the tested endpoint and path. Treat saved client settings, UI toggles, effective Windows settings and actual application access as separate evidence.
+2. Run `scripts/Start-ProxyDoctor.ps1 -Json` with the user's current permissions. Use `-Goal Setup` for first-time preparation and `-Goal Diagnose` for checking an existing setup or a reported fault. When the user wants to resume, use their agreed local checkpoint with `-Goal Auto` and reconcile the reported step against new observations. Check actual tool availability before offering desktop or browser help.
+3. Give the user the current step and next action in plain language. Keep local diagnosis, HTTPS results, the specific application's result, agreed configuration acceptance, and lifecycle evidence separate. `DIAGNOSIS_COMPLETE` covers local diagnosis only. `UNKNOWN` means evidence was unavailable. See [verification inputs](references/user-interaction.md#agent-的向导参数) before recording an observed result.
 4. If the user needs to act, use `templates/user-action-request.md`. Explain the change, scope, expected impact and rollback. Download, install, access privileges, start/stop and modify network settings only within fresh, action-specific permission. For a downloaded installer, run `scripts/Test-ProxyDoctorInstaller.ps1` with a digest or signing certificate thumbprint independently obtained from the official source. Keep account registration, payments, identity checks, and entry of credentials with the user. Continue inventory and diagnosis when the user declines a change.
 5. Before a scoped configuration change, record the verified starting state and recovery plan. Prefer native client controls. If multiple clients manage the same Windows settings, establish which client should own them and verify the others' listeners separately. On failure, follow the approved rollback and recheck the same path.
-6. To resume, load the explicit local checkpoint, re-run discovery, and verify any milestones the user reports. Reconfirm risky actions against the live state and current request. Label isolated tests, user observations, live observations and unknowns separately in the report.
+6. If a user reports completing a step but the checkpoint or action is unclear, inspect the agreed checkpoint and ask only for the missing detail. Never guess a decision or reuse prior authorization. Use the getting-started guide for preparation or resumption and the troubleshooting guide for application faults.
 
 The default guide reads local state. Keep active HTTPS/DNS probes explicit and scoped to the user's request. Keep authenticated account actions and secret values out of the diagnosis, command arguments, checkpoints and reports. Use the Skill for network setup and troubleshooting within the user's service terms and eligibility.
 

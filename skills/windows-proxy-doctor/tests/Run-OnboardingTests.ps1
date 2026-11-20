@@ -5,6 +5,7 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $wizard = Join-Path $root 'scripts\Start-ProxyDoctor.ps1'
 $installer = Join-Path $root 'scripts\Test-ProxyDoctorInstaller.ps1'
+. (Join-Path $root 'scripts\ProxyDoctorVerification.ps1')
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('w p doctor ' + [guid]::NewGuid().ToString('N'))
 [void][IO.Directory]::CreateDirectory($tmp)
 $checkpoint = Join-Path $tmp 'windows-proxy-doctor-checkpoint.json'
@@ -121,7 +122,7 @@ try {
     Case 'diagnostic-only' {
         $f = Facts
         $f.installedApps = @($star, $clash)
-        $r = Run $f
+        $r = Run $f @{Goal = 'Diagnose'}
         Assert-True ($r.mode -eq 'Diagnose' -and $r.action.step -eq 'diagnose' -and -not $r.checkpointSaved) 'Configured users should enter diagnosis without persistence'
     }
     Case 'rollback-requires-real-verification' {
@@ -197,6 +198,100 @@ try {
         try {
             Assert-True (($zip.Entries.FullName -contains 'hidden.txt') -and ($zip.Entries.FullName -notcontains 'wrong.txt')) 'The snapshot must include hidden files from the literal directory only'
         } finally { $zip.Dispose() }
+    }
+    Case 'two-installs-and-explicit-auto-resume' {
+        $profile = Join-Path $tmp 'fresh onboarding'
+        [void][IO.Directory]::CreateDirectory($profile)
+        $saved = Join-Path $profile 'windows-proxy-doctor-checkpoint.json'
+        $f = Facts
+        $r = Run $f @{Goal = 'Auto'; CheckpointPath = $saved}
+        Assert-True ($r.mode -eq 'Setup' -and $r.missingClients.Count -eq 2) 'Fresh Auto must start onboarding'
+        $r = Run $f @{Goal = 'Auto'; Decision = 'InstallationReported'; CheckpointPath = $saved}
+        Assert-True ($r.action.step -eq 'software' -and $r.missingClients.Count -eq 2) 'An installation report cannot replace observed software'
+        $f.installedApps = @($star)
+        $r = Run $f @{Goal = 'Auto'; Decision = 'InstallationReported'; CheckpointPath = $saved}
+        Assert-True ($r.action.step -eq 'software' -and ($r.missingClients -join ',') -eq 'clashVerge') 'Report only the client still unconfirmed'
+        $before = (Get-FileHash -LiteralPath $saved).Hash
+        $refused = $false
+        try { $null = Run $f @{Decision = 'UseExistingService'; CheckpointPath = $saved} } catch { $refused = $true }
+        Assert-True ($refused -and (Get-FileHash -LiteralPath $saved).Hash -eq $before) 'Out-of-order service votes must leave the checkpoint intact'
+        $f.installedApps = @($star, $clash)
+        $f.proxy.proxyEnabled = $true
+        $f.proxy.proxyServer = '127.0.0.1:18321'
+        $f | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $fixtures -Encoding UTF8
+        $engine = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+        $r = & $engine -NoProfile -ExecutionPolicy Bypass -File $wizard -TestFixture $fixtures -CheckpointPath $saved -Goal Auto -Decision InstallationReported -Json | ConvertFrom-Json
+        Assert-True ($LASTEXITCODE -eq 0 -and $r.mode -eq 'Setup' -and $r.action.step -eq 'service') 'Explicit Auto must resume Setup across processes even if an installer enabled the proxy'
+        $r = Run $f @{Goal = 'Diagnose'; CheckpointPath = $saved; NetworkStatus = 'Broken'}
+        Assert-True ($r.mode -eq 'Diagnose' -and $r.action.step -eq 'diagnose') 'A temporary diagnostic request must be honored'
+        $r = Run $f @{Goal = 'Auto'; Decision = 'UseExistingService'; CheckpointPath = $saved}
+        Assert-True ($r.mode -eq 'Setup' -and $r.state -eq 'READY_FOR_REVIEW') 'A diagnostic consultation must not replace onboarding'
+        $r = Run $f @{Goal = 'Auto'; Decision = 'ChangeReported'; CheckpointPath = $saved}
+        Assert-True ($r.state -eq 'VERIFYING' -and $r.verification.configuration -eq 'PENDING') 'A reported change must still wait for acceptance'
+    }
+    Case 'dual-registration-alone-is-setup' {
+        $f = Facts
+        $f.installedApps = @($star, $clash)
+        $r = Run $f @{Goal = 'Auto'}
+        Assert-True ($r.mode -eq 'Setup' -and $r.action.step -eq 'service') 'Installed software alone says nothing about configuration'
+        $r = Run $f @{Goal = 'Auto'; NetworkStatus = 'Broken'}
+        Assert-True ($r.mode -eq 'Diagnose' -and $r.state -eq 'PARTIAL') 'Explicit current problem takes precedence when there is no saved intent'
+    }
+    Case 'legacy-lowercase-checkpoint' {
+        $profile = Join-Path $tmp 'lowercase'
+        [void][IO.Directory]::CreateDirectory($profile)
+        $saved = Join-Path $profile 'windows-proxy-doctor-checkpoint.json'
+        '{"schema":1,"goal":"setup","software":"current","service":"existing","change":"pending"}' | Set-Content -LiteralPath $saved
+        $r = Run (Facts) @{Goal = 'Auto'; CheckpointPath = $saved}
+        $updated = Get-Content -LiteralPath $saved -Raw | ConvertFrom-Json
+        Assert-True ($r.state -eq 'READY_FOR_REVIEW' -and $updated.goal -ceq 'Setup') 'RC1 checkpoint spelling variants must resume and normalize'
+    }
+    Case 'unknown-local-evidence' {
+        $f = Facts
+        $f.proxy = @{proxyEnabled = $true; proxyServer = '127.0.0.1:18321'; pacConfigured = $false; uiEnabled = $true}
+        $f.listeners = @(@{port = 18321; pid = 901; address = '127.0.0.1'})
+        $r = Run $f @{Goal = 'Diagnose'; NetworkStatus = 'Working'}
+        Assert-True ($r.diagnostic.code -eq 'UNKNOWN_LOCAL_STATE' -and $r.state -eq 'PARTIAL' -and $r.verification.local -eq 'UNKNOWN') 'A listener without PID ownership evidence remains unknown even when the user reports connectivity'
+        $f = Facts
+        $r = Run $f @{Goal = 'Diagnose'}
+        Assert-True ($r.state -eq 'DIAGNOSIS_COMPLETE' -and $r.verification.application -eq 'NOT_TESTED' -and $r.verification.configuration -eq 'NOT_TESTED') 'Completed read-only diagnosis cannot certify application or configuration'
+    }
+    Case 'mapped-address-families-must-match' {
+        $f = Facts
+        $f.proxy = @{proxyEnabled = $true; proxyServer = 'http=127.0.0.1:18321; https=127.0.0.1:18321'; pacConfigured = $false; uiEnabled = $true}
+        $f.processes = @(@{name = 'mihomo'; id = 901})
+        $f.listeners = @(@{port = 18321; pid = 901; address = '::1'})
+        $r = Run $f @{Goal = 'Diagnose'}
+        Assert-True ($r.diagnostic.code -eq 'LISTENER_MISSING' -and $r.state -eq 'PARTIAL') 'An IPv6-only listener cannot satisfy a mapped IPv4 endpoint'
+        $f.proxy.proxyServer = 'http=127.0.0.1:18321;https=[::1]:18321'
+        $r = Run $f @{Goal = 'Diagnose'}
+        Assert-True ($r.diagnostic.code -eq 'UNKNOWN_LOCAL_STATE' -and $r.state -eq 'PARTIAL') 'Mixed address families require independent verification'
+        $f.proxy.proxyServer = 'http=[::1]:18321;https=[::1]:18321'
+        $r = Run $f @{Goal = 'Diagnose'}
+        Assert-True ($r.environment.proxy.targetClient -eq 'mihomo' -and $r.state -eq 'DIAGNOSIS_COMPLETE') 'A matching mapped IPv6 listener is recognized'
+    }
+    Case 'configuration-evidence-stages' {
+        $sample = @{Source='live-read-only'; StatusCodes=@(200,200); DiagnosticCode='CHECK_APPLICATION'; NetworkStatus='Unknown'; Change='Reported'}
+        $r = Get-DoctorVerification @sample
+        Assert-True ($r.status -eq 'HTTPS_REACHABLE' -and $r.application -eq 'NOT_TESTED' -and $r.configuration -eq 'PENDING') 'HTTPS alone cannot verify the application or configuration'
+        $r = Get-DoctorVerification @sample -ApplicationObservation UserPassed -ConfigurationObservation AgentMatched
+        Assert-True ($r.application -eq 'USER_OBSERVED_PASS' -and $r.configuration -eq 'CONFIGURATION_VERIFIED' -and $r.lifecycle -eq 'NOT_TESTED') 'Configuration acceptance must preserve application provenance and lifecycle boundary'
+        $r = Get-DoctorVerification @sample -ApplicationObservation AgentFailed -ConfigurationObservation AgentMatched
+        Assert-True ($r.application -eq 'AGENT_OBSERVED_FAIL' -and $r.configuration -eq 'NEEDS_REVIEW') 'An app failure overrides successful HTTPS'
+        $sample.DiagnosticCode = 'UNKNOWN_LOCAL_STATE'
+        $r = Get-DoctorVerification @sample -ApplicationObservation AgentPassed -ConfigurationObservation AgentMatched
+        Assert-True ($r.local -eq 'UNKNOWN' -and $r.configuration -eq 'PENDING') 'All other evidence cannot resolve unknown local state'
+        $sample.DiagnosticCode = 'CHECK_APPLICATION'
+        $sample.NetworkStatus = 'Broken'
+        $r = Get-DoctorVerification @sample -ApplicationObservation AgentPassed -ConfigurationObservation AgentMatched
+        Assert-True ($r.configuration -eq 'NEEDS_REVIEW') 'Contradictory evidence requires review'
+        $sample.Source = 'test-fixture'
+        $sample.NetworkStatus = 'Unknown'
+        $r = Get-DoctorVerification @sample -ApplicationObservation AgentPassed -ConfigurationObservation AgentMatched
+        Assert-True ($r.configuration -eq 'PENDING') 'Modelled inputs cannot confer live configuration acceptance'
+        $blocked = $false
+        try { $null = Run (Facts) @{ApplicationObservation = 'AgentPassed'} } catch { $blocked = $true }
+        Assert-True $blocked 'Fixture mode must reject live app observations'
     }
 } finally {
     if ([IO.Directory]::Exists($tmp)) {
