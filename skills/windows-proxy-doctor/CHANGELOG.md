@@ -3,6 +3,7 @@
 ## 2.0.0 RC2
 
 - Resumes saved setup on explicit Auto and keeps a temporary diagnostic check from replacing the setup goal. Reports the particular client still unconfirmed after each installation.
+- Keeps the current workflow usable if Windows declines atomic checkpoint replacement and reports unsaved progress explicitly.
 - Separates local diagnosis completion, HTTPS results, actual application observations, configuration or rollback acceptance, and lifecycle results. Unknown or ambiguous loopback routing remains open for verification.
 - Adds regressions for staged installation, cross-process resumption, earlier lowercase checkpoints, mixed IPv4/IPv6 mappings, and conflicting evidence.
 - Updates installation and recurring first-hop interruption guidance and documents the remaining release gates.

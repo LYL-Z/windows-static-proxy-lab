@@ -246,6 +246,23 @@ try {
         $updated = Get-Content -LiteralPath $saved -Raw | ConvertFrom-Json
         Assert-True ($r.state -eq 'READY_FOR_REVIEW' -and $updated.goal -ceq 'Setup') 'RC1 checkpoint spelling variants must resume and normalize'
     }
+    Case 'unwritable-atomic-update-preserves-progress' {
+        $profile = Join-Path $tmp 'locked checkpoint'
+        [void][IO.Directory]::CreateDirectory($profile)
+        $saved = Join-Path $profile 'windows-proxy-doctor-checkpoint.json'
+        $f = Facts
+        $f.installedApps = @($star, $clash)
+        $null = Run $f @{Goal = 'Setup'; CheckpointPath = $saved}
+        $before = (Get-FileHash -LiteralPath $saved).Hash
+        $reader = [IO.File]::Open($saved, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+        try {
+            $r = Run $f @{Goal = 'Auto'; Decision = 'UseExistingService'; CheckpointPath = $saved}
+            Assert-True ($r.state -eq 'READY_FOR_REVIEW' -and -not $r.checkpointSaved -and $r.checkpointSaveStatus -eq 'WRITE_FAILED') 'A denied atomic replace must preserve the current next action and report unsaved progress'
+        } finally { $reader.Dispose() }
+        Assert-True ((Get-FileHash -LiteralPath $saved).Hash -eq $before) 'Denied replacement must not edit the original file in place'
+        $r = Run $f @{Goal = 'Auto'; Decision = 'UseExistingService'; CheckpointPath = $saved}
+        Assert-True ($r.state -eq 'READY_FOR_REVIEW' -and $r.checkpointSaved) 'Normal atomic save must work after the blocker is cleared'
+    }
     Case 'unknown-local-evidence' {
         $f = Facts
         $f.proxy = @{proxyEnabled = $true; proxyServer = '127.0.0.1:18321'; pacConfigured = $false; uiEnabled = $true}

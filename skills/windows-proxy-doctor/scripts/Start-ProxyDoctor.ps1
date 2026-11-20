@@ -240,13 +240,27 @@ try {
         $action = New-DoctorAction 'configuration-review' '环境与已有服务已进入方案核对。' '对照官方客户端功能和当前实际系统代理，逐项核对原值、建议值、影响和回退。' '每项更改需操作当时的明确授权。' '用户或 Agent 实际改动后选择 ChangeReported。' '选择 ConfigurationDeclined 可保留网络并继续诊断。' $assistance
     }
 
-    if ($checkpoint) { Save-DoctorCheckpoint $checkpoint $progress }
+    $checkpointSaveStatus = 'NOT_REQUESTED'
+    $checkpointWarning = $null
+    if ($checkpoint) {
+        try {
+            Save-DoctorCheckpoint $checkpoint $progress
+            $checkpointSaveStatus = 'SAVED'
+        } catch {
+            $failure = $_.Exception.GetBaseException()
+            if ($failure -isnot [IO.IOException] -and $failure -isnot [UnauthorizedAccessException]) { throw }
+            $checkpointSaveStatus = 'WRITE_FAILED'
+            $checkpointWarning = '本次进度未能保存。当前步骤可在本次会话继续。请核对原检查点，释放占用或选用可写的私人目录后重试。'
+        }
+    }
     $out = [ordered]@{
         schema = 1; source = $environment.source; mode = $mode; audience = $audience; state = $state
         action = $action; environment = $environment; diagnostic = [ordered]@{ code = $signal; explanation = $explanation }
         verification = $verification
         missingClients = $missing
-        checkpointSaved = [bool]$checkpoint
+        checkpointSaved = $checkpointSaveStatus -eq 'SAVED'
+        checkpointSaveStatus = $checkpointSaveStatus
+        checkpointWarning = $checkpointWarning
         authorization = 'NEVER_PERSISTED'
     }
     if ($Json) { $out | ConvertTo-Json -Depth 10 }
@@ -254,6 +268,7 @@ try {
         Write-Output ('{0} · {1}' -f $state, $action.step)
         Write-Output $explanation
         Write-Output ('本地诊断 {0} · HTTPS {1} · 应用 {2} · 配置 {3}' -f $verification.local, $verification.status, $verification.application, $verification.configuration)
+        if ($checkpointWarning) { Write-Output $checkpointWarning }
         foreach ($field in 'why','operation','permissionsOrCost','confirm','onFailure','assistance') { Write-Output $action[$field] }
     }
 } finally {
