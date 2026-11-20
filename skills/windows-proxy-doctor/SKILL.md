@@ -3,7 +3,7 @@ name: windows-proxy-doctor
 description: Read-only Windows network and proxy diagnostics for state mismatches, competing proxy clients, TCP/DNS/UDP path differences, transactional backup/rollback design, test isolation, credentials, and startup lifecycle.
 license: MIT
 metadata:
-  version: "1.6.0"
+  version: "1.6.1"
   platforms: "Windows 10/11 PowerShell 5.1+"
 ---
 
@@ -37,6 +37,7 @@ Read-only. Do not modify HKCU, WinHTTP, adapters, routes, TUN, DNS, firewall, De
    - UNKNOWN: insufficient evidence; do not guess.
 4. Report evidence, confidence, and what was not tested.
 5. When considering a manual recovery, verify saved proxy intent, the active managed profile and the expected HTTPS path. Resolve pending transactions and conflicting writers before requesting a change. Record an actual lifecycle run before claiming automatic recovery.
+   When two clients share Windows proxy settings, look for a native option that leaves one client as the settings owner while the other keeps its listener. Record each client's saved setting, listening process and protocol, Windows selection for the test URLs, and actual application results. Change one setting in an authorized window. Validate save, stop, restart, and exit separately. Record the original setting and verify the original path after any rollback.
 
 ## Scripts
 

@@ -1,5 +1,16 @@
 #Requires -Version 5.1
 
+function Select-ProxyDoctorRegistryEventsInWindow {
+    param($Events, [DateTimeOffset]$From, [DateTimeOffset]$Through)
+
+    foreach ($event in $Events) {
+        $time = [DateTimeOffset]::MinValue
+        if ([DateTimeOffset]::TryParse($event.timeUtc, [ref]$time) -and $time -ge $From -and $time -le $Through) {
+            $event
+        }
+    }
+}
+
 function ConvertFrom-ProxyDoctorRegistryEvent {
     param([xml]$EventXml, [string]$UserSid)
 

@@ -93,6 +93,14 @@ try {
         Assert-True ($null -eq (ConvertFrom-ProxyDoctorRegistryEvent $sysmon 'S-1-5-21-100-200-300-1002')) 'event matched a different user hive'
         ($sysmon.Event.EventData.Data | Where-Object Name -eq 'TargetObject').InnerText = "HKU\$key\Connections\ProxyServer"
         Assert-True ($null -eq (ConvertFrom-ProxyDoctorRegistryEvent $sysmon $sid)) 'event matched another registry key'
+        $events = @(
+            @{ timeUtc = '2026-01-01T00:59:59.900Z'; marker = 'before' }
+            @{ timeUtc = '2026-01-01T01:00:00.150Z'; marker = 'during previous snapshot' }
+            @{ timeUtc = '2026-01-01T01:00:05.100Z'; marker = 'after latest registry read' }
+            @{ timeUtc = 'invalid'; marker = 'invalid' }
+        )
+        $selected = @(Select-ProxyDoctorRegistryEventsInWindow -Events $events -From '2026-01-01T01:00:00Z' -Through '2026-01-01T01:00:05Z')
+        Assert-True ($selected.Count -eq 1 -and $selected[0].marker -eq 'during previous snapshot') 'writer window lost an event between the prior registry read and the prior snapshot completion'
     }
     Check 'https-layer-classification' {
         . (Join-Path $root 'scripts\NetworkPathResult.ps1')

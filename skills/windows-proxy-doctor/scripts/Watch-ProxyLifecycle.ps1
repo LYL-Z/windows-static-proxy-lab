@@ -120,6 +120,7 @@ for ($i = 0; $i -lt $sampleCount; $i++) {
     })
     $record = [ordered]@{
         sample = $i + 1; observedAt = $sample.ts; completedAt = (Get-Date).ToString('o'); source = $sample.source
+        proxyReadStartedAt = $sample.proxyReadStartedAt; proxyReadFinishedAt = $sample.proxyReadFinishedAt
         observed = $observed; confirmed = $confirmed; transition = $transition; level = $level
         proxy = $settings; clientProcessRunning = $sample.processRunning; coreRunning = $sample.coreRunning
         mixedPort = $MixedPort; mixedPortOpen = $sample.mixedPortOpen
@@ -144,14 +145,12 @@ for ($i = 0; $i -lt $sampleCount; $i++) {
         $record.proxyChange = @{ before = $previous.proxy; after = $settings; fields = $changes; actor = 'unknown' }
         if ($IncludeWriterEvidence -and $null -ne $sample.proxyEnabled -and $null -ne $previous.proxy.enabled -and
             @($changes | Where-Object { $_ -ne 'savedClientIntent' }).Count) {
+            $from = [DateTimeOffset]$previous.proxyReadStartedAt
+            $through = [DateTimeOffset]$sample.proxyReadFinishedAt
+            $record.writerEvidenceWindow = @{ from = $previous.proxyReadStartedAt; through = $sample.proxyReadFinishedAt }
             $record.writerEvidence = @(Get-ProxyDoctorWriterEvidence | ForEach-Object {
-                $source = $_
-                $source.events = @($source.events | Where-Object {
-                    [DateTimeOffset]$time = [DateTimeOffset]::MinValue
-                    [DateTimeOffset]::TryParse($_.timeUtc, [ref]$time) -and
-                        $time -ge [DateTimeOffset]$previous.observedAt -and $time -le [DateTimeOffset]$sample.ts
-                })
-                $source
+                $_.events = @(Select-ProxyDoctorRegistryEventsInWindow -Events $_.events -From $from -Through $through)
+                $_
             })
         }
     }

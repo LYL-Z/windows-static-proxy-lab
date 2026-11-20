@@ -36,6 +36,8 @@ function Get-ListenerProcessNames($listeners) {
     }
 }
 
+$proxyReadStartedAt = $null
+$proxyReadFinishedAt = $null
 if ($TestFixture) {
     $f = Get-Content -LiteralPath $TestFixture -Raw | ConvertFrom-Json
     $proxyEnabled = ConvertTo-Bool $f.proxyEnabled
@@ -50,6 +52,7 @@ if ($TestFixture) {
     $exitMatches = if ($null -eq $f.exitMatches) { $null } else { [bool]$f.exitMatches }
 } else {
     $k = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings'
+    $proxyReadStartedAt = [DateTimeOffset]::UtcNow.ToString('o')
     try {
         $p = Get-ItemProperty -LiteralPath $k -ErrorAction Stop
         $proxyEnabled = ([int]$p.ProxyEnable -eq 1)
@@ -59,6 +62,8 @@ if ($TestFixture) {
         $proxyEnabled = $null
         $proxyServer = ''
         $pacConfigured = $null
+    } finally {
+        $proxyReadFinishedAt = [DateTimeOffset]::UtcNow.ToString('o')
     }
     $uiEnabled = Get-UiEnabled
     $coreNames = @('verge-mihomo', 'mihomo')
@@ -120,6 +125,8 @@ $displayServer = if ($proxyServer -match '^(?:(?:http|https)://)?(?:127\.0\.0\.1
 $out = [ordered]@{
     schema = 1
     ts = (Get-Date).ToString('o')
+    proxyReadStartedAt = $proxyReadStartedAt
+    proxyReadFinishedAt = $proxyReadFinishedAt
     source = $(if ($TestFixture) { 'test-fixture' } else { 'live-read-only' })
     proxyEnabled = $proxyEnabled
     proxyServer = $displayServer
