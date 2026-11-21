@@ -39,3 +39,6 @@ location of the person**, not IP address. A US IP is not an eligibility criterio
 ## What is deliberately NOT in this repo
 
 See `SECURITY-NOTES.md`. In short: no credentials, no config backups, no shell history.
+## V6.9 用户需求与安全验收边界（研究记录）
+
+[八项用户原始要求（逐字）与可验证工程验收矩阵](docs/V6.9-EIGHT-REQUIREMENTS.md) 已收录在独立文档中。此处是需求追踪，**不表示已经实现、不保证任何账号或地区使用资格**；通用网络隐私、安全和可靠性研究须经过隔离故障注入、真实应用验证与授权回滚。
