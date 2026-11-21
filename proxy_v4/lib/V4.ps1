@@ -183,6 +183,72 @@ function Invoke-V4Recovery {
 # ---------------------------------------------------- transaction journal --
 function Get-V4JournalPath { return (Join-Path $script:ConfigDir 'transaction.json') }
 
+function Get-V4RepairDirectory {
+    if ($script:TestMode) { return (Join-Path $script:Root 'repair-state') }
+    return (Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'WindowsStaticProxyLab-Recovery')
+}
+
+function Get-V4RepairReceipt {
+    # Stored per user so a second candidate checkout also sees interrupted work.
+    $dir = Get-V4RepairDirectory
+    try {
+        $directory = Get-Item -LiteralPath $dir -Force -ErrorAction Stop
+        $allowed = Get-V4AllowedSidSet
+        if (-not $directory.PSIsContainer -or ($directory.Attributes -band [IO.FileAttributes]::ReparsePoint) -or
+            -not (Test-V4AclHardened -Path $dir -Allowed $allowed)) { throw 'unsafe recovery directory' }
+        $path = Join-Path $dir 'pending.json'
+        $file = Get-Item -LiteralPath $path -Force -ErrorAction Stop
+        if ($file.PSIsContainer -or ($file.Attributes -band [IO.FileAttributes]::ReparsePoint) -or
+            $file.Length -gt 2048 -or -not (Test-V4AclHardened -Path $path -Allowed $allowed)) { throw 'unsafe recovery receipt' }
+        $entry = [IO.File]::ReadAllText($file.FullName) | ConvertFrom-Json
+        if ($entry.schema -ne 1 -or $entry.id -notmatch '^[a-f0-9]{32}$' -or $entry.previous -eq $entry.target) { throw 'invalid record' }
+        foreach ($server in @($entry.previous, $entry.target)) {
+            if ($server -isnot [string] -or $server -notmatch '^127\.0\.0\.1:([1-9]\d{0,4})$' -or
+                [int]$Matches[1] -gt 65535) { throw 'invalid local proxy target' }
+        }
+        return $entry
+    } catch [System.Management.Automation.ItemNotFoundException] { return $null }
+    catch { return [pscustomobject]@{ invalid=$true } }
+}
+
+function New-V4RepairReceipt {
+    param([string]$Previous, [string]$Target)
+    $dir = Get-V4RepairDirectory
+    $id = [guid]::NewGuid().ToString('N')
+    if (-not (Test-Path -LiteralPath $dir -ErrorAction Stop)) {
+        $stage = $dir + '-stage-' + $id
+        $null = New-Item -ItemType Directory -Path $stage -ErrorAction Stop
+        try {
+            if (-not (Protect-V4Acl -Path $stage)) { throw (New-V4Fault 12 'could not protect recovery directory') }
+            [IO.Directory]::Move($stage, $dir)
+        } finally { if ([IO.Directory]::Exists($stage)) { [IO.Directory]::Delete($stage) } }
+    }
+    if (Get-V4RepairReceipt) { throw (New-V4Fault 34 'pending or unreadable repair receipt') }
+    $entry = [ordered]@{schema=1; id=$id; previous=$Previous; target=$Target}
+    $temp = Join-Path $dir ($id + '.tmp')
+    $stream = [IO.File]::Open($temp, 'CreateNew', 'Write', 'None')
+    try {
+        $bytes = [Text.Encoding]::UTF8.GetBytes(($entry | ConvertTo-Json -Compress))
+        $stream.Write($bytes, 0, $bytes.Length)
+        $stream.Flush($true)
+    } finally { $stream.Dispose() }
+    try {
+        if (-not (Protect-V4Acl -Path $temp)) { throw (New-V4Fault 12 'could not protect recovery receipt') }
+        [IO.File]::Move($temp, (Join-Path $dir 'pending.json'))
+        $saved = Get-V4RepairReceipt
+        if (-not $saved -or $saved.id -ne $id) { throw (New-V4Fault 34 'could not verify recovery receipt') }
+        return $saved
+    } finally { if ([IO.File]::Exists($temp)) { [IO.File]::Delete($temp) } }
+}
+
+function Complete-V4RepairReceipt {
+    param($Receipt)
+    $current = Get-V4RepairReceipt
+    if (-not $current -or -not $Receipt.id -or $current.id -ne $Receipt.id) { throw (New-V4Fault 40 'recovery receipt changed; inspect before continuing') }
+    [IO.File]::Delete((Join-Path (Get-V4RepairDirectory) 'pending.json'))
+    if (Get-V4RepairReceipt) { throw (New-V4Fault 40 'recovery receipt could not be retired') }
+}
+
 function Get-V4Journal {
     $p = Get-V4JournalPath
     if (-not (Test-Path -LiteralPath $p)) { return $null }
@@ -653,6 +719,27 @@ function Remove-V4StaleLock {
     }
 }
 
+function Enter-V4UserMutationLock {
+    # HKCU proxy values are shared by all installations for a Windows user.
+    # Fixture processes coordinate only within their temporary test root.
+    $scope = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+    if ($script:TestMode) {
+        $hash = [Security.Cryptography.SHA256]::Create()
+        try {
+            $bytes = [Text.Encoding]::UTF8.GetBytes($script:Root.ToUpperInvariant())
+            $scope = 'Test-' + [BitConverter]::ToString($hash.ComputeHash($bytes)).Replace('-', '')
+        } finally { $hash.Dispose() }
+    }
+    $mutex = [Threading.Mutex]::new($false, ('Global\V4ProxyMutation-' + $scope))
+    $owned = $false
+    try {
+        try { $owned = $mutex.WaitOne(0) }
+        catch [Threading.AbandonedMutexException] { $owned = $true }
+        if ($owned) { return $mutex }
+    } finally { if (-not $owned) { $mutex.Dispose() } }
+    return $null
+}
+
 function Enter-V4Lock {
     param([int]$TimeoutSec = 20)
     Ensure-V4Dir $script:ConfigDir
@@ -821,15 +908,16 @@ function Start-V4Clash {
 }
 
 function Test-V4ClashListener {
-    param([int]$Port, [string]$ExpectedCore)
+    param([int]$Port, [string]$ExpectedCore, [switch]$RequireImagePath)
     if (-not $ExpectedCore) { return $false }
     $listeners = @(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue)
     $onLoopback = @($listeners | Where-Object LocalAddress -in @('127.0.0.1','0.0.0.0'))
-    if (-not $onLoopback) { $onLoopback = @($listeners | Where-Object LocalAddress -eq '::') }
+    if ($RequireImagePath -and @($onLoopback.OwningProcess | Sort-Object -Unique).Count -ne 1) { return $false }
+    if (-not $onLoopback -and -not $RequireImagePath) { $onLoopback = @($listeners | Where-Object LocalAddress -eq '::') }
     $expectedName = [IO.Path]::GetFileNameWithoutExtension($ExpectedCore)
     foreach ($listener in $onLoopback) {
         $process = Get-Process -Id $listener.OwningProcess -ErrorAction SilentlyContinue
-        if ($process.ProcessName -eq $expectedName -and (-not $process.Path -or $process.Path -eq $ExpectedCore)) {
+        if ($process.ProcessName -eq $expectedName -and ($process.Path -eq $ExpectedCore -or (-not $RequireImagePath -and -not $process.Path))) {
             return (Test-V4Port -Port $Port)
         }
     }
@@ -1066,7 +1154,8 @@ function Get-V4SystemProxy {
     }
     $k = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings'
     $v = Get-ItemProperty -LiteralPath $k -ErrorAction Stop
-    return [pscustomobject]@{ enabled = [bool]$v.ProxyEnable; server = $v.ProxyServer }
+    # Only the native DWORD 1 confirms the user enabled this proxy.
+    return [pscustomobject]@{ enabled = ($v.ProxyEnable -is [int] -and $v.ProxyEnable -eq 1); server = $v.ProxyServer }
 }
 
 function Get-V4AutomaticProxyStatus {
@@ -1130,12 +1219,36 @@ function Clear-V4SystemProxy {
     Write-V4SystemProxyRegistry -Enabled $false -Server ((Get-V4SystemProxy).server)
 }
 
+function Set-V4RepairServer {
+    param([string]$ExpectedServer, [string]$NewServer, [ref]$WriteAttempted)
+    $current = Get-V4SystemProxy
+    if (-not $current.enabled -or $current.server -ne $ExpectedServer) {
+        throw (New-V4Fault 32 'Windows proxy selection changed before the write')
+    }
+    if ($script:TestMode) {
+        if (-not $script:TestRegistryWriter) { throw 'isolated repair writer is missing' }
+        if ($WriteAttempted) { $WriteAttempted.Value = $true }
+        & $script:TestRegistryWriter $current.enabled $NewServer
+        return
+    }
+    Assert-V4ProductionOperation 'repair enabled proxy target'
+    # Never re-enable the proxy, even if a user disables it during this call.
+    $key = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings'
+    if ($WriteAttempted) { $WriteAttempted.Value = $true }
+    Set-ItemProperty -LiteralPath $key -Name ProxyServer -Value $NewServer -ErrorAction Stop
+    Update-V4WinInet -RequireSuccess
+}
+
 function Update-V4WinInet {
+    param([switch]$RequireSuccess)
     if (-not ('V4Inet.Refresh' -as [type])) {
         Add-Type -MemberDefinition '[DllImport("wininet.dll",SetLastError=true)]public static extern bool InternetSetOption(IntPtr h,int o,IntPtr b,int l);' -Name Refresh -Namespace V4Inet | Out-Null
     }
-    [void][V4Inet.Refresh]::InternetSetOption([IntPtr]::Zero, 39, [IntPtr]::Zero, 0)
-    [void][V4Inet.Refresh]::InternetSetOption([IntPtr]::Zero, 37, [IntPtr]::Zero, 0)
+    $changed = [V4Inet.Refresh]::InternetSetOption([IntPtr]::Zero, 39, [IntPtr]::Zero, 0)
+    $refreshed = [V4Inet.Refresh]::InternetSetOption([IntPtr]::Zero, 37, [IntPtr]::Zero, 0)
+    if ($RequireSuccess -and (-not $changed -or -not $refreshed)) {
+        throw 'Windows could not confirm notification of the proxy change'
+    }
 }
 
 function Get-V4ExitIp {
@@ -1548,6 +1661,7 @@ function Get-V4StateCore {
         exitViaChain = $null
         chainStatus = 'NOT_PROBED'
         windowsTargetsClash = $false
+        windowsTargetsFirstHop = $false
         automaticProxy = $AutomaticProxyStatus
         applicationPath = 'NOT_TESTED'
         uiSystemProxy = $(if ($null -eq $UiSystemProxy) { 'unknown' } elseif ($UiSystemProxy) { 'enabled' } else { 'disabled' })
@@ -1581,6 +1695,7 @@ function Get-V4StateCore {
     }
     $expectedProxy = '127.0.0.1:' + $Settings.mixedPort
     $out.windowsTargetsClash = ($actualProxyEnabled -and $SystemProxy.server -eq $expectedProxy)
+    $out.windowsTargetsFirstHop = ($actualProxyEnabled -and $SystemProxy.server -eq ('127.0.0.1:' + $Settings.hopPort))
     if ($null -eq $SystemProxy) {
         $out.faults += 'SYSTEM_PROXY_UNVERIFIED'
         $out.reasons += 'Windows proxy state could not be read'

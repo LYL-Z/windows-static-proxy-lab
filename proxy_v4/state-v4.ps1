@@ -72,6 +72,7 @@ function Get-StateResult {
     }
     if (-not $markersOk -and $result.state -eq 'CHAIN_VERIFIED') { $result.state = 'DEGRADED' }
     $result.recoveryAction = switch ($true) {
+        { [bool](Get-V4RepairReceipt) } { 'REVIEW_INTERRUPTED_REPAIR'; break }
         { [bool](Get-V4Journal) } { 'REVIEW_PENDING_TRANSACTION'; break }
         { $st.mode -eq 'UNKNOWN' } { 'REVIEW_SETTINGS_OR_PROBE'; break }
         { -not $st.clashRunning -or -not $st.mixedPort } { 'CHECK_CLASH_STARTUP'; break }
@@ -80,7 +81,8 @@ function Get-StateResult {
         { $result.chainStatus -ne 'EXPECTED_EXIT' } { 'CHECK_HTTPS_CHAIN'; break }
         { $result.systemProxy -eq 'unknown' -or $result.uiSystemProxy -ne 'enabled' -or
           $result.automaticProxy -ne 'NOT_OBSERVED' } { 'REVIEW_PROXY_MODE'; break }
-        { -not $result.windowsTargetsClash } { 'CONSIDER_MANUAL_REPAIR'; break }
+        { $st.windowsTargetsFirstHop -and -not $result.windowsTargetsClash } { 'CONSIDER_MANUAL_REPAIR'; break }
+        { -not $result.windowsTargetsClash } { 'REVIEW_PROXY_MODE'; break }
         default { 'VERIFY_APPLICATION_PATH' }
     }
     if ($result.recoveryAction -eq 'CONSIDER_MANUAL_REPAIR') {
@@ -88,6 +90,10 @@ function Get-StateResult {
     }
     if ($result.recoveryAction -eq 'REVIEW_PENDING_TRANSACTION') {
         $result.faults += 'PENDING_TRANSACTION'
+        if ($result.state -eq 'CHAIN_VERIFIED') { $result.state = 'DEGRADED' }
+    }
+    if ($result.recoveryAction -eq 'REVIEW_INTERRUPTED_REPAIR') {
+        $result.faults += 'PENDING_REPAIR'
         if ($result.state -eq 'CHAIN_VERIFIED') { $result.state = 'DEGRADED' }
     }
     $result.advice = if ($result.state -eq 'CHAIN_VERIFIED') {
@@ -113,7 +119,7 @@ function Write-StateResult($result) {
     'automaticProxy {0}   applicationPath {1}' -f $result.automaticProxy, $result.coverage.applicationPath
     'recoveryAction {0}' -f $result.recoveryAction
     if ($result.faults.Count) { 'faults         {0}' -f ($result.faults -join ', ') }
-    'profile marker {0}   runtime marker {1}' -f $integrity.markerOk, $integrity.runtimeMarkerOk
+    'profile marker {0}   runtime marker {1}' -f $result.integrity.markerOk, $result.integrity.runtimeMarkerOk
     if ($result.reasons.Count) { Write-Host 'reasons:'; $result.reasons | ForEach-Object { '  - ' + $_ } }
     Write-Host ''
 }

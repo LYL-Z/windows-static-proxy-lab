@@ -18,12 +18,14 @@ param(
     [switch]$Repair,
     [string]$StaticHost, [int]$StaticPort = 0, [string]$StaticUser, [string]$CredentialFile,
     [string]$StaticPass, [string]$StaticPassFile,
-    [string]$HopHost = '127.0.0.1', [int]$HopPort = 11119, [int]$MixedPort = 7897
+    [string]$HopHost = '127.0.0.1', [int]$HopPort = 11119, [int]$MixedPort = 7897,
+    [ValidateSet('KeepCurrent','RestorePrevious')][string]$ResolveRepair
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'lib\V4.ps1')
 $exit = 0
 $lock = $null
+$userLock = $null
 if (-not $DryRun) {
     $null = Enable-V4ProductionWrites
     if (-not (Start-V4Log 'apply')) { Write-Host 'WARN: evidence log could not be opened; continuing' -ForegroundColor Yellow }
@@ -33,6 +35,7 @@ function Fail([int]$c, [string]$m) { throw [pscustomobject]@{ code = $c; msg = $
 
 try {
     Write-V4Log ('mode={0} dryRun={1} init={2}' -f $Mode, [bool]$DryRun, [bool]$Init) -Level STEP
+    if ($ResolveRepair -and ($DryRun -or $Repair -or $Init)) { Fail 11 '-ResolveRepair must be used separately' }
     if ($Repair -and $DryRun) { Fail 11 '-Repair and -DryRun are mutually exclusive' }
     if ($Init -and $DryRun)   { Fail 11 '-Init and -DryRun are mutually exclusive' }
     if ($Init -and $Repair)   { Fail 11 '-Init and -Repair are mutually exclusive' }
@@ -42,6 +45,8 @@ try {
 
     # F09: the lock is acquired BEFORE any settings write, including -Init.
     if (-not $DryRun) {
+        $userLock = Enter-V4UserMutationLock
+        if (-not $userLock) { Fail 33 'another operation holds the per-user mutation lock' }
         $lock = Enter-V4Lock
         if (-not $lock) { Fail 33 'another apply/rollback holds the lock' }
     }
@@ -53,6 +58,28 @@ try {
         if ($pending.corrupt) { Fail 34 'config\transaction.json is corrupt; inspect it before retrying' }
         Fail 34 ('unfinished transaction; run rollback-v4.ps1 -SnapshotDir ' + [string]$pending.data.snapshot)
     }
+
+    $receipt = Get-V4RepairReceipt
+    if ($receipt -and $receipt.invalid) { Fail 34 'unreadable or unsafe repair receipt; inspect its ACL and contents locally' }
+    if ($ResolveRepair) {
+        if (-not $receipt) { Fail 34 'no interrupted repair is recorded' }
+        if ($ResolveRepair -eq 'RestorePrevious') {
+            $active = Get-V4SystemProxy
+            if (-not $active.enabled -or $active.server -notin @($receipt.target, $receipt.previous) -or
+                (Get-V4AutomaticProxyStatus) -ne 'NOT_OBSERVED' -or (Get-V4UiSystemProxy) -ne $true) {
+                Fail 32 'proxy selection changed; preserve it and decide whether to acknowledge with KeepCurrent'
+            }
+            if ($active.server -eq $receipt.target) {
+                Set-V4RepairServer -ExpectedServer $receipt.target -NewServer $receipt.previous
+            }
+            $active = Get-V4SystemProxy
+            if (-not $active.enabled -or $active.server -ne $receipt.previous) { Fail 40 'previous proxy target could not be confirmed; receipt retained' }
+        }
+        Complete-V4RepairReceipt $receipt
+        Write-V4Log ('interrupted repair acknowledged: ' + $ResolveRepair + '; application paths remain untested') -Level OK
+        return
+    }
+    if ($receipt) { Fail 34 'interrupted repair; review the current selection before using -ResolveRepair KeepCurrent or RestorePrevious' }
 
     if ($Init) {
         $staticPass = $null
@@ -76,7 +103,7 @@ try {
     }
 
     if (-not (Test-Path -LiteralPath $script:SettingsPath)) { Fail 11 'config\settings.json missing; run with -Init first' }
-    $s = Get-V4Settings
+    $s = Get-V4Settings -StatusOnly:$Repair
     $p = Get-V4Paths
     if (-not $p.AppData -or -not $p.Core) { Fail 10 'clash paths not found' }
 
@@ -97,20 +124,24 @@ try {
     # Repair: re-assert system-proxy ownership without touching configs or restarting.
     if ($Repair) {
         $prev = Get-V4SystemProxy
-        $prevVal = if ($prev.enabled) { $prev.server } else { 'off' }
         $target = '127.0.0.1:' + $s.mixedPort
-        if (-not (Test-V4ClashListener -Port $s.mixedPort -ExpectedCore $p.Core)) {
+        if (-not $prev.enabled) { Fail 32 'Windows proxy is disabled or unknown; preserve the current selection' }
+        $prevVal = $prev.server
+        if ($prevVal -notin @($target, ('127.0.0.1:' + $s.hopPort))) {
+            Fail 32 'Windows selected another proxy; review the intended target manually'
+        }
+        if (-not (Test-V4ClashListener -Port $s.mixedPort -ExpectedCore $p.Core -RequireImagePath)) {
             Fail 32 'expected IPv4 Clash core listener could not be verified; nothing changed'
         }
         Write-V4Log ('repair: observed system proxy = {0}' -f $prevVal) -Level WARN
         $got = Get-V4ExitIp -Proxy ('http://' + $target) -TimeoutSec 5
-        if ($got -ne $s.host) { Fail 31 'chain HTTPS exit did not match the configured static IPv4; nothing changed' }
+        if ($got -isnot [string] -or $got -ne $s.host) { Fail 31 'chain HTTPS exit did not match the configured static IPv4; nothing changed' }
         $current = Get-V4SystemProxy
         if ((Get-V4UiSystemProxy) -ne $true -or (Get-V4AutomaticProxyStatus) -ne 'NOT_OBSERVED' -or
             $current.enabled -ne $prev.enabled -or $current.server -ne $prev.server) {
             Fail 32 'saved Clash mode or Windows proxy changed during the probe; review the current state before retrying'
         }
-        if (-not (Test-V4ClashListener -Port $s.mixedPort -ExpectedCore $p.Core)) {
+        if (-not (Test-V4ClashListener -Port $s.mixedPort -ExpectedCore $p.Core -RequireImagePath)) {
             Fail 32 'expected IPv4 Clash core listener changed during the probe; nothing changed'
         }
         $currentIntegrity = Get-V4Integrity -Paths $p
@@ -121,36 +152,45 @@ try {
             Write-V4Log 'Windows proxy already targets the sampled Clash HTTPS path. Application paths are untested.' -Level OK
             return
         }
-        $didWrite = $false
+        $writeAttempted = $false
+        $receipt = New-V4RepairReceipt -Previous $prevVal -Target $target
         try {
-            Set-V4SystemProxy -Server $target
-            $didWrite = $true
+            Write-V4Log 'RECOVERING: one attempt to restore the selected local proxy target' -Level STEP
+            Set-V4RepairServer -ExpectedServer $prevVal -NewServer $target -WriteAttempted ([ref]$writeAttempted)
+            $afterExit = Get-V4ExitIp -Proxy ('http://' + $target) -TimeoutSec 5
+            if ($afterExit -isnot [string] -or $afterExit -ne $s.host) {
+                Fail 31 'post-write HTTPS exit did not match the configured IPv4'
+            }
             $px = Get-V4SystemProxy
             if (-not $px.enabled -or $px.server -ne $target -or (Get-V4UiSystemProxy) -ne $true -or
                 (Get-V4AutomaticProxyStatus) -ne 'NOT_OBSERVED' -or
-                -not (Test-V4ClashListener -Port $s.mixedPort -ExpectedCore $p.Core)) {
+                -not (Test-V4ClashListener -Port $s.mixedPort -ExpectedCore $p.Core -RequireImagePath)) {
                 Fail 32 'Windows proxy selection or expected core could not be reverified after the write'
             }
             try { Set-V4Owner -Owner 'clash' -SystemProxy $px.server -Note ('repair; previous=' + $prevVal) }
             catch { Write-V4Log ('repair: owner record failed (proxy is still correct): ' + (Get-V4Redacted $_.Exception.Message)) -Level WARN }
-            Write-V4Log ('Windows proxy target verified: {0} -> {1}. Application paths are untested.' -f $prevVal, $px.server) -Level OK
+            Complete-V4RepairReceipt $receipt
+            Write-V4Log ('VERIFIED_PROXY_TARGET: {0} -> {1}; explicit IPv4 HTTPS matched. Application paths are untested.' -f $prevVal, $px.server) -Level OK
             return
         }
         catch {
+            if (-not $writeAttempted) { Complete-V4RepairReceipt $receipt; throw }
             try {
-                if ($didWrite) {
-                    $now = Get-V4SystemProxy
-                    if ($now.enabled -and $now.server -eq $target) {
-                        Write-V4SystemProxyRegistry -Enabled $prev.enabled -Server $prev.server
-                        $restored = Get-V4SystemProxy
-                        if ($restored.enabled -ne $prev.enabled -or $restored.server -ne $prev.server) {
-                            throw 'previous Windows proxy values did not match after restore'
-                        }
-                        Write-V4Log ('repair failed; restored previous system proxy = {0}' -f $prevVal) -Level WARN
-                    } else {
-                        Write-V4Log 'repair failed; Windows proxy changed independently and was left as observed' -Level WARN
+                # A write can commit before the WinINet notification throws.
+                # Inspect the resulting selection even on setter failure.
+                $now = Get-V4SystemProxy
+                if ($now.enabled -and $now.server -eq $target -and
+                    (Get-V4UiSystemProxy) -eq $true -and (Get-V4AutomaticProxyStatus) -eq 'NOT_OBSERVED') {
+                    Set-V4RepairServer -ExpectedServer $target -NewServer $prevVal
+                    $restored = Get-V4SystemProxy
+                    if ($restored.enabled -ne $prev.enabled -or $restored.server -ne $prev.server) {
+                        throw 'previous Windows proxy values did not match after restore'
                     }
+                    Write-V4Log ('repair failed; restored previous system proxy = {0}' -f $prevVal) -Level WARN
+                } elseif ($now.enabled -ne $prev.enabled -or $now.server -ne $prevVal) {
+                    Write-V4Log 'repair failed; Windows proxy changed independently and was left as observed' -Level WARN
                 }
+                Complete-V4RepairReceipt $receipt
             }
             catch {
                 Write-V4Log ('repair failed and previous proxy could not be verified after restore: ' + (Get-V4Redacted $_.Exception.Message)) -Level ERROR
@@ -267,5 +307,6 @@ catch {
 }
 finally {
     if ($lock) { $null = Exit-V4Lock $lock }
+    if ($userLock) { $userLock.ReleaseMutex(); $userLock.Dispose() }
     exit $exit
 }

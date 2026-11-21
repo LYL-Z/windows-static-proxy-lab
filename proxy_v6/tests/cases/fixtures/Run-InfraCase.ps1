@@ -373,7 +373,7 @@ try {
             Add-Content -LiteralPath $fixtureLib -Encoding ASCII -Value @'
 if (-not $script:TestMode) { throw 'fixture requires test mode' }
 $script:listenerReads = 0
-$script:proxyValue = 'old:1234'
+$script:proxyValue = '127.0.0.1:19321'
 function Get-V4Settings { [pscustomobject]@{host='203.0.113.10';hopPort=19321;mixedPort=19322} }
 function Get-V4Paths { @{AppData=$script:Root;Core='fixture.exe'} }
 function Get-V4UiSystemProxy { $true }
@@ -401,7 +401,7 @@ function Get-V4ExitIp {
 Set-V4TestRegistryWriter {
     param($Enabled,$Server)
     [IO.File]::AppendAllText($env:V68_WRITE_LOG, $Server + [Environment]::NewLine)
-    if ($env:V68_CASE -eq 'RestoreFails' -and $Server -eq 'old:1234') { throw 'fixture restore failure' }
+    if ($env:V68_CASE -eq 'RestoreFails' -and $Server -eq '127.0.0.1:19321') { throw 'fixture restore failure' }
     $script:proxyValue = $Server
 }
 '@
@@ -412,8 +412,8 @@ Set-V4TestRegistryWriter {
                     @{name='NoOwner';code=32;writes='';message='listener could not be verified'},
                     @{name='CoreChanged';code=32;writes='';message='listener changed during the probe'},
                     @{name='WrongExit';code=31;writes='';message='nothing changed'},
-                    @{name='CoreLostAfterWrite';code=32;writes='127.0.0.1:19322,old:1234';message='restored previous system proxy'},
-                    @{name='RestoreFails';code=40;writes='127.0.0.1:19322,old:1234';message='restore of previous settings could not be verified'}
+                    @{name='CoreLostAfterWrite';code=32;writes='127.0.0.1:19322,127.0.0.1:19321';message='restored previous system proxy'},
+                    @{name='RestoreFails';code=40;writes='127.0.0.1:19322,127.0.0.1:19321';message='restore of previous settings could not be verified'}
                 )) {
                     $env:V68_CASE = $variant.name
                     [IO.File]::WriteAllText($env:V68_WRITE_LOG, '')

@@ -10,10 +10,13 @@
 param([string]$SnapshotDir, [switch]$List, [switch]$KeepSystemProxy)
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'lib\V4.ps1')
-$null = Enable-V4ProductionWrites
-$null = Start-V4Log 'rollback'
+if (-not $List) {
+    $null = Enable-V4ProductionWrites
+    $null = Start-V4Log 'rollback'
+}
 $exit = 0
 $lock = $null
+$userLock = $null
 $mixedPort = 7897
 
 function Get-RollbackSnapshots {
@@ -25,12 +28,6 @@ function Get-RollbackSnapshots {
 }
 
 try {
-    try {
-        $settings = Get-V4Settings
-        $mixedPort = [int]$settings.mixedPort
-    }
-    catch { }
-
     if ($List) {
         $all = @(Get-RollbackSnapshots)
         if (-not $all) { Write-V4Log 'no snapshots' -Level WARN; return }
@@ -40,7 +37,9 @@ try {
         }
         return
     }
-    $lock = Enter-V4Lock
+    try { $mixedPort = [int](Get-V4Settings -StatusOnly).mixedPort } catch { }
+    $userLock = Enter-V4UserMutationLock
+    if ($userLock) { $lock = Enter-V4Lock }
     if (-not $lock) {
         Write-V4Log 'another operation holds the lock' -Level ERROR
         $exit = 33
@@ -50,6 +49,11 @@ try {
     # R2A-01: lock is held until after any补救 restart. Only a failure that
     # actually entered restore may start the app; a pre-restore failure must not.
     try {
+        if (Get-V4RepairReceipt) {
+            Write-V4Log 'interrupted or unreadable repair receipt; review before rollback' -Level ERROR
+            $exit = 34
+            return
+        }
         $restoreAttempted = $false
         try {
             $journal = Get-V4Journal
@@ -124,4 +128,7 @@ catch {
     Write-V4Log ('rollback refused/failed before restore: ' + (Get-V4Redacted $_.Exception.Message)) -Level ERROR
     $exit = 40
 }
-finally { exit $exit }
+finally {
+    if ($userLock) { $userLock.ReleaseMutex(); $userLock.Dispose() }
+    exit $exit
+}

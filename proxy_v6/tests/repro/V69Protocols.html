@@ -1,0 +1,62 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Local protocol fixture</title>
+<img src="hold" alt="">
+<script>
+// Run before window.load. The fixture releases the image after the result POST.
+(async () => {
+  const session = await (await fetch('setup')).json();
+  const config = {iceServers: [{urls: 'stun:127.0.0.1:' + session.port}]};
+  const peers = [new RTCPeerConnection(config), new RTCPeerConnection(config)];
+  const pending = [[], []];
+  const result = {gathered: [], gatheringState: [], dataSent: false, dataReceived: false,
+    selectedTransport: null, error: null};
+  let received;
+  const delivered = new Promise(resolve => { received = resolve; });
+  try {
+    peers.forEach((peer, i) => {
+      peer.onicecandidate = async ({candidate}) => {
+        if (!candidate) return;
+        // Only record type and transport. Never serialize addresses or SDP.
+        result.gathered.push([i, candidate.type, candidate.protocol]);
+        const other = peers[1 - i];
+        try {
+          if (other.remoteDescription) await other.addIceCandidate(candidate);
+          else pending[1 - i].push(candidate);
+        } catch (e) { result.error = e.name; }
+      };
+    });
+    const tx = peers[0].createDataChannel('local-echo');
+    peers[1].ondatachannel = ({channel}) => {
+      channel.onmessage = ({data}) => {
+        if (data === session.challenge) {
+          result.dataReceived = true;
+          channel.send('ack-' + data);
+        }
+      };
+    };
+    tx.onopen = () => { tx.send(session.challenge); result.dataSent = true; };
+    tx.onmessage = ({data}) => {
+      if (data === 'ack-' + session.challenge) received('round-trip');
+    };
+    await peers[0].setLocalDescription(await peers[0].createOffer());
+    await peers[1].setRemoteDescription(peers[0].localDescription);
+    for (const c of pending[1]) await peers[1].addIceCandidate(c);
+    await peers[1].setLocalDescription(await peers[1].createAnswer());
+    await peers[0].setRemoteDescription(peers[1].localDescription);
+    for (const c of pending[0]) await peers[0].addIceCandidate(c);
+    result.outcome = await Promise.race([delivered,
+      new Promise(resolve => setTimeout(() => resolve('observation-timeout'), 5500))]);
+    const stats = await peers[0].getStats();
+    const transport = [...stats.values()].find(s => s.type === 'transport' && s.selectedCandidatePairId);
+    const pair = transport && stats.get(transport.selectedCandidatePairId);
+    const local = pair && stats.get(pair.localCandidateId);
+    result.selectedTransport = local?.protocol || null;
+  } catch (e) { result.error = e.name; }
+  finally {
+    result.gatheringState = peers.map(p => p.iceGatheringState);
+    peers.forEach(p => p.close());
+  }
+  await fetch('result', {method: 'POST', body: JSON.stringify(result)});
+})().catch(() => fetch('result', {method: 'POST', body: '{"error":"fixture-error"}'}));
+</script>
