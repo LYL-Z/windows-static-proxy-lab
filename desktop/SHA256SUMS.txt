@@ -1,5 +1,8 @@
-FE1BB05C8A2E6F27B2F517DDE7FB83ED3AD83DD839E98B28E34E8CB81B789D4A  ProxyDoctor.exe
+DD7C1C378520F33EE66A1D54C48228D01C018E8A1665285B76ECAC34F9AA4533  ProxyDoctor.exe
+A05264A6F9DA04896A9043368FC8327616668BA79EB5405865790A0B0A51F422  ProxyDoctor.dll
+AE336C11A86AFFA7B66C71B0BBCD341DCC59031F632419E60E2F9CEB9488E7CD  ProxyDoctor.Core.dll
 
-The hash is for the unsigned self-contained win-x64 publish.
+The hashes are for the unsigned self-contained win-x64 publish.
 The publish folder is local and is not stored in git.
 There is no Authenticode signature.
+The portable folder also contains proxy_v4\rollback-v4.ps1 and lib\V4.ps1 so isolated recovery does not read another copy.

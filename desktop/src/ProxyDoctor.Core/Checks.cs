@@ -13,7 +13,7 @@ public sealed record CheckResult(
 public static class CheckRunner
 {
     public static IReadOnlyList<string> Ids { get; } =
-        ["selection", "listeners", "ipv4", "ipv6", "https", "claude-status"];
+        ["selection", "listeners", "ipv4", "ipv6", "udp", "dns", "doh", "https", "claude-status", "webrtc"];
 
     public static async Task<IReadOnlyList<CheckResult>> RunAll(CancellationToken cancellationToken)
     {
@@ -35,8 +35,14 @@ public static class CheckRunner
             "listeners" => Listeners(at),
             "ipv4" => FromCapability("ipv4", "IPv4 回环", "确认本机 IPv4 回环还能交换数据。", LiveChecks.Loopback("IPv4 回环", System.Net.Sockets.AddressFamily.InterNetwork), at),
             "ipv6" => FromCapability("ipv6", "IPv6 回环", "记录 IPv6 回环是交换成功、明确拒绝还是超时。", LiveChecks.Loopback("IPv6 回环", System.Net.Sockets.AddressFamily.InterNetworkV6), at),
+            "udp" => FromCapability("udp", "UDP 回环", "确认本机 UDP 回环还能收到测试字节。", LiveChecks.UdpLoopback(), at),
+            "dns" => await Dns(at),
+            "doh" => await Doh(at, cancellationToken),
             "https" => await Https(at, cancellationToken),
             "claude-status" => await Claude(at, cancellationToken),
+            "webrtc" => new CheckResult("webrtc", "WebRTC", "区分实验室、这台电脑和已部署保护。",
+                "这次没有启动浏览器，也没有接收端计数。", EvidenceState.NotVerified,
+                at.ToString("HH:mm:ss") + " 没有采集浏览器候选地址。固定说明不能当成已检测。", at, false),
             _ => new CheckResult(id, id, "未知项目", "未执行", EvidenceState.Unknown, "没有这项检查。", at, false)
         };
     }
@@ -52,14 +58,18 @@ public static class CheckRunner
 
     private static CheckResult Listeners(DateTimeOffset at)
     {
-        var rows = NetworkReader.ReadListeners();
-        var detail = rows.Count == 0
+        var read = NetworkReader.ReadListeners();
+        if (!read.Complete)
+            return new CheckResult("listeners", "回环监听", "看本机回环上谁在监听，不用固定端口猜测角色。",
+                "netstat -ano -p tcp，只保留 LISTENING 或侦听，再按 PID 取进程名。",
+                EvidenceState.Unknown, "读取超时或不完整。不能把缺少的行当成端口已关闭。", at, false);
+        var detail = read.Rows.Count == 0
             ? "没有读到代理相关的回环 LISTENING 记录。空结果不能当成端口已经关闭。"
-            : string.Join("；", rows.Select(item => item.Port + " " + item.ProcessName))
+            : string.Join("；", read.Rows.Select(item => item.Port + " " + item.ProcessName))
               + "。另有 " + NetworkReader.OtherLoopbackListenerCount() + " 个非代理回环监听，未列出名称。";
         return new CheckResult("listeners", "回环监听", "看本机回环上谁在监听，不用固定端口猜测角色。",
             "netstat -ano -p tcp，只保留 LISTENING 或侦听，再按 PID 取进程名。",
-            rows.Count == 0 ? EvidenceState.Unknown : EvidenceState.Verified, detail, at, false);
+            EvidenceState.Verified, detail, at, false);
     }
 
     private static async Task<CheckResult> Https(DateTimeOffset at, CancellationToken cancellationToken)
@@ -87,8 +97,55 @@ public static class CheckRunner
             probe.StatusCode is null ? EvidenceState.Unknown : EvidenceState.Verified, detail, at, false);
     }
 
+    private static async Task<CheckResult> Dns(DateTimeOffset at)
+    {
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        try
+        {
+            var answers = await System.Net.Dns.GetHostAddressesAsync("example.com");
+            return new CheckResult("dns", "系统 DNS", "问系统解析器，不判断泄漏是否已经修复。",
+                "Dns.GetHostAddresses(example.com)。这是当前电脑的实时解析，不是实验室结论，也不是生产保护。",
+                answers.Length > 0 ? EvidenceState.Verified : EvidenceState.Unknown,
+                at.ToString("HH:mm:ss") + " example.com 得到 " + answers.Length + " 个地址，" + watch.ElapsedMilliseconds + " ms。有应答不等于没有泄漏。",
+                at, false);
+        }
+        catch (Exception ex) when (ex is System.Net.Sockets.SocketException or ArgumentException)
+        {
+            return new CheckResult("dns", "系统 DNS", "问系统解析器，不判断泄漏是否已经修复。",
+                "Dns.GetHostAddresses(example.com)。", EvidenceState.Unknown,
+                at.ToString("HH:mm:ss") + " " + ex.GetType().Name + "，" + watch.ElapsedMilliseconds + " ms。失败不是已确认的泄漏。",
+                at, false);
+        }
+    }
+
+    private static async Task<CheckResult> Doh(DateTimeOffset at, CancellationToken cancellationToken)
+    {
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        try
+        {
+            using var client = new HttpClient(new SocketsHttpHandler { UseProxy = true, Proxy = HttpClient.DefaultProxy })
+            {
+                Timeout = TimeSpan.FromSeconds(8)
+            };
+            using var response = await client.GetAsync("https://dns.google/resolve?name=example.com&type=A", cancellationToken);
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            return new CheckResult("doh", "DoH 端点", "看当前默认代理路径能否到达一个中性 DoH 端点。",
+                "GET https://dns.google/resolve?name=example.com&type=A。不是浏览器 DoH 开关，也不是泄漏已修复。",
+                response.IsSuccessStatusCode ? EvidenceState.Partial : EvidenceState.Unknown,
+                at.ToString("HH:mm:ss") + " HTTP " + (int)response.StatusCode + "，" + watch.ElapsedMilliseconds + " ms，正文 " + Math.Min(body.Length, 180) + " 字节。",
+                at, false);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            return new CheckResult("doh", "DoH 端点", "看当前默认代理路径能否到达一个中性 DoH 端点。",
+                "GET https://dns.google/resolve?name=example.com&type=A。", EvidenceState.Unknown,
+                at.ToString("HH:mm:ss") + " " + ex.GetType().Name + "，" + watch.ElapsedMilliseconds + " ms。",
+                at, false);
+        }
+    }
+
     private static CheckResult FromCapability(string id, string name, string purpose, CapabilityFact fact, DateTimeOffset at) =>
-        new(id, name, purpose, "本进程发起一次回环 TCP，并在同一进程接收。", fact.State, fact.Detail, at, false);
+        new(id, name, purpose, "本进程发起一次回环交换，并在同一进程接收。", fact.State, fact.Detail, at, false);
 }
 
 public sealed class AlertGate

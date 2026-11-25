@@ -119,6 +119,35 @@ public class ClassifierTests
     public void A_setup_sentence_is_not_a_fault() =>
         Assert.False(RequestRouter.IsDiagnoseRequest("帮我准备代理设置"));
 
+    [Theory]
+    [InlineData(1, "127.0.0.1:18080", "127.0.0.1:18080")]
+    [InlineData(1, "10.1.2.3:7897", "TARGET_OTHER")]
+    [InlineData(0, "127.0.0.1:7897", "OFF")]
+    public void Proxy_text_keeps_any_loopback_port(int enable, string server, string expected) =>
+        Assert.Equal(expected, NetworkReader.FormatProxyServer(enable, server));
+
+    [Fact]
+    public void Multiple_core_listeners_follow_the_selected_port()
+    {
+        var listeners = new ListenerFact[]
+        {
+            new(7897, "verge-mihomo", true),
+            new(18080, "verge-mihomo", true)
+        };
+        Assert.Equal(18080, NetworkReader.ChooseCore(listeners, "127.0.0.1:18080")?.Port);
+        Assert.Null(NetworkReader.ChooseCore(listeners, "127.0.0.1:9"));
+    }
+
+    [Fact]
+    public void User_off_blocks_an_enabling_snapshot_and_rollback_restores()
+    {
+        var proxy = new IsolatedProxy { UserOff = true };
+        Assert.Equal(32, proxy.ApplySnapshot(true, "127.0.0.1:9"));
+        Assert.False(proxy.Enabled);
+        proxy.Rollback();
+        Assert.False(proxy.Enabled);
+    }
+
     [Fact]
     public void Alert_gate_is_silent_until_the_key_changes()
     {
@@ -127,6 +156,68 @@ public class ClassifierTests
         Assert.False(gate.ShouldNotify("Aligned|127.0.0.1:7897"));
         Assert.True(gate.ShouldNotify("ProxyDrift|127.0.0.1:11119"));
         Assert.False(gate.ShouldNotify("ProxyDrift|127.0.0.1:11119"));
+    }
+
+    [Fact]
+    public void Stale_paused_or_demo_samples_are_dropped()
+    {
+        Assert.False(SampleGate.Accept(1, 2, false, false));
+        Assert.False(SampleGate.Accept(1, 1, true, false));
+        Assert.False(SampleGate.Accept(1, 1, false, true));
+        Assert.True(SampleGate.Accept(4, 4, false, false));
+    }
+
+    [Fact]
+    public void Expired_or_failed_monitor_samples_are_not_shown_as_healthy()
+    {
+        var sample = new ChannelSample("upstream", "上游", DateTimeOffset.Now.AddMinutes(-5),
+            TimeSpan.FromSeconds(90), TimeSpan.FromSeconds(180), EvidenceState.Verified, "old", null);
+        Assert.Equal(EvidenceState.Unknown, sample.Display(DateTimeOffset.Now, false));
+        Assert.Equal(EvidenceState.Fault, sample.Display(DateTimeOffset.Now, true));
+    }
+
+    [Fact]
+    public void Repeated_failures_and_flaps_are_counted_separately()
+    {
+        var streak = new FaultStreak();
+        Assert.Equal("new", streak.Observe("down"));
+        Assert.Equal("repeat", streak.Observe("down"));
+        Assert.Equal(2, streak.Consecutive);
+        Assert.Equal("recovered", streak.Observe(null));
+        Assert.Equal(1, streak.Flaps);
+        Assert.Equal("new", streak.Observe("down"));
+        Assert.Equal(2, streak.Flaps);
+    }
+
+    [Fact]
+    public void Listener_up_and_upstream_down_does_not_restart_the_client()
+    {
+        var text = ClientLayers.Decide(true, true, false, false);
+        Assert.Contains("不会重启", text);
+        Assert.Contains("不等于加速", text);
+    }
+
+    [Fact]
+    public async Task Wrong_authorization_does_not_start_the_rollback_script()
+    {
+        var run = await IsolatedRecovery.ExecuteAsync("no", CancellationToken.None);
+        Assert.False(run.ScriptStarted);
+        Assert.Equal(-1, run.TransactionExit);
+    }
+
+    [Fact]
+    public async Task Isolated_rollback_returns_32_and_leaves_the_live_proxy()
+    {
+        var before = NetworkReader.LiveProxyStamp();
+        var run = await IsolatedRecovery.ExecuteAsync(IsolatedRecovery.AuthorizationText, CancellationToken.None);
+        Assert.True(run.ScriptStarted, run.Detail);
+        Assert.Equal(32, run.TransactionExit);
+        Assert.True(run.LiveUnchanged);
+        Assert.True(run.ProfileRestored);
+        Assert.False(run.JournalRemains);
+        Assert.Contains("enabled=0", run.Writes);
+        Assert.DoesNotContain("enabled=1", run.Writes);
+        Assert.Equal(before, NetworkReader.LiveProxyStamp());
     }
 
     [Fact]

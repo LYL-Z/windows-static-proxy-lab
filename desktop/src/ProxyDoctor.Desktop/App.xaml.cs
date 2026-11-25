@@ -8,13 +8,17 @@ public partial class App : System.Windows.Application
     private NotifyIcon? _tray;
 
     public static string? CapturePath { get; private set; }
+    public static string? Section { get; private set; }
+    public static bool Recover { get; private set; }
 
     private void OnStartup(object sender, StartupEventArgs e)
     {
         for (var i = 0; i < e.Args.Length - 1; i++)
         {
             if (e.Args[i] == "--capture") CapturePath = e.Args[i + 1];
+            if (e.Args[i] == "--section") Section = e.Args[i + 1];
         }
+        Recover = e.Args.Contains("--recover");
         var window = new MainWindow();
         MainWindow = window;
         if (window.DataContext is ShellViewModel shell)

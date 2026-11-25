@@ -39,7 +39,15 @@ public static class CapabilityCatalog
 
 public static class NetworkReader
 {
-    public static FaultObservation ReadObservation()
+    public static string LiveProxyStamp()
+    {
+        using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Internet Settings");
+        var enable = key?.GetValue("ProxyEnable")?.ToString() ?? "missing";
+        var server = key?.GetValue("ProxyServer") as string ?? "";
+        return enable + "|" + server;
+    }
+
+    public static FaultObservation ReadObservation(ListenerSnapshot? listeners = null)
     {
         using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Internet Settings");
         if (key is null)
@@ -49,14 +57,17 @@ public static class NetworkReader
         bool? proxyEnabled = enable is int number ? number == 1 : null;
         var server = key.GetValue("ProxyServer") as string;
         var auto = key.GetValue("AutoConfigURL") as string;
-        var listeners = ReadListeners();
-        var coreListener = listeners.FirstOrDefault(item => item.ProcessName.Equals("verge-mihomo", StringComparison.OrdinalIgnoreCase));
-        var corePort = coreListener is not null;
+        listeners ??= ReadListeners();
+        var coreListener = listeners.Complete ? ChooseCore(listeners.Rows, server) : null;
+        var corePort = listeners.Complete ? coreListener is not null : (bool?)null;
         var coreOwned = corePort;
-        var hopOpen = listeners.Any(item => item.ProcessName.Equals("magicspeed", StringComparison.OrdinalIgnoreCase));
-        var targets = coreListener is not null && string.Equals(server?.Trim(), "127.0.0.1:" + coreListener.Port, StringComparison.Ordinal);
+        var hopOpen = listeners.Complete
+            ? listeners.Rows.Any(item => item.ProcessName.Equals("magicspeed", StringComparison.OrdinalIgnoreCase))
+            : (bool?)null;
+        var targets = listeners.Complete && coreListener is not null &&
+            string.Equals(server?.Trim(), "127.0.0.1:" + coreListener.Port, StringComparison.Ordinal);
         var clients = ReadClients();
-        var hopExpected = hopOpen || clients.Any(name =>
+        var hopExpected = hopOpen == true || clients.Any(name =>
             name.Equals("magicspeed", StringComparison.OrdinalIgnoreCase) ||
             name.Equals("StarSky", StringComparison.OrdinalIgnoreCase));
         var coreRunning = clients.Any(name => name.Equals("verge-mihomo", StringComparison.OrdinalIgnoreCase));
@@ -66,7 +77,7 @@ public static class NetworkReader
             ProxyEnabled = proxyEnabled,
             UiEnabled = ReadClashUiEnabled(),
             PacConfigured = !string.IsNullOrWhiteSpace(auto),
-            ProxyTargetsExpected = proxyEnabled == true ? targets : null,
+            ProxyTargetsExpected = proxyEnabled == true ? (bool?)targets : null,
             CoreRunning = coreRunning,
             MixedPortOpen = corePort,
             MixedIpv4CoreOwned = coreOwned,
@@ -81,10 +92,35 @@ public static class NetworkReader
         using var key = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Internet Settings");
         if (key?.GetValue("ProxyEnable") is not int enable)
             return "UNKNOWN";
+        return FormatProxyServer(enable, key.GetValue("ProxyServer") as string);
+    }
+
+    public static string FormatProxyServer(int enable, string? server)
+    {
         if (enable == 0) return "OFF";
-        var server = (key.GetValue("ProxyServer") as string)?.Trim();
-        if (server is "127.0.0.1:7897" or "127.0.0.1:11119") return server;
-        return "TARGET_OTHER";
+        return TryParseLoopback(server, out var text) ? text : "TARGET_OTHER";
+    }
+
+    public static bool TryParseLoopback(string? server, out string normalized)
+    {
+        normalized = "";
+        var text = server?.Trim();
+        if (string.IsNullOrEmpty(text)) return false;
+        var parts = text.Split(':');
+        if (parts.Length != 2 || !parts[0].Equals("127.0.0.1", StringComparison.Ordinal)) return false;
+        if (!int.TryParse(parts[1], out var port) || port is < 1 or > 65535) return false;
+        normalized = "127.0.0.1:" + port;
+        return true;
+    }
+
+    public static ListenerFact? ChooseCore(IReadOnlyList<ListenerFact> listeners, string? proxyServer)
+    {
+        var cores = listeners.Where(item => item.ProcessName.Equals("verge-mihomo", StringComparison.OrdinalIgnoreCase)).ToArray();
+        if (cores.Length == 0) return null;
+        if (cores.Length == 1) return cores[0];
+        if (!TryParseLoopback(proxyServer, out var selected)) return null;
+        var port = int.Parse(selected.Split(':')[1], System.Globalization.CultureInfo.InvariantCulture);
+        return cores.FirstOrDefault(item => item.Port == port);
     }
 
     public static bool AutomaticProxySet()
@@ -99,14 +135,15 @@ public static class NetworkReader
         return names.Where(name => Process.GetProcessesByName(name).Length > 0).ToArray();
     }
 
-    public static IReadOnlyList<ListenerFact> ReadListeners()
+    public static ListenerSnapshot ReadListeners()
     {
-        var owners = ReadLoopbackOwners();
-        return owners
+        var read = ReadLoopbackOwners();
+        var rows = read.Rows
             .Where(item => IsProxyProcess(item.ProcessName))
             .Select(item => new ListenerFact(item.Port, item.ProcessName, true))
             .Distinct()
             .ToArray();
+        return new ListenerSnapshot(rows, read.Complete);
     }
 
     private static bool? ReadClashUiEnabled()
@@ -130,7 +167,8 @@ public static class NetworkReader
 
     public static int OtherLoopbackListenerCount()
     {
-        return ReadLoopbackOwners().Count(item => !IsProxyProcess(item.ProcessName));
+        var read = ReadLoopbackOwners();
+        return read.Complete ? read.Rows.Count(item => !IsProxyProcess(item.ProcessName)) : -1;
     }
 
     private static bool IsProxyProcess(string name) =>
@@ -140,7 +178,7 @@ public static class NetworkReader
         name.Equals("clash-verge", StringComparison.OrdinalIgnoreCase) ||
         name.Equals("StarSky", StringComparison.OrdinalIgnoreCase);
 
-    private static IEnumerable<(int Port, string ProcessName)> ReadLoopbackOwners()
+    private static RawListeners ReadLoopbackOwners()
     {
         var start = new ProcessStartInfo("netstat", "-ano -p tcp")
         {
@@ -149,14 +187,16 @@ public static class NetworkReader
             CreateNoWindow = true
         };
         using var process = Process.Start(start);
-        if (process is null) yield break;
+        if (process is null) return new RawListeners([], false);
         var read = process.StandardOutput.ReadToEndAsync();
-        if (!process.WaitForExit(4000))
+        var exited = process.WaitForExit(4000);
+        if (!exited)
         {
             try { process.Kill(entireProcessTree: true); } catch { /* already gone */ }
         }
-        if (!read.Wait(1000)) yield break;
+        if (!read.Wait(1000)) return new RawListeners([], false);
         var output = read.Result;
+        var rows = new List<(int Port, string ProcessName)>();
         foreach (var line in output.Split('\n'))
         {
             var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -167,18 +207,20 @@ public static class NetworkReader
             var loopback = local.StartsWith("127.0.0.1:", StringComparison.Ordinal) ||
                            local.StartsWith("[::1]:", StringComparison.Ordinal);
             if (!loopback) continue;
-            var portText = local.StartsWith("[", StringComparison.Ordinal)
-                ? local.Split(':')[^1]
-                : local.Split(':')[^1];
+            var portText = local.Split(':')[^1];
             if (!int.TryParse(portText, out var port)) continue;
             if (!int.TryParse(parts[^1], out var pid)) continue;
             string name;
             try { name = Process.GetProcessById(pid).ProcessName; }
             catch { name = "unknown"; }
-            yield return (port, name);
+            rows.Add((port, name));
         }
+        return new RawListeners(rows, exited);
     }
 }
+
+public sealed record ListenerSnapshot(IReadOnlyList<ListenerFact> Rows, bool Complete);
+public sealed record RawListeners(IReadOnlyList<(int Port, string ProcessName)> Rows, bool Complete);
 
 public static class HttpsProbe
 {
@@ -211,17 +253,22 @@ public static class DiagnosticEngine
 {
     public static DiagnosticReport ReadLocal()
     {
-        var observation = NetworkReader.ReadObservation();
+        var listeners = NetworkReader.ReadListeners();
+        var observation = NetworkReader.ReadObservation(listeners);
         var fault = FaultClassifier.Classify(observation);
         return Build(false, observation, fault, NetworkReader.DescribeSelection(), NetworkReader.AutomaticProxySet(),
-            NetworkReader.ReadListeners(), NetworkReader.ReadClients(),
+            listeners.Rows, NetworkReader.ReadClients(),
             [],
-            [new CapabilityFact("本地心跳", EvidenceState.Verified, $"{DateTimeOffset.Now:HH:mm:ss} 只读了代理开关、进程和回环监听。这次心跳没有做外部 HTTPS，也没有做回环交换。")]);
+            [new CapabilityFact("本地心跳", listeners.Complete ? EvidenceState.Partial : EvidenceState.Unknown,
+                listeners.Complete
+                    ? $"{DateTimeOffset.Now:HH:mm:ss} 只读了代理开关、进程和回环监听。这次心跳没有做外部 HTTPS。监听正常不等于上游可用。"
+                    : $"{DateTimeOffset.Now:HH:mm:ss} 监听读取不完整，不能当成端口已经关闭。")]);
     }
 
     public static async Task<DiagnosticReport> ReadLiveAsync(CancellationToken cancellationToken)
     {
-        var observation = NetworkReader.ReadObservation();
+        var listeners = NetworkReader.ReadListeners();
+        var observation = NetworkReader.ReadObservation(listeners);
         var fault = FaultClassifier.Classify(observation);
         var probes = new List<ProbeFact>(await HttpsProbe.SampleAsync(cancellationToken))
         {
@@ -236,7 +283,7 @@ public static class DiagnosticEngine
             new("整机网络阻断", EvidenceState.NotVerified, "没有在本次检查中安装防火墙规则。进程守卫不是整机阻断。")
         };
         return Build(false, observation, fault, NetworkReader.DescribeSelection(), NetworkReader.AutomaticProxySet(),
-            NetworkReader.ReadListeners(), NetworkReader.ReadClients(), probes, capabilities);
+            listeners.Rows, NetworkReader.ReadClients(), probes, capabilities);
     }
 
     public static DiagnosticReport Demo()

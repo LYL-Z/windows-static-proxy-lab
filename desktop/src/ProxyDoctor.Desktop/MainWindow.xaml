@@ -54,6 +54,7 @@
           <StackPanel>
             <TextBlock Text="{Binding Status}" FontSize="28" FontWeight="SemiBold" />
             <TextBlock Text="{Binding Summary}" Foreground="{DynamicResource App.Muted}" TextWrapping="Wrap" Margin="0,6,80,0" />
+            <TextBlock Text="{Binding UpstreamLine}" TextWrapping="Wrap" Margin="0,8,80,0" />
           </StackPanel>
         </DockPanel>
 
@@ -100,6 +101,9 @@
                       <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
                     </DockPanel>
                     <TextBlock Text="{Binding Detail}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                    <Button Content="重测这项" HorizontalAlignment="Left" Margin="0,8,0,0"
+                            Command="{Binding DataContext.RecheckCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                            CommandParameter="{Binding Id}" />
                   </StackPanel>
                 </Border>
               </DataTemplate>
@@ -120,15 +124,27 @@
         <StackPanel x:Name="RecoveryPage" Visibility="Collapsed">
           <Border Style="{StaticResource Card}">
             <StackPanel>
-              <TextBlock Text="建议" FontSize="20" FontWeight="SemiBold" />
+              <TextBlock Text="恢复" FontSize="20" FontWeight="SemiBold" />
               <TextBlock Text="{Binding Advice}" TextWrapping="Wrap" Margin="0,8,0,12" />
-              <TextBlock Text="{Binding Monitor}" TextWrapping="Wrap" Foreground="{DynamicResource App.Muted}" />
-              <TextBlock Text="下面两个动作只写本程序自己的记录，或者只在内存里演练。它们不改 Windows 代理。" TextWrapping="Wrap" Margin="0,8,0,0" />
+              <TextBlock Text="{Binding RecoveryLog}" TextWrapping="Wrap" LineHeight="24" />
+              <TextBlock Text="授权文字是：授权隔离事务，不修改当前 Windows。点击执行才会启动脚本。" TextWrapping="Wrap" Margin="0,12,0,0" Foreground="{DynamicResource App.Muted}" />
               <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
-                <Button Content="演练：关闭时不打开" Command="{Binding RehearseCommand}" Margin="0,0,8,0" />
+                <Button Content="预览方案" Command="{Binding PreviewRecoveryCommand}" Margin="0,0,8,0" />
+                <Button Content="授权并执行隔离回滚" Command="{Binding RunIsolatedRecoveryCommand}" Margin="0,0,8,0" />
                 <Button Content="记录我关闭了代理" Command="{Binding RecordOffCommand}" Margin="0,0,8,0" />
                 <Button Content="清除这条记录" Command="{Binding ClearIntentCommand}" />
               </StackPanel>
+            </StackPanel>
+          </Border>
+        </StackPanel>
+
+        <StackPanel x:Name="MonitorPage" Visibility="Collapsed">
+          <Border Style="{StaticResource Card}">
+            <StackPanel>
+              <TextBlock Text="监测通道" FontSize="20" FontWeight="SemiBold" />
+              <TextBlock Text="{Binding Monitor}" TextWrapping="Wrap" Margin="0,8,0,12" />
+              <TextBlock Text="{Binding Channels}" TextWrapping="Wrap" LineHeight="26" />
+              <TextBlock Text="{Binding UpstreamLine}" TextWrapping="Wrap" Margin="0,12,0,0" />
             </StackPanel>
           </Border>
         </StackPanel>

@@ -1,8 +1,10 @@
-# Windows Proxy Doctor Desktop 1.0
+# Windows Proxy Doctor Desktop 1.2
 
-中文名：网络代理医生。它是一个以当前用户权限运行的 Windows 桌面程序，用来做只读的代理检查。故障分类与 Windows Proxy Doctor Skill 2.0.0 RC2 一致。
+中文名：网络代理医生。它以当前用户权限运行。故障分类与已合并的 Windows Proxy Doctor Skill 一致。
 
-这一版不写入系统代理，不重启 StarSky 或 Clash，也不提供“保证不封号”或地区身份。
+只读检查不写入系统代理。恢复按钮会把 `proxy_v4\rollback-v4.ps1` 复制到临时目录，强制 `V4_TEST_MODE=1`，执行后删除临时目录，并比较执行前后的当前用户代理指纹。它不重启 StarSky 或 Clash，也不提供账号安全结论。
+
+本地心跳每 20 秒采样。上游 HTTPS 每 90 秒单独采样。协议检查只在点击时运行。一条通道失败不会被另一条通道的旧结果显示成正常。
 
 构建：
 
