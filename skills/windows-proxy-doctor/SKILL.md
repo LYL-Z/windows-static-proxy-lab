@@ -30,7 +30,7 @@ The default guide reads local state. Keep active HTTPS/DNS probes explicit and s
 | First launch, installation choices and resuming | [Getting started](references/getting-started.md) |
 | Inventory, alternate installations and ambiguous results | [Environment discovery](references/environment-discovery.md) |
 | User decisions, trust checks, commercial disclosure and checkpoints | [User interaction](references/user-interaction.md) |
-| Symptom to evidence, recovery and verification | [Troubleshooting](references/troubleshooting.md) |
+| Symptom to evidence, recovery and verification | [Troubleshooting](references/troubleshooting.md). An isolated recovery is successful only when `Test-ProxyDoctorRecoveryResult` in `scripts/RecoveryVerdict.ps1` reports `CompleteSuccess`. Transaction exit 32 by itself is not success, and `V4_TEST_MODE` is not an operating-system sandbox. |
 | Startup, switching and observed lifecycle limits | [Lifecycle observations](references/lifecycle-observations.md) and [reliability gaps](references/reliability-gaps.md) |
 | Technical evidence and publication | [Architecture](references/architecture.md), [targeted findings](references/targeted-findings.md), [safety](references/safety.md), [V1–V6 lessons](references/v1-v6-lessons.md) |
 

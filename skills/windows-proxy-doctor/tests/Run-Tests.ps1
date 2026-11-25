@@ -193,6 +193,23 @@ try {
         Assert-True ($rejectedExit -ne 0 -and -not (Test-Path -LiteralPath $rejectedZip)) 'invalid hash yielded plaintext output'
         Assert-True ((Get-Content -LiteralPath $sentinel) -eq 'existing-file') 'existing temporary file was overwritten or deleted'
     }
+    Check 'recovery-exit-code-alone-is-not-success' {
+        . (Join-Path $root 'scripts\RecoveryVerdict.ps1')
+        $onlyCode = [pscustomobject]@{
+            ScriptStarted = $true; Cancelled = $false; TimedOut = $false
+            ProcessExit = 0; TransactionExit = 32; ExpectedTransactionExit = 32
+            ProfileRestored = $false; WritesMatch = $false; JournalClear = $false; LiveUnchanged = $true
+        }
+        $rejected = Test-ProxyDoctorRecoveryResult $onlyCode
+        Assert-True (-not $rejected.CompleteSuccess) 'exit 32 alone was accepted'
+        $complete = [pscustomobject]@{
+            ScriptStarted = $true; Cancelled = $false; TimedOut = $false
+            ProcessExit = 0; TransactionExit = 32; ExpectedTransactionExit = 32
+            ProfileRestored = $true; WritesMatch = $true; JournalClear = $true; LiveUnchanged = $true
+        }
+        $accepted = Test-ProxyDoctorRecoveryResult $complete
+        Assert-True ($accepted.CompleteSuccess) 'complete evidence was rejected'
+    }
 }
 finally { Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue }
 Write-Host ('COUNTS=' + $count + ' failures=' + $failures.Count)
