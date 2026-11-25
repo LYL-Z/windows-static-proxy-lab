@@ -209,6 +209,13 @@ try {
         }
         $accepted = Test-ProxyDoctorRecoveryResult $complete
         Assert-True ($accepted.CompleteSuccess) 'complete evidence was rejected'
+        $textBool = [pscustomobject]$complete
+        $textBool | Add-Member -Force -NotePropertyName ScriptStarted -NotePropertyValue 'true'
+        Assert-True (-not (Test-ProxyDoctorRecoveryResult $textBool).CompleteSuccess) 'string boolean was accepted'
+        $missing = [pscustomobject]@{ ScriptStarted = $true; TransactionExit = 32 }
+        Assert-True (-not (Test-ProxyDoctorRecoveryResult $missing).CompleteSuccess) 'missing fields were accepted'
+        Assert-True (-not (Test-ProxyDoctorRecoveryWrites "enabled=0 server=old:8080`nenabled=1 server=x")) 'extra write was accepted'
+        Assert-True (Test-ProxyDoctorRecoveryWrites "enabled=0 server=old:8080`r`n") 'exact write was rejected'
     }
 }
 finally { Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue }
