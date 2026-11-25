@@ -1,6 +1,6 @@
 # RELEASE-GATE-V6
 
-最后更新：2026-11-18T06:40-08:00
+最后更新：2026-11-25。V6.9 候选 `171d060` 隔离回归 114/114、退出码 0、跳过 0。两轮审查后没有未关闭的 HIGH。无条件生产发布仍然 NOT_READY。生产四脚本当时仍与 `854b6d6` 逐字节一致。
 结论：**SHORT_RUN_ACCEPTED（有条件）**；无条件生产发布 **NOT_READY**。条件：C-01/C-12 用户书面处置、V6 尚未部署到生产目录、真实 apply/rollback/boot 等 WAITING-USER；24h/72h DEFERRED。
 
 | # | Gate 条件 | 状态 | 证据 |
