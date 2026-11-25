@@ -1031,6 +1031,44 @@ function Start-V4Clash {
             }
             finally { Remove-Item Env:V4_TEST_APPDATA,Env:V4_FIXTURE_PROXY_WRITE_LOG,Env:V4_TEST_PROXY_ENABLE,Env:V4_TEST_PROXY_SERVER,Env:V4_TEST_EXIT_AFTER_JOURNAL -ErrorAction SilentlyContinue }
         }
+        'INF-ROLLBACK-09' {
+            $fx = New-SnapshotFixture
+            $env:V4_TEST_APPDATA = $fx.app
+            $env:V4_TEST_PROXY_ENABLE = '0'
+            $env:V4_TEST_PROXY_SERVER = 'old:8080'
+            $env:V4_FIXTURE_PROXY_WRITE_LOG = Join-Path $root 'proxy-write.log'
+            $rollback = Join-Path $root 'rollback-v4.ps1'
+            Copy-Item -LiteralPath (Join-Path $repo 'proxy_v4\rollback-v4.ps1') -Destination $rollback
+            $stubs = @'
+if (-not $script:TestMode) { throw 'rollback fixture requires V4_TEST_MODE' }
+Set-V4TestRegistryWriter {
+    param($enabled, $server)
+    Add-Content -LiteralPath $env:V4_FIXTURE_PROXY_WRITE_LOG -Value ("enabled=" + [int][bool]$enabled + " server=" + $server)
+    $env:V4_TEST_PROXY_ENABLE = if ($enabled) { '1' } else { '0' }
+    $env:V4_TEST_PROXY_SERVER = $server
+}
+function Start-V4Clash {
+    param($TimeoutSec, $Port)
+    $env:V4_TEST_PROXY_ENABLE = '1'
+    $env:V4_TEST_PROXY_SERVER = '127.0.0.1:9'
+    return $true
+}
+'@
+            Add-Content -LiteralPath (Join-Path $root 'lib\V4.ps1') -Value ($LF + $stubs)
+            try {
+                $savedPreference = $ErrorActionPreference
+                $ErrorActionPreference = 'Continue'
+                try { $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $rollback -SnapshotDir $fx.snap 2>&1 }
+                finally { $ErrorActionPreference = $savedPreference }
+                $writes = if (Test-Path -LiteralPath $env:V4_FIXTURE_PROXY_WRITE_LOG) { Get-Content -LiteralPath $env:V4_FIXTURE_PROXY_WRITE_LOG -Raw } else { '' }
+                Assert-Infra ($LASTEXITCODE -eq 41) ('different-target rollback exit=' + $LASTEXITCODE + ' out=' + (($out | Select-Object -Last 4) -join ' | '))
+                Assert-Infra ([string]::IsNullOrEmpty($writes)) ('different-target rollback wrote the proxy: ' + $writes)
+                Assert-Infra ($null -ne (Get-V4Journal)) 'different-target rollback cleared the journal'
+                Assert-Infra (-not (Test-Path -LiteralPath (Join-Path $root 'config\.lock'))) 'rollback left the lock behind'
+                $script:Actual = 'a different enabled proxy during rollback was left unchanged'
+            }
+            finally { Remove-Item Env:V4_TEST_APPDATA,Env:V4_FIXTURE_PROXY_WRITE_LOG,Env:V4_TEST_PROXY_ENABLE,Env:V4_TEST_PROXY_SERVER -ErrorAction SilentlyContinue }
+        }
         'INF-SNAP-09' {
             $app = New-TestAppData
             $target = Join-Path $app 'profiles.yaml'
