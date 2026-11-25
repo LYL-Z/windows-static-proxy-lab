@@ -89,16 +89,13 @@ try {
                     $keptProxy = Get-V4SystemProxy
                 }
             }
-            $preserveUserOff = $false
-            if ($journalMatches -and $journal.data.PSObject.Properties.Name -contains 'preserveUserOff') {
-                $preserveUserOff = [bool]$journal.data.preserveUserOff
-            }
             $snapshotProxy = $manifest.manifest.systemProxy
-            if (-not $KeepSystemProxy -and -not $preserveUserOff -and $snapshotProxy -and [bool]$snapshotProxy.enabled) {
-                $observed = Get-V4SystemProxy
-                if (-not $observed.enabled) { $preserveUserOff = $true }
+            $storedOff = $journalMatches -and $journal.data.PSObject.Properties.Name -contains 'preserveUserOff' -and [bool]$journal.data.preserveUserOff
+            $preserveUserOff = [bool]$storedOff
+            if (-not $KeepSystemProxy -and -not $preserveUserOff -and $snapshotProxy -and [bool]$snapshotProxy.enabled -and -not (Get-V4SystemProxy).enabled) {
+                $preserveUserOff = $true
             }
-            if (-not $journalMatches) {
+            if (-not $journalMatches -or ($preserveUserOff -and -not $storedOff)) {
                 Write-V4Journal -SnapshotDir $SnapshotDir -Reason 'rollback' -KeepSystemProxy:$KeepSystemProxy -PreserveUserOff:$preserveUserOff -KeptProxy $keptProxy
             }
             if ($script:TestMode -and $env:V4_TEST_EXIT_AFTER_JOURNAL -eq '1') {

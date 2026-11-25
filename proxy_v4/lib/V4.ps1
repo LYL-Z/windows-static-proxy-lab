@@ -376,7 +376,14 @@ function Invoke-V4ApplyTransaction {
                 }.GetNewClosure()
                 $verifyProxy = {
                     $now = & $ops.GetSystemProxy
-                    if ($intent.preserveOff) { return [bool]($now -and -not $now.enabled) }
+                    if ($intent.preserveOff) {
+                        if ($now -and $now.enabled -and [string]$now.server -eq [string]$bp.server -and $ops.ClearSystemProxy) {
+                            & $ops.ClearSystemProxy
+                            $now = & $ops.GetSystemProxy
+                        }
+                        if ($now -and $now.enabled) { return $false }
+                        return [bool]$now
+                    }
                     Test-V4SystemProxyMatch -Expected $bp -Actual $now
                 }.GetNewClosure()
             }

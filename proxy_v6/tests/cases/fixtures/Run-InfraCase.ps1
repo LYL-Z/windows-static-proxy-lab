@@ -1069,6 +1069,52 @@ function Start-V4Clash {
             }
             finally { Remove-Item Env:V4_TEST_APPDATA,Env:V4_FIXTURE_PROXY_WRITE_LOG,Env:V4_TEST_PROXY_ENABLE,Env:V4_TEST_PROXY_SERVER -ErrorAction SilentlyContinue }
         }
+        'INF-ROLLBACK-10' {
+            $fx = New-SnapshotFixture
+            $snap = (Get-Item -LiteralPath $fx.snap).FullName
+            Write-V4Journal -SnapshotDir $snap -Reason 'rollback' -PreserveUserOff:$false
+            $env:V4_TEST_APPDATA = $fx.app
+            $env:V4_TEST_PROXY_ENABLE = '0'
+            $env:V4_TEST_PROXY_SERVER = 'old:8080'
+            $env:V4_TEST_EXIT_AFTER_JOURNAL = '1'
+            $env:V4_FIXTURE_PROXY_WRITE_LOG = Join-Path $root 'proxy-write.log'
+            $rollback = Join-Path $root 'rollback-v4.ps1'
+            Copy-Item -LiteralPath (Join-Path $repo 'proxy_v4\rollback-v4.ps1') -Destination $rollback
+            $stubs = @'
+if (-not $script:TestMode) { throw 'rollback fixture requires V4_TEST_MODE' }
+Set-V4TestRegistryWriter {
+    param($enabled, $server)
+    Add-Content -LiteralPath $env:V4_FIXTURE_PROXY_WRITE_LOG -Value ("enabled=" + [int][bool]$enabled + " server=" + $server)
+    $env:V4_TEST_PROXY_ENABLE = if ($enabled) { '1' } else { '0' }
+    $env:V4_TEST_PROXY_SERVER = $server
+}
+function Start-V4Clash {
+    param($TimeoutSec, $Port)
+    $env:V4_TEST_PROXY_ENABLE = '1'
+    $env:V4_TEST_PROXY_SERVER = 'old:8080'
+    return $true
+}
+'@
+            Add-Content -LiteralPath (Join-Path $root 'lib\V4.ps1') -Value ($LF + $stubs)
+            try {
+                $savedPreference = $ErrorActionPreference
+                $ErrorActionPreference = 'Continue'
+                try { $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $rollback 2>&1 }
+                finally { $ErrorActionPreference = $savedPreference }
+                Assert-Infra ($LASTEXITCODE -eq 41) ('journal correction exit=' + $LASTEXITCODE)
+                Assert-Infra ((Get-V4Journal).data.preserveUserOff -eq $true) 'matching journal was not corrected before restart'
+                Remove-Item Env:V4_TEST_EXIT_AFTER_JOURNAL
+                $ErrorActionPreference = 'Continue'
+                try { $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $rollback 2>&1 }
+                finally { $ErrorActionPreference = $savedPreference }
+                $writes = if (Test-Path -LiteralPath $env:V4_FIXTURE_PROXY_WRITE_LOG) { Get-Content -LiteralPath $env:V4_FIXTURE_PROXY_WRITE_LOG -Raw } else { '' }
+                Assert-Infra ($LASTEXITCODE -eq 32) ('corrected resume exit=' + $LASTEXITCODE + ' out=' + (($out | Select-Object -Last 3) -join ' | '))
+                Assert-Infra ($writes -match 'enabled=0' -and $writes -notmatch 'enabled=1') ('corrected resume wrote an enable: ' + $writes)
+                Assert-Infra ($null -eq (Get-V4Journal)) 'corrected resume left the journal'
+                $script:Actual = 'a matching journal learned user-off before restart and the resume did not enable the proxy'
+            }
+            finally { Remove-Item Env:V4_TEST_APPDATA,Env:V4_FIXTURE_PROXY_WRITE_LOG,Env:V4_TEST_PROXY_ENABLE,Env:V4_TEST_PROXY_SERVER,Env:V4_TEST_EXIT_AFTER_JOURNAL -ErrorAction SilentlyContinue }
+        }
         'INF-SNAP-09' {
             $app = New-TestAppData
             $target = Join-Path $app 'profiles.yaml'

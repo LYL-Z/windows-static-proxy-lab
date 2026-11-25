@@ -88,6 +88,8 @@ Check 'journal remains after failed clear' ($null -ne (Get-V4Journal))
 
 $reads = 0
 $enableWrites = 0
+$phase = 'before'
+$cleared = $false
 $recover = [pscustomobject]@{
     Reason = 'apply-test'
     Mode = 'strict'
@@ -106,27 +108,29 @@ $recover = [pscustomobject]@{
         Snapshot = { param($Reason) Join-Path $root 'snap' }
         WriteJournal = { param($Snap, $Reason) Write-V4Journal -SnapshotDir $Snap -Reason $Reason }
         WriteAtomic = { throw [pscustomobject]@{ code = 12; msg = 'disk full' } }
-        StartApp = { param($Timeout, $Port) $true }
+        StartApp = { param($Timeout, $Port) $script:phase = 'reassert'; return $true }
         StopApp = { param($Port) }
         Restore = { param($Dir) }
+        ClearSystemProxy = { $script:phase = 'cleared'; $script:cleared = $true }
         GetExitIp = { param($Proxy) '203.0.113.10' }
         SetSystemProxy = { param($Server) $script:enableWrites++ }
         GetSystemProxy = {
             $script:reads++
-            if ($script:reads -le 1) { return [pscustomobject]@{ enabled = $true; server = '127.0.0.1:7897' } }
+            if ($script:phase -eq 'before') { $script:phase = 'seen'; return [pscustomobject]@{ enabled = $true; server = '127.0.0.1:7897' } }
+            if ($script:phase -eq 'reassert') { return [pscustomobject]@{ enabled = $true; server = '127.0.0.1:7897' } }
             return [pscustomobject]@{ enabled = $false; server = '127.0.0.1:7897' }
         }
         ProtectAcl = { param($Path) $true }
         SetOwner = { param($Server, $Note) }
         GetOwnerText = { 'previous-owner' }
         RestoreOwner = { param($Text) }
-        IsAppRunning = { $false }
+        IsAppRunning = { $true }
         ClearJournal = { Clear-V4Journal }
         Log = { param($Message, $Level) }
     }
 }
 $recovered = Invoke-V4ApplyTransaction -Context $recover
-Check 'recovery does not re-enable a proxy the user turned off' ($enableWrites -eq 0 -and $recovered.exitCode -eq 12)
+Check 'recovery does not re-enable a proxy the user turned off' ($enableWrites -eq 0 -and $cleared -and $recovered.exitCode -eq 12)
 
 if ($failed.Count) {
     Write-Host ("FAILED " + $failed.Count)
