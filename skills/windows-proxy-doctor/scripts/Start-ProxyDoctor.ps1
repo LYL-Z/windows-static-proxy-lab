@@ -19,6 +19,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'ProxyDoctorVerification.ps1')
+. (Join-Path $PSScriptRoot 'ProxyFaultClass.ps1')
 
 function New-DoctorAction($step, $why, $operation, $permissions, $confirmation, $back, $assistance) {
     [ordered]@{
@@ -263,10 +264,14 @@ try {
         checkpointWarning = $checkpointWarning
         authorization = 'NEVER_PERSISTED'
     }
+    if ($mode -eq 'Diagnose') {
+        $out.faultClass = Get-ProxyDoctorFaultClass -Observation (ConvertTo-ProxyDoctorFaultObservation -Environment $environment)
+    }
     if ($Json) { $out | ConvertTo-Json -Depth 10 }
     else {
         Write-Output ('{0} · {1}' -f $state, $action.step)
         Write-Output $explanation
+        if ($out.Contains('faultClass')) { Write-Output ($out.faultClass.class + '. ' + $out.faultClass.note) }
         Write-Output ('本地诊断 {0} · HTTPS {1} · 应用 {2} · 配置 {3}' -f $verification.local, $verification.status, $verification.application, $verification.configuration)
         if ($checkpointWarning) { Write-Output $checkpointWarning }
         foreach ($field in 'why','operation','permissionsOrCost','confirm','onFailure','assistance') { Write-Output $action[$field] }

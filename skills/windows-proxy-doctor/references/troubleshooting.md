@@ -1,6 +1,6 @@
 # 故障处理手册
 
-先问用户哪个应用出错、何时开始、最近是否操作过设置。保留旧配置和故障证据。使用 `Start-ProxyDoctor.ps1 -Goal Diagnose` 和环境发现，在对应层取证。下表的原因均为排查方向，验收随实际证据更新。使用与用户故障相关、获准的公开测试地址。
+先问用户哪个应用出错、何时开始、最近是否操作过设置。保留旧配置和故障证据。使用 `Start-ProxyDoctor.ps1 -Goal Diagnose` 和环境发现，在对应层取证。对「检查我的代理为什么没有正常工作」或同等说法，在该命令之后调用 `scripts/ProxyFaultClass.ps1` 中的 `Get-ProxyDoctorFaultClass`。它只对传入的观察分类为 `USER_OFF`、`PROXY_DRIFT`、`CORE_DOWN`、`FIRST_HOP_DOWN`、`ALIGNED` 或 `UNKNOWN`，不修改系统设置。`USER_OFF` 表示用户关闭了代理，不要建议恢复。`ALIGNED` 只表示本地选择与监听一致，不是应用访问成功。An alert or UI status is not proof the network was blocked. 下表的原因均为排查方向，验收随实际证据更新。使用与用户故障相关、获准的公开测试地址。
 
 | 现象 | 必要检测与证据 | 可能原因 | 所需授权与恢复 | 验收 |
 | --- | --- | --- | --- | --- |
