@@ -1,0 +1,1 @@
+{"schema":1,"source":"example","proxyEnabled":true,"proxyServer":"127.0.0.1:7897","uiEnabled":true,"processRunning":true,"mixedPort":7897,"mixedPortOpen":true,"firstHopPort":11119,"firstHopOpen":true,"exitMatches":true,"state":"HEALTHY","reasons":[]}
