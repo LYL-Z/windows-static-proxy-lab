@@ -78,6 +78,7 @@ $cases = @(
   @{ id='INF-ROLLBACK-05'; req='TX-ROLLBACK'; pre='valid snapshot and journal'; fault='restart never becomes ready'; exp='exit 40, journal retained, lock released' },
   @{ id='INF-ROLLBACK-06'; req='TX-ROLLBACK'; pre='valid enabled proxy snapshot and journal'; fault='restart disables the same target'; exp='exit 41, journal retained, lock released' },
   @{ id='INF-ROLLBACK-07'; req='TX-ROLLBACK'; pre='valid snapshot and keep-current-proxy flag'; fault='restart disables the current target'; exp='exit 41 with journal retained and no proxy writes' },
+  @{ id='INF-ROLLBACK-08'; req='TX-ROLLBACK'; pre='user already disabled the proxy'; fault='kill after the journal, then restart reasserts the snapshot proxy'; exp='exit 32, proxy stays off, no enable write, journal cleared' },
   @{ id='INF-LOCK-05'; req='LOCK-04'; pre='zero-byte lock older than grace'; fault='empty lock file'; exp='reclaimed, not stuck forever' },
   @{ id='INF-LOCK-06'; req='LOCK-02'; pre='winner still holds its lock file handle'; fault='sharing error reading winner lock'; exp='bounded lock-busy return, no exception or removal' },
   @{ id='INF-LOCK-07'; req='LOCK-04'; pre='stale lock plus active reaper in a separate process'; fault='another process attempts stale removal'; exp='contender waits and preserves the file; lock remains recoverable' },

@@ -263,7 +263,7 @@ function Get-V4Journal {
 }
 
 function Write-V4Journal {
-    param([string]$SnapshotDir, [string]$Reason = 'apply', [switch]$KeepSystemProxy, $KeptProxy)
+    param([string]$SnapshotDir, [string]$Reason = 'apply', [switch]$KeepSystemProxy, [switch]$PreserveUserOff, $KeptProxy)
     Ensure-V4Dir $script:ConfigDir
     $o = [ordered]@{
         schema = 1
@@ -274,6 +274,7 @@ function Write-V4Journal {
     }
     if ($Reason -eq 'rollback') {
         $o['keepSystemProxy'] = [bool]$KeepSystemProxy
+        $o['preserveUserOff'] = [bool]$PreserveUserOff
         if ($KeepSystemProxy) {
             if ($null -eq $KeptProxy) { throw 'KeepSystemProxy rollback requires the proxy selection to record' }
             $o['keptEnabled'] = [bool]$KeptProxy.enabled
@@ -363,11 +364,21 @@ function Invoke-V4ApplyTransaction {
             $verifyProxy = $null
             if ($beforeProxy) {
                 $bp = $beforeProxy
+                $intent = @{ preserveOff = $false }
                 $restoreProxy = {
+                    $now = & $ops.GetSystemProxy
+                    if ($bp.enabled -and $now -and -not $now.enabled) {
+                        $intent.preserveOff = $true
+                        return
+                    }
                     if ($bp.enabled) { & $ops.SetSystemProxy $bp.server }
                     elseif ($ops.ClearSystemProxy) { & $ops.ClearSystemProxy }
-                }
-                $verifyProxy = { Test-V4SystemProxyMatch -Expected $bp -Actual (& $ops.GetSystemProxy) }
+                }.GetNewClosure()
+                $verifyProxy = {
+                    $now = & $ops.GetSystemProxy
+                    if ($intent.preserveOff) { return [bool]($now -and -not $now.enabled) }
+                    Test-V4SystemProxyMatch -Expected $bp -Actual $now
+                }.GetNewClosure()
             }
             $recoverStart = { & $ops.StartApp 30 $Context.Settings.mixedPort }
             $recoverStop = { & $ops.StopApp $Context.Settings.mixedPort }

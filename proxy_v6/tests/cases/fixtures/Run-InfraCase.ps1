@@ -982,6 +982,55 @@ function Start-V4Clash {
             }
             finally { Remove-Item Env:V4_TEST_APPDATA,Env:V4_FIXTURE_START_FAILURE,Env:V4_FIXTURE_PROXY_WRITE_LOG,Env:V4_TEST_PROXY_ENABLE,Env:V4_TEST_PROXY_SERVER -ErrorAction SilentlyContinue }
         }
+        'INF-ROLLBACK-08' {
+            $fx = New-SnapshotFixture
+            Put-Text (Join-Path $fx.app 'profiles.yaml') 'changed-live'
+            $env:V4_TEST_APPDATA = $fx.app
+            $env:V4_TEST_PROXY_ENABLE = '0'
+            $env:V4_TEST_PROXY_SERVER = 'old:8080'
+            $env:V4_FIXTURE_PROXY_WRITE_LOG = Join-Path $root 'proxy-write.log'
+            $env:V4_TEST_EXIT_AFTER_JOURNAL = '1'
+            $rollback = Join-Path $root 'rollback-v4.ps1'
+            Copy-Item -LiteralPath (Join-Path $repo 'proxy_v4\rollback-v4.ps1') -Destination $rollback
+            $stubs = @'
+if (-not $script:TestMode) { throw 'rollback fixture requires V4_TEST_MODE' }
+Set-V4TestRegistryWriter {
+    param($enabled, $server)
+    Add-Content -LiteralPath $env:V4_FIXTURE_PROXY_WRITE_LOG -Value ("enabled=" + [int][bool]$enabled + " server=" + $server)
+    $env:V4_TEST_PROXY_ENABLE = if ($enabled) { '1' } else { '0' }
+    $env:V4_TEST_PROXY_SERVER = $server
+}
+function Start-V4Clash {
+    param($TimeoutSec, $Port)
+    $env:V4_TEST_PROXY_ENABLE = '1'
+    $env:V4_TEST_PROXY_SERVER = 'old:8080'
+    return $true
+}
+'@
+            Add-Content -LiteralPath (Join-Path $root 'lib\V4.ps1') -Value ($LF + $stubs)
+            try {
+                $savedPreference = $ErrorActionPreference
+                $ErrorActionPreference = 'Continue'
+                try { $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $rollback -SnapshotDir $fx.snap 2>&1 }
+                finally { $ErrorActionPreference = $savedPreference }
+                Assert-Infra ($LASTEXITCODE -eq 41) ('interrupted rollback exit=' + $LASTEXITCODE + ' out=' + (($out | Select-Object -Last 4) -join ' | '))
+                $pending = Get-V4Journal
+                Assert-Infra ($pending -and $pending.data.preserveUserOff -eq $true) 'journal did not record the user-off decision'
+                Assert-Infra (-not (Test-Path -LiteralPath $env:V4_FIXTURE_PROXY_WRITE_LOG)) 'interrupted rollback wrote the proxy'
+                Remove-Item Env:V4_TEST_EXIT_AFTER_JOURNAL
+                $ErrorActionPreference = 'Continue'
+                try { $out = & powershell -NoProfile -ExecutionPolicy Bypass -File $rollback 2>&1 }
+                finally { $ErrorActionPreference = $savedPreference }
+                $writes = if (Test-Path -LiteralPath $env:V4_FIXTURE_PROXY_WRITE_LOG) { Get-Content -LiteralPath $env:V4_FIXTURE_PROXY_WRITE_LOG -Raw } else { '' }
+                Assert-Infra ($LASTEXITCODE -eq 32) ('resumed rollback exit=' + $LASTEXITCODE + ' out=' + (($out | Select-Object -Last 4) -join ' | '))
+                Assert-Infra ($writes -match 'enabled=0' -and $writes -notmatch 'enabled=1') ('resumed rollback did not only disable: ' + $writes)
+                Assert-Infra ($null -eq (Get-V4Journal)) 'successful user-off rollback left the journal'
+                Assert-Infra ((Get-Sha (Join-Path $fx.app 'profiles.yaml')) -eq (Get-Sha (Join-Path $fx.snap 'profiles.yaml'))) 'files were not restored'
+                Assert-Infra (-not (Test-Path -LiteralPath (Join-Path $root 'config\.lock'))) 'rollback left the lock behind'
+                $script:Actual = 'interrupted and resumed rollback kept the user-disabled proxy off'
+            }
+            finally { Remove-Item Env:V4_TEST_APPDATA,Env:V4_FIXTURE_PROXY_WRITE_LOG,Env:V4_TEST_PROXY_ENABLE,Env:V4_TEST_PROXY_SERVER,Env:V4_TEST_EXIT_AFTER_JOURNAL -ErrorAction SilentlyContinue }
+        }
         'INF-SNAP-09' {
             $app = New-TestAppData
             $target = Join-Path $app 'profiles.yaml'

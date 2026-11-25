@@ -86,6 +86,48 @@ $result = Invoke-V4ApplyTransaction -Context $ctx
 Check 'uncleared journal is not success' ((-not $result.ok) -and $result.exitCode -eq 40 -and $result.restored -eq $false)
 Check 'journal remains after failed clear' ($null -ne (Get-V4Journal))
 
+$reads = 0
+$enableWrites = 0
+$recover = [pscustomobject]@{
+    Reason = 'apply-test'
+    Mode = 'strict'
+    Settings = [pscustomobject]@{ host = '203.0.113.10'; mixedPort = 7897 }
+    Paths = [pscustomobject]@{
+        ProfilesFile = (Join-Path $stage 'profiles.yaml')
+        ProfileFile = (Join-Path $stage 'profile.yaml')
+        RuntimeFile = (Join-Path $stage 'runtime.yaml')
+    }
+    ProfileText = 'profile'
+    ProfileTextBuilder = { 'profile' }
+    ProfileValidator = { }
+    RuntimeValidator = { }
+    Redact = { param($Message) $Message }
+    Ops = [pscustomobject]@{
+        Snapshot = { param($Reason) Join-Path $root 'snap' }
+        WriteJournal = { param($Snap, $Reason) Write-V4Journal -SnapshotDir $Snap -Reason $Reason }
+        WriteAtomic = { throw [pscustomobject]@{ code = 12; msg = 'disk full' } }
+        StartApp = { param($Timeout, $Port) $true }
+        StopApp = { param($Port) }
+        Restore = { param($Dir) }
+        GetExitIp = { param($Proxy) '203.0.113.10' }
+        SetSystemProxy = { param($Server) $script:enableWrites++ }
+        GetSystemProxy = {
+            $script:reads++
+            if ($script:reads -le 1) { return [pscustomobject]@{ enabled = $true; server = '127.0.0.1:7897' } }
+            return [pscustomobject]@{ enabled = $false; server = '127.0.0.1:7897' }
+        }
+        ProtectAcl = { param($Path) $true }
+        SetOwner = { param($Server, $Note) }
+        GetOwnerText = { 'previous-owner' }
+        RestoreOwner = { param($Text) }
+        IsAppRunning = { $false }
+        ClearJournal = { Clear-V4Journal }
+        Log = { param($Message, $Level) }
+    }
+}
+$recovered = Invoke-V4ApplyTransaction -Context $recover
+Check 'recovery does not re-enable a proxy the user turned off' ($enableWrites -eq 0 -and $recovered.exitCode -eq 12)
+
 if ($failed.Count) {
     Write-Host ("FAILED " + $failed.Count)
     exit 1
