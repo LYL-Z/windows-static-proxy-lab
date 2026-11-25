@@ -49,12 +49,12 @@ public static class NetworkReader
         bool? proxyEnabled = enable is int number ? number == 1 : null;
         var server = key.GetValue("ProxyServer") as string;
         var auto = key.GetValue("AutoConfigURL") as string;
-        var targets = string.Equals(server?.Trim(), "127.0.0.1:7897", StringComparison.Ordinal);
         var listeners = ReadListeners();
-        var corePort = listeners.Any(item => item.Port == 7897 && item.Loopback);
-        var coreOwned = listeners.Any(item => item.Port == 7897 && item.Loopback &&
-            item.ProcessName.Equals("verge-mihomo", StringComparison.OrdinalIgnoreCase));
-        var hopOpen = listeners.Any(item => item.Port == 11119 && item.Loopback);
+        var coreListener = listeners.FirstOrDefault(item => item.ProcessName.Equals("verge-mihomo", StringComparison.OrdinalIgnoreCase));
+        var corePort = coreListener is not null;
+        var coreOwned = corePort;
+        var hopOpen = listeners.Any(item => item.ProcessName.Equals("magicspeed", StringComparison.OrdinalIgnoreCase));
+        var targets = coreListener is not null && string.Equals(server?.Trim(), "127.0.0.1:" + coreListener.Port, StringComparison.Ordinal);
         var clients = ReadClients();
         var hopExpected = hopOpen || clients.Any(name =>
             name.Equals("magicspeed", StringComparison.OrdinalIgnoreCase) ||
@@ -72,7 +72,7 @@ public static class NetworkReader
             MixedIpv4CoreOwned = coreOwned,
             FirstHopExpected = hopExpected,
             FirstHopOpen = hopOpen,
-            UserTurnedProxyOff = proxyEnabled == false ? true : null
+            UserTurnedProxyOff = IntentStore.Read()
         };
     }
 
@@ -103,7 +103,6 @@ public static class NetworkReader
     {
         var owners = ReadLoopbackOwners();
         return owners
-            .Where(item => item.Port is 7897 or 11119 or 11120)
             .Select(item => new ListenerFact(item.Port, item.ProcessName, true))
             .Distinct()
             .ToArray();
@@ -138,16 +137,26 @@ public static class NetworkReader
         };
         using var process = Process.Start(start);
         if (process is null) yield break;
+        if (!process.WaitForExit(4000))
+        {
+            try { process.Kill(entireProcessTree: true); } catch { /* already gone */ }
+            yield break;
+        }
         var output = process.StandardOutput.ReadToEnd();
-        process.WaitForExit(4000);
         foreach (var line in output.Split('\n'))
         {
             var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
             if (parts.Length < 5 || !parts[0].Equals("TCP", StringComparison.OrdinalIgnoreCase)) continue;
             if (!parts[^2].Equals("LISTENING", StringComparison.OrdinalIgnoreCase) &&
                 !parts[^2].Contains("侦听", StringComparison.Ordinal)) continue;
-            if (!parts[1].StartsWith("127.0.0.1:", StringComparison.Ordinal)) continue;
-            if (!int.TryParse(parts[1].Split(':')[^1], out var port)) continue;
+            var local = parts[1];
+            var loopback = local.StartsWith("127.0.0.1:", StringComparison.Ordinal) ||
+                           local.StartsWith("[::1]:", StringComparison.Ordinal);
+            if (!loopback) continue;
+            var portText = local.StartsWith("[", StringComparison.Ordinal)
+                ? local.Split(':')[^1]
+                : local.Split(':')[^1];
+            if (!int.TryParse(portText, out var port)) continue;
             if (!int.TryParse(parts[^1], out var pid)) continue;
             string name;
             try { name = Process.GetProcessById(pid).ProcessName; }
@@ -186,13 +195,34 @@ public static class HttpsProbe
 
 public static class DiagnosticEngine
 {
+    public static DiagnosticReport ReadLocal()
+    {
+        var observation = NetworkReader.ReadObservation();
+        var fault = FaultClassifier.Classify(observation);
+        return Build(false, observation, fault, NetworkReader.DescribeSelection(), NetworkReader.AutomaticProxySet(),
+            NetworkReader.ReadListeners(), NetworkReader.ReadClients(),
+            [],
+            [new CapabilityFact("本地心跳", EvidenceState.Verified, $"{DateTimeOffset.Now:HH:mm:ss} 只读了代理开关、进程和回环监听。这次心跳没有做外部 HTTPS，也没有做回环交换。")]);
+    }
+
     public static async Task<DiagnosticReport> ReadLiveAsync(CancellationToken cancellationToken)
     {
         var observation = NetworkReader.ReadObservation();
         var fault = FaultClassifier.Classify(observation);
-        var probes = await HttpsProbe.SampleAsync(cancellationToken);
+        var probes = new List<ProbeFact>(await HttpsProbe.SampleAsync(cancellationToken))
+        {
+            await LiveChecks.ClaudeStatusAsync(cancellationToken)
+        };
+        var capabilities = new List<CapabilityFact>
+        {
+            LiveChecks.Loopback("IPv4 回环", System.Net.Sockets.AddressFamily.InterNetwork),
+            LiveChecks.Loopback("IPv6 回环", System.Net.Sockets.AddressFamily.InterNetworkV6),
+            new("DNS / DoH", EvidenceState.NotVerified, $"{DateTimeOffset.Now:HH:mm:ss} 这次没有向受控解析器发送查询，不能判断系统或浏览器的解析路径。"),
+            new("WebRTC", EvidenceState.NotVerified, $"{DateTimeOffset.Now:HH:mm:ss} 这次没有启动浏览器，也没有接收端计数。"),
+            new("整机网络阻断", EvidenceState.NotVerified, "没有在本次检查中安装防火墙规则。进程守卫不是整机阻断。")
+        };
         return Build(false, observation, fault, NetworkReader.DescribeSelection(), NetworkReader.AutomaticProxySet(),
-            NetworkReader.ReadListeners(), NetworkReader.ReadClients(), probes);
+            NetworkReader.ReadListeners(), NetworkReader.ReadClients(), probes, capabilities);
     }
 
     public static DiagnosticReport Demo()
@@ -212,13 +242,18 @@ public static class DiagnosticEngine
         return Build(true, observation, FaultClassifier.Classify(observation), "127.0.0.1:7897", false,
             [new ListenerFact(7897, "verge-mihomo", true), new ListenerFact(11119, "magicspeed", true)],
             ["StarSky", "clash-verge", "verge-mihomo", "magicspeed"],
-            [new ProbeFact("https://www.baidu.com", null, 0, null, "演示，未发送请求")]);
+            [new ProbeFact("https://www.baidu.com", null, 0, null, "演示，未发送请求")],
+            [new CapabilityFact("演示", EvidenceState.NotVerified, "演示模式不代表这台电脑完成了检测。")]);
     }
 
     private static DiagnosticReport Build(bool demo, FaultObservation observation, FaultResult fault, string selection,
-        bool automatic, IReadOnlyList<ListenerFact> listeners, IReadOnlyList<string> clients, IReadOnlyList<ProbeFact> probes)
+        bool automatic, IReadOnlyList<ListenerFact> listeners, IReadOnlyList<string> clients, IReadOnlyList<ProbeFact> probes,
+        IReadOnlyList<CapabilityFact> capabilities)
     {
-        var events = new List<string> { $"{DateTimeOffset.Now:HH:mm:ss} 完成一次只读采样。分类 {fault.Class}。" };
+        var line = $"{DateTimeOffset.Now:HH:mm:ss} 完成一次只读采样。分类 {fault.Class}。";
+        if (!demo) EventLog.Append(line);
+        var events = new List<string> { line };
+        events.AddRange(EventLog.Recent());
         if (fault.Class == FaultClass.Aligned)
             events.Add("本地选择与监听一致。应用路径仍未验证。");
         if (!demo)
@@ -234,7 +269,7 @@ public static class DiagnosticEngine
             Listeners = listeners,
             RunningClients = clients,
             Probes = probes,
-            Capabilities = CapabilityCatalog.Current(),
+            Capabilities = capabilities,
             Events = events
         };
     }

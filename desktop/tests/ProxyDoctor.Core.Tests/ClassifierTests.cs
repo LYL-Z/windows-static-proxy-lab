@@ -118,4 +118,18 @@ public class ClassifierTests
     [Fact]
     public void A_setup_sentence_is_not_a_fault() =>
         Assert.False(RequestRouter.IsDiagnoseRequest("帮我准备代理设置"));
+
+    [Fact]
+    public void Both_off_without_a_record_is_not_confirmed_intent()
+    {
+        var result = FaultClassifier.Classify(new FaultObservation
+        {
+            ProxyEnabled = false,
+            UiEnabled = false,
+            PacConfigured = false,
+            CoreRunning = false
+        });
+        Assert.Equal(FaultClass.ObservedOff, result.Class);
+        Assert.False(result.RecommendRestore);
+    }
 }

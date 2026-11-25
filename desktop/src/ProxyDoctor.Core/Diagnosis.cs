@@ -3,6 +3,7 @@ namespace ProxyDoctor;
 public enum FaultClass
 {
     UserOff,
+    ObservedOff,
     ProxyDrift,
     CoreDown,
     FirstHopDown,
@@ -56,6 +57,8 @@ public static class FaultClassifier
         {
             if (observation.UserTurnedProxyOff == false)
                 return new FaultResult(FaultClass.ProxyDrift, "Windows 和客户端保存的选择都已关闭，但记录并不是用户主动关闭。确认是谁改的，再决定是否修改。");
+            if (observation.UserTurnedProxyOff != true)
+                return new FaultResult(FaultClass.ObservedOff, "系统代理和客户端保存的开关都是关闭的。没有用户主动关闭的记录，所以不会自动打开，也不会把这次观察写成已确认意图。");
             return UserOff();
         }
         if (observation.ProxyEnabled != observation.UiEnabled || observation.ProxyTargetsExpected == false)

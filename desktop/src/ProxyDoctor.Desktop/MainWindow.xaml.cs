@@ -22,6 +22,8 @@ public partial class MainWindow : Window
         };
         Loaded += async (_, _) =>
         {
+            _model.StartMonitor();
+            Closed += (_, _) => _model.StopMonitor();
             await _model.DiagnoseCommand.ExecuteAsync(null);
             if (App.CapturePath is null) return;
             await Dispatcher.InvokeAsync(SaveCapture, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
@@ -41,7 +43,7 @@ public partial class MainWindow : Window
 
     private void ShowSection(string section)
     {
-        OverviewPage.Visibility = section == "overview" ? Visibility.Visible : Visibility.Collapsed;
+        OverviewPage.Visibility = section is "overview" or "monitor" ? Visibility.Visible : Visibility.Collapsed;
         PrivacyPage.Visibility = section == "privacy" ? Visibility.Visible : Visibility.Collapsed;
         RecoveryPage.Visibility = section == "recovery" ? Visibility.Visible : Visibility.Collapsed;
         EventsPage.Visibility = section == "events" ? Visibility.Visible : Visibility.Collapsed;

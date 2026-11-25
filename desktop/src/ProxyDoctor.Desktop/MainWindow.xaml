@@ -29,11 +29,12 @@
     <Border Grid.Column="0" Background="{DynamicResource App.Sidebar}" BorderBrush="{DynamicResource App.Line}" BorderThickness="0,0,1,0" Padding="18,22">
       <DockPanel>
         <StackPanel DockPanel.Dock="Top">
-          <TextBlock Text="网络代理医生" FontSize="20" FontWeight="SemiBold" />
+          <TextBlock Text="网络代理医生" FontFamily="Georgia" FontSize="22" />
           <TextBlock Text="Windows Proxy Doctor" Foreground="{DynamicResource App.Muted}" Margin="0,2,0,18" />
           <TextBlock Text="{Binding ModeLabel}" TextWrapping="Wrap" Foreground="{DynamicResource App.Accent}" Margin="0,0,0,16" />
         </StackPanel>
         <StackPanel DockPanel.Dock="Bottom">
+          <CheckBox Content="暂停监测" IsChecked="{Binding Paused}" Foreground="{DynamicResource App.Ink}" Margin="0,0,0,8" />
           <CheckBox Content="深色" IsChecked="{Binding Dark}" Foreground="{DynamicResource App.Ink}" Margin="0,0,0,8" />
           <CheckBox Content="演示数据" IsChecked="{Binding Demo}" Foreground="{DynamicResource App.Ink}" />
         </StackPanel>
@@ -41,6 +42,7 @@
           <Button Content="概览" Command="{Binding ShowCommand}" CommandParameter="overview" Style="{StaticResource NavButton}" />
           <Button Content="隐私" Command="{Binding ShowCommand}" CommandParameter="privacy" Style="{StaticResource NavButton}" />
           <Button Content="恢复" Command="{Binding ShowCommand}" CommandParameter="recovery" Style="{StaticResource NavButton}" />
+          <Button Content="监测" Command="{Binding ShowCommand}" CommandParameter="monitor" Style="{StaticResource NavButton}" />
           <Button Content="事件" Command="{Binding ShowCommand}" CommandParameter="events" Style="{StaticResource NavButton}" />
         </StackPanel>
       </DockPanel>
@@ -105,8 +107,13 @@
             <StackPanel>
               <TextBlock Text="建议" FontSize="20" FontWeight="SemiBold" />
               <TextBlock Text="{Binding Advice}" TextWrapping="Wrap" Margin="0,8,0,12" />
-              <TextBlock Text="这一版不会写入系统代理、防火墙或客户端。需要替换生产脚本时，使用已核对哈希的四个文件，并保留回滚副本。" TextWrapping="Wrap" Foreground="{DynamicResource App.Muted}" />
-              <Button Content="保持当前选择" IsEnabled="False" Margin="0,16,0,0" HorizontalAlignment="Left" />
+              <TextBlock Text="{Binding Monitor}" TextWrapping="Wrap" Foreground="{DynamicResource App.Muted}" />
+              <TextBlock Text="下面两个动作只写本程序自己的记录，或者只在内存里演练。它们不改 Windows 代理。" TextWrapping="Wrap" Margin="0,8,0,0" />
+              <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+                <Button Content="演练：关闭时不打开" Command="{Binding RehearseCommand}" Margin="0,0,8,0" />
+                <Button Content="记录我关闭了代理" Command="{Binding RecordOffCommand}" Margin="0,0,8,0" />
+                <Button Content="清除这条记录" Command="{Binding ClearIntentCommand}" />
+              </StackPanel>
             </StackPanel>
           </Border>
         </StackPanel>
