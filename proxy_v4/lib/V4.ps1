@@ -183,6 +183,74 @@ function Invoke-V4Recovery {
 # ---------------------------------------------------- transaction journal --
 function Get-V4JournalPath { return (Join-Path $script:ConfigDir 'transaction.json') }
 
+function Get-V4RepairDirectory {
+    if ($script:TestMode) { return (Join-Path $script:Root 'repair-state') }
+    return (Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'WindowsStaticProxyLab-Recovery')
+}
+
+function Get-V4RepairReceipt {
+    # Stored per user so a second candidate checkout also sees interrupted work.
+    $dir = Get-V4RepairDirectory
+    try {
+        $directory = Get-Item -LiteralPath $dir -Force -ErrorAction Stop
+        $allowed = Get-V4AllowedSidSet
+        if (-not $directory.PSIsContainer -or ($directory.Attributes -band [IO.FileAttributes]::ReparsePoint) -or
+            -not (Test-V4AclHardened -Path $dir -Allowed $allowed)) { throw 'unsafe recovery directory' }
+        $path = Join-Path $dir 'pending.json'
+        $file = Get-Item -LiteralPath $path -Force -ErrorAction Stop
+        if ($file.PSIsContainer -or ($file.Attributes -band [IO.FileAttributes]::ReparsePoint) -or
+            $file.Length -gt 2048 -or -not (Test-V4AclHardened -Path $path -Allowed $allowed)) { throw 'unsafe recovery receipt' }
+        $entry = [IO.File]::ReadAllText($file.FullName) | ConvertFrom-Json
+        $schema = $entry.schema
+        if ($schema -is [System.Array] -or $schema -is [string] -or $schema -is [bool] -or $schema -isnot [System.ValueType] -or [int]$schema -ne 1) { throw 'invalid record' }
+        if ($entry.id -isnot [string] -or $entry.previous -isnot [string] -or $entry.target -isnot [string]) { throw 'invalid record' }
+        if ($entry.id -notmatch '\A[a-f0-9]{32}\z' -or $entry.previous -eq $entry.target) { throw 'invalid record' }
+        foreach ($server in @($entry.previous, $entry.target)) {
+            if ($server -notmatch '\A127\.0\.0\.1:([1-9]\d{0,4})\z' -or [int]$Matches[1] -gt 65535) { throw 'invalid local proxy target' }
+        }
+        return $entry
+    } catch [System.Management.Automation.ItemNotFoundException] { return $null }
+    catch { return [pscustomobject]@{ invalid=$true } }
+}
+
+function New-V4RepairReceipt {
+    param([string]$Previous, [string]$Target)
+    $dir = Get-V4RepairDirectory
+    $id = [guid]::NewGuid().ToString('N')
+    if (-not (Test-Path -LiteralPath $dir -ErrorAction Stop)) {
+        $stage = $dir + '-stage-' + $id
+        $null = New-Item -ItemType Directory -Path $stage -ErrorAction Stop
+        try {
+            if (-not (Protect-V4Acl -Path $stage)) { throw (New-V4Fault 12 'could not protect recovery directory') }
+            [IO.Directory]::Move($stage, $dir)
+        } finally { if ([IO.Directory]::Exists($stage)) { [IO.Directory]::Delete($stage) } }
+    }
+    if (Get-V4RepairReceipt) { throw (New-V4Fault 34 'pending or unreadable repair receipt') }
+    $entry = [ordered]@{schema=1; id=$id; previous=$Previous; target=$Target}
+    $temp = Join-Path $dir ($id + '.tmp')
+    $stream = [IO.File]::Open($temp, 'CreateNew', 'Write', 'None')
+    try {
+        $bytes = [Text.Encoding]::UTF8.GetBytes(($entry | ConvertTo-Json -Compress))
+        $stream.Write($bytes, 0, $bytes.Length)
+        $stream.Flush($true)
+    } finally { $stream.Dispose() }
+    try {
+        if (-not (Protect-V4Acl -Path $temp)) { throw (New-V4Fault 12 'could not protect recovery receipt') }
+        [IO.File]::Move($temp, (Join-Path $dir 'pending.json'))
+        $saved = Get-V4RepairReceipt
+        if (-not $saved -or $saved.id -ne $id) { throw (New-V4Fault 34 'could not verify recovery receipt') }
+        return $saved
+    } finally { if ([IO.File]::Exists($temp)) { [IO.File]::Delete($temp) } }
+}
+
+function Complete-V4RepairReceipt {
+    param($Receipt)
+    $current = Get-V4RepairReceipt
+    if (-not $current -or -not $Receipt.id -or $current.id -ne $Receipt.id) { throw (New-V4Fault 40 'recovery receipt changed; inspect before continuing') }
+    [IO.File]::Delete((Join-Path (Get-V4RepairDirectory) 'pending.json'))
+    if (Get-V4RepairReceipt) { throw (New-V4Fault 40 'recovery receipt could not be retired') }
+}
+
 function Get-V4Journal {
     $p = Get-V4JournalPath
     if (-not (Test-Path -LiteralPath $p)) { return $null }
@@ -195,7 +263,7 @@ function Get-V4Journal {
 }
 
 function Write-V4Journal {
-    param([string]$SnapshotDir, [string]$Reason = 'apply', [switch]$KeepSystemProxy)
+    param([string]$SnapshotDir, [string]$Reason = 'apply', [switch]$KeepSystemProxy, [switch]$PreserveUserOff, $KeptProxy)
     Ensure-V4Dir $script:ConfigDir
     $o = [ordered]@{
         schema = 1
@@ -204,7 +272,15 @@ function Write-V4Journal {
         started = (Get-Date).ToString('o')
         pid = $PID
     }
-    if ($Reason -eq 'rollback') { $o['keepSystemProxy'] = [bool]$KeepSystemProxy }
+    if ($Reason -eq 'rollback') {
+        $o['keepSystemProxy'] = [bool]$KeepSystemProxy
+        $o['preserveUserOff'] = [bool]$PreserveUserOff
+        if ($KeepSystemProxy) {
+            if ($null -eq $KeptProxy) { throw 'KeepSystemProxy rollback requires the proxy selection to record' }
+            $o['keptEnabled'] = [bool]$KeptProxy.enabled
+            $o['keptServer'] = [string]$KeptProxy.server
+        }
+    }
     Set-V4Atomic -TargetPath (Get-V4JournalPath) -Content ($o | ConvertTo-Json -Depth 4) | Out-Null
 }
 
@@ -268,8 +344,12 @@ function Invoke-V4ApplyTransaction {
         }
         & $ops.SetOwner ('127.0.0.1:' + $Context.Settings.mixedPort) ('mode=' + $Context.Mode)
         if ($journalWritten -and $ops.ClearJournal) {
-            try { if (-not (& $ops.ClearJournal)) { Write-V4RecoveryNote $ops.Log 'transaction succeeded but the journal could not be cleared' 'WARN' } }
-            catch { Write-V4RecoveryNote $ops.Log ('transaction journal clear failed: ' + $_.Exception.Message) 'WARN' }
+            $cleared = $false
+            try { $cleared = [bool](& $ops.ClearJournal) } catch { $cleared = $false }
+            if (-not $cleared) {
+                Write-V4RecoveryNote $ops.Log 'transaction writes are in place but the journal could not be cleared; do not roll them back until that journal is understood' 'ERROR'
+                return [pscustomobject]@{ ok = $false; exitCode = 40; error = 'transaction writes are in place but the journal could not be cleared'; snapshot = $snap; applied = $applied; restored = $false; journalWritten = $journalWritten }
+            }
         }
         return [pscustomobject]@{ ok = $true; exitCode = 0; error = ''; snapshot = $snap; applied = $applied; restored = $false; journalWritten = $journalWritten }
     }
@@ -284,11 +364,28 @@ function Invoke-V4ApplyTransaction {
             $verifyProxy = $null
             if ($beforeProxy) {
                 $bp = $beforeProxy
+                $intent = @{ preserveOff = $false }
                 $restoreProxy = {
+                    $now = & $ops.GetSystemProxy
+                    if ($bp.enabled -and $now -and -not $now.enabled) {
+                        $intent.preserveOff = $true
+                        return
+                    }
                     if ($bp.enabled) { & $ops.SetSystemProxy $bp.server }
                     elseif ($ops.ClearSystemProxy) { & $ops.ClearSystemProxy }
-                }
-                $verifyProxy = { Test-V4SystemProxyMatch -Expected $bp -Actual (& $ops.GetSystemProxy) }
+                }.GetNewClosure()
+                $verifyProxy = {
+                    $now = & $ops.GetSystemProxy
+                    if ($intent.preserveOff) {
+                        if ($now -and $now.enabled -and [string]$now.server -eq [string]$bp.server -and $ops.ClearSystemProxy) {
+                            & $ops.ClearSystemProxy
+                            $now = & $ops.GetSystemProxy
+                        }
+                        if ($now -and $now.enabled) { return $false }
+                        return [bool]$now
+                    }
+                    Test-V4SystemProxyMatch -Expected $bp -Actual $now
+                }.GetNewClosure()
             }
             $recoverStart = { & $ops.StartApp 30 $Context.Settings.mixedPort }
             $recoverStop = { & $ops.StopApp $Context.Settings.mixedPort }
@@ -382,6 +479,7 @@ function Assert-V4SettingsInput {
 }
 
 function Get-V4Settings {
+    param([switch]$StatusOnly)
     if (-not (Test-Path -LiteralPath $script:SettingsPath)) { throw (New-V4Fault 11 'settings.json missing; run with -Init first') }
     if (-not (Test-V4AclHardened -Path $script:ConfigDir -Allowed (Get-V4AllowedSidSet))) { throw (New-V4Fault 12 'config directory ACL is not hardened; re-run -Init under the lock') }
     if (-not (Test-V4AclHardened -Path $script:SettingsPath -Allowed (Get-V4AllowedSidSet))) { throw (New-V4Fault 12 'settings.json ACL is not hardened; re-run -Init under the lock') }
@@ -391,6 +489,13 @@ function Get-V4Settings {
     try { Assert-V4SettingsInput -Host_ $j.staticProxy.host -Port ([int]$j.staticProxy.port) -Username $j.staticProxy.username -Password 'present' -HopHost $j.firstHop.host -HopPort ([int]$j.firstHop.port) -MixedPort ([int]$j.mixedPort) }
     catch { throw (New-V4Fault 11 ('settings.json values invalid: ' + $_.Exception.Message)) }
     if (-not $j.staticProxy.passwordDpapi) { throw (New-V4Fault 11 'settings.json has no DPAPI credential') }
+    if ($StatusOnly) {
+        return [pscustomobject]@{
+            host = $j.staticProxy.host
+            hopPort = [int]$j.firstHop.port
+            mixedPort = [int]$j.mixedPort
+        }
+    }
     try { $pw = Unprotect-V4Secret $j.staticProxy.passwordDpapi }
     catch { throw (New-V4Fault 11 'stored credential cannot be decrypted for this user') }
     Register-V4Secret $pw
@@ -645,6 +750,27 @@ function Remove-V4StaleLock {
     }
 }
 
+function Enter-V4UserMutationLock {
+    # HKCU proxy values are shared by all installations for a Windows user.
+    # Fixture processes coordinate only within their temporary test root.
+    $scope = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+    if ($script:TestMode) {
+        $hash = [Security.Cryptography.SHA256]::Create()
+        try {
+            $bytes = [Text.Encoding]::UTF8.GetBytes($script:Root.ToUpperInvariant())
+            $scope = 'Test-' + [BitConverter]::ToString($hash.ComputeHash($bytes)).Replace('-', '')
+        } finally { $hash.Dispose() }
+    }
+    $mutex = [Threading.Mutex]::new($false, ('Global\V4ProxyMutation-' + $scope))
+    $owned = $false
+    try {
+        try { $owned = $mutex.WaitOne(0) }
+        catch [Threading.AbandonedMutexException] { $owned = $true }
+        if ($owned) { return $mutex }
+    } finally { if (-not $owned) { $mutex.Dispose() } }
+    return $null
+}
+
 function Enter-V4Lock {
     param([int]$TimeoutSec = 20)
     Ensure-V4Dir $script:ConfigDir
@@ -813,15 +939,16 @@ function Start-V4Clash {
 }
 
 function Test-V4ClashListener {
-    param([int]$Port, [string]$ExpectedCore)
+    param([int]$Port, [string]$ExpectedCore, [switch]$RequireImagePath)
     if (-not $ExpectedCore) { return $false }
     $listeners = @(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue)
     $onLoopback = @($listeners | Where-Object LocalAddress -in @('127.0.0.1','0.0.0.0'))
-    if (-not $onLoopback) { $onLoopback = @($listeners | Where-Object LocalAddress -eq '::') }
+    if ($RequireImagePath -and @($onLoopback.OwningProcess | Sort-Object -Unique).Count -ne 1) { return $false }
+    if (-not $onLoopback -and -not $RequireImagePath) { $onLoopback = @($listeners | Where-Object LocalAddress -eq '::') }
     $expectedName = [IO.Path]::GetFileNameWithoutExtension($ExpectedCore)
     foreach ($listener in $onLoopback) {
         $process = Get-Process -Id $listener.OwningProcess -ErrorAction SilentlyContinue
-        if ($process.ProcessName -eq $expectedName -and (-not $process.Path -or $process.Path -eq $ExpectedCore)) {
+        if ($process.ProcessName -eq $expectedName -and ($process.Path -eq $ExpectedCore -or (-not $RequireImagePath -and -not $process.Path))) {
             return (Test-V4Port -Port $Port)
         }
     }
@@ -832,6 +959,46 @@ function Test-V4ClashListener {
 $script:V4RootConfigFiles = @('clash-verge.yaml','config.yaml','verge.yaml','profiles.yaml')
 $script:V4ManagedProfile = 'v4-managed.yaml'
 $script:V4ManagedProfileRel = 'profiles\v4-managed.yaml'
+$script:V4SnapshotEntropy = [Text.Encoding]::UTF8.GetBytes('V4Snapshot.v1')
+
+function Protect-V4SnapshotBytes {
+    param([byte[]]$Plain)
+    Add-Type -AssemblyName System.Security
+    return [Security.Cryptography.ProtectedData]::Protect($Plain, $script:V4SnapshotEntropy, 'CurrentUser')
+}
+
+function Unprotect-V4SnapshotBytes {
+    param([byte[]]$Cipher)
+    Add-Type -AssemblyName System.Security
+    try { return [Security.Cryptography.ProtectedData]::Unprotect($Cipher, $script:V4SnapshotEntropy, 'CurrentUser') }
+    catch { throw 'sealed snapshot cannot be decrypted by the current user' }
+}
+
+function Get-V4Sha256Bytes {
+    param([byte[]]$Bytes)
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try { return ([BitConverter]::ToString($sha.ComputeHash($Bytes)).Replace('-', '')) }
+    finally { $sha.Dispose() }
+}
+
+function Set-V4SealedSnapshotFile {
+    param([string]$Path, [string]$PlainSha)
+    $plain = [IO.File]::ReadAllBytes($Path)
+    try {
+        if ((Get-V4Sha256Bytes $plain) -ne $PlainSha) { throw ('snapshot plaintext changed before seal: ' + $Path) }
+        $cipher = Protect-V4SnapshotBytes $plain
+        Set-V4Atomic -TargetPath $Path -Bytes $cipher | Out-Null
+    }
+    finally { [Array]::Clear($plain, 0, $plain.Length) }
+    if (-not (Protect-V4Acl -Path $Path)) { throw 'cannot harden sealed snapshot file' }
+    return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash
+}
+
+function Test-V4SnapshotEntrySealed {
+    param($Entry)
+    if ($Entry.PSObject.Properties.Name -contains 'sealed' -and [bool]$Entry.sealed) { return $true }
+    return ($Entry.PSObject.Properties.Name -contains 'cipherSha256' -and -not [string]::IsNullOrWhiteSpace([string]$Entry.cipherSha256))
+}
 
 function New-V4SnapshotFiles {
     param(
@@ -858,7 +1025,8 @@ function New-V4SnapshotFiles {
             Copy-Item -LiteralPath $src -Destination $dst -Force
             $dstHash = (Get-FileHash -LiteralPath $dst -Algorithm SHA256).Hash
             if ($srcHash -ne $dstHash) { throw ('snapshot copy mismatch: ' + $f) }
-            $files += [pscustomobject]@{ name = $f; sha256 = $dstHash; bytes = (Get-Item -LiteralPath $dst).Length }
+            $cipherSha = Set-V4SealedSnapshotFile -Path $dst -PlainSha $dstHash
+            $files += [pscustomobject]@{ name = $f; sha256 = $dstHash; cipherSha256 = $cipherSha; sealed = $true; bytes = (Get-Item -LiteralPath $dst).Length }
         }
         else { $absent += $f }
     }
@@ -872,12 +1040,13 @@ function New-V4SnapshotFiles {
             Copy-Item -LiteralPath $fi.FullName -Destination $dst -Force
             $dstHash = (Get-FileHash -LiteralPath $dst -Algorithm SHA256).Hash
             if ($srcHash -ne $dstHash) { throw ('snapshot copy mismatch: ' + $rel) }
-            $files += [pscustomobject]@{ name = $rel; sha256 = $dstHash; bytes = (Get-Item -LiteralPath $dst).Length }
+            $cipherSha = Set-V4SealedSnapshotFile -Path $dst -PlainSha $dstHash
+            $files += [pscustomobject]@{ name = $rel; sha256 = $dstHash; cipherSha256 = $cipherSha; sealed = $true; bytes = (Get-Item -LiteralPath $dst).Length }
         }
     }
     if (-not $managedSeen) { $absent += $script:V4ManagedProfileRel }
     $manifest = [ordered]@{
-        schema = 2
+        schema = 3
         createdAt = (Get-Date).ToString('s')
         reason = $Reason
         systemProxy = $SystemProxy
@@ -930,10 +1099,24 @@ function Test-V4SnapshotManifest {
         if ($names -contains $name) { throw ('snapshot manifest has a duplicate entry: ' + $name) }
         $src = Join-Path $SnapshotDir $name
         if (-not (Test-Path -LiteralPath $src)) { throw ('snapshot incomplete: missing ' + $name) }
-        $hash = (Get-FileHash -LiteralPath $src -Algorithm SHA256).Hash
-        if ($hash.ToLowerInvariant() -ne ([string]$e.sha256).ToLowerInvariant()) { throw ('snapshot hash mismatch: ' + $name) }
+        $sealed = Test-V4SnapshotEntrySealed $e
+        if ($sealed) {
+            if (-not $e.cipherSha256) { throw ('sealed snapshot entry has no ciphertext hash: ' + $name) }
+            $cipherHash = (Get-FileHash -LiteralPath $src -Algorithm SHA256).Hash
+            if ($cipherHash.ToLowerInvariant() -ne ([string]$e.cipherSha256).ToLowerInvariant()) { throw ('snapshot ciphertext mismatch: ' + $name) }
+            $plain = Unprotect-V4SnapshotBytes ([IO.File]::ReadAllBytes($src))
+            try {
+                $hash = Get-V4Sha256Bytes $plain
+                if ($hash.ToLowerInvariant() -ne ([string]$e.sha256).ToLowerInvariant()) { throw ('sealed snapshot plaintext mismatch: ' + $name) }
+            }
+            finally { [Array]::Clear($plain, 0, $plain.Length) }
+        }
+        else {
+            $hash = (Get-FileHash -LiteralPath $src -Algorithm SHA256).Hash
+            if ($hash.ToLowerInvariant() -ne ([string]$e.sha256).ToLowerInvariant()) { throw ('snapshot hash mismatch: ' + $name) }
+        }
         $names += $name
-        $entries += [pscustomobject]@{ name = $name; sha256 = $hash }
+        $entries += [pscustomobject]@{ name = $name; sha256 = ([string]$e.sha256); sealed = $sealed; cipherSha256 = $(if ($sealed) { [string]$e.cipherSha256 } else { $null }) }
     }
     $absent = @()
     foreach ($a in @($m.absent)) {
@@ -968,10 +1151,17 @@ function Restore-V4Files {
     foreach ($e in $v.entries) {
         $target = Get-V4SnapshotTarget -Name $e.name -AppData $AppData -ProfilesDir $ProfilesDir
         try {
-            $content = [System.IO.File]::ReadAllBytes((Join-Path $SnapshotDir $e.name))
+            $stored = [System.IO.File]::ReadAllBytes((Join-Path $SnapshotDir $e.name))
+            if ($e.sealed) {
+                if ((Get-FileHash -LiteralPath (Join-Path $SnapshotDir $e.name) -Algorithm SHA256).Hash.ToLowerInvariant() -ne ([string]$e.cipherSha256).ToLowerInvariant()) { throw 'ciphertext changed before restore' }
+                $content = Unprotect-V4SnapshotBytes $stored
+            }
+            else { $content = $stored }
             $expected = $e.sha256
+            if ((Get-V4Sha256Bytes $content).ToLowerInvariant() -ne $expected.ToLowerInvariant()) { throw 'snapshot plaintext hash mismatch before write' }
             $validator = ({ param($f) if ((Get-FileHash -LiteralPath $f -Algorithm SHA256).Hash.ToLowerInvariant() -ne $expected.ToLowerInvariant()) { throw 'restored hash mismatch' } }).GetNewClosure()
-            Set-V4Atomic -TargetPath $target -Bytes $content -Validator $validator | Out-Null
+            try { Set-V4Atomic -TargetPath $target -Bytes $content -Validator $validator | Out-Null }
+            finally { if ($e.sealed) { [Array]::Clear($content, 0, $content.Length) } }
             if (-not (Protect-V4Acl -Path $target)) { throw 'restored file ACL could not be hardened' }
             $restored += $e.name
         }
@@ -986,6 +1176,35 @@ function Restore-V4Files {
         catch { $failures += [pscustomobject]@{ name = $name; error = $_.Exception.Message } }
     }
     return [pscustomobject]@{ ok = ($failures.Count -eq 0); manifest = $v.manifest; restored = $restored; failures = $failures }
+}
+
+function Remove-V4ExpiredSnapshots {
+    param([string]$BackupRoot, [int]$OlderThanDays = 14, [switch]$Confirm)
+    if (-not $script:TestMode) { throw 'expired snapshot cleanup is refused outside test mode' }
+    if (-not $Confirm) { throw 'expired snapshot cleanup requires -Confirm' }
+    if (-not $BackupRoot) { throw 'backup root is empty' }
+    $root = [IO.Path]::GetFullPath($BackupRoot).TrimEnd('\')
+    $temp = [IO.Path]::GetFullPath($env:TEMP).TrimEnd('\')
+    $testRoot = if ($env:V4_TEST_ROOT) { [IO.Path]::GetFullPath($env:V4_TEST_ROOT).TrimEnd('\') } else { $null }
+    $allowed = @($temp)
+    if ($testRoot) { $allowed += $testRoot }
+    $inside = $false
+    foreach ($parent in $allowed) {
+        if ($root.StartsWith($parent + '\', [StringComparison]::OrdinalIgnoreCase)) { $inside = $true }
+    }
+    if (-not $inside) { throw 'refusing to clean a backup root outside TEMP or the test root' }
+    $removed = @()
+    foreach ($dir in @(Get-ChildItem -LiteralPath $root -Directory -ErrorAction SilentlyContinue)) {
+        $mp = Join-Path $dir.FullName 'manifest.json'
+        if (-not (Test-Path -LiteralPath $mp)) { continue }
+        try { $m = Get-Content -LiteralPath $mp -Raw -Encoding UTF8 | ConvertFrom-Json } catch { continue }
+        if (-not $m.createdAt) { continue }
+        $created = [datetime]::Parse([string]$m.createdAt, [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::AssumeLocal)
+        if ($created -gt (Get-Date).AddDays(-1 * $OlderThanDays)) { continue }
+        Remove-Item -LiteralPath $dir.FullName -Recurse -Force
+        $removed += $dir.Name
+    }
+    return $removed
 }
 
 function Restore-V4Snapshot {
@@ -1058,7 +1277,27 @@ function Get-V4SystemProxy {
     }
     $k = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings'
     $v = Get-ItemProperty -LiteralPath $k -ErrorAction Stop
-    return [pscustomobject]@{ enabled = [bool]$v.ProxyEnable; server = $v.ProxyServer }
+    # Only the native DWORD 1 confirms the user enabled this proxy.
+    return [pscustomobject]@{ enabled = ($v.ProxyEnable -is [int] -and $v.ProxyEnable -eq 1); server = $v.ProxyServer }
+}
+
+function Get-V4AutomaticProxyStatus {
+    if ($script:TestMode) { return 'NOT_OBSERVED' }
+    try {
+        $key = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings'
+        $settings = Get-ItemProperty -LiteralPath $key -ErrorAction Stop
+        if ($settings.PSObject.Properties['AutoConfigURL'] -and
+            -not [string]::IsNullOrWhiteSpace($settings.AutoConfigURL)) { return 'PRESENT' }
+        $connections = Get-ItemProperty -LiteralPath "$key\Connections" -ErrorAction Stop
+        if (-not $connections.PSObject.Properties['DefaultConnectionSettings']) { return 'UNKNOWN' }
+        $bytes = $connections.DefaultConnectionSettings
+        if ($bytes -isnot [byte[]] -or $bytes.Length -lt 12) { return 'UNKNOWN' }
+        # Default connection flags: 0x04 is an automatic URL and 0x08 is auto-detect.
+        $flags = [BitConverter]::ToUInt32($bytes, 8)
+        if ($flags -band 12) { return 'PRESENT' }
+        if (-not $flags -or ($flags -band 15) -ne $flags) { return 'UNKNOWN' }
+        return 'NOT_OBSERVED'
+    } catch { return 'UNKNOWN' }
 }
 
 function Test-V4SystemProxyMatch {
@@ -1103,12 +1342,40 @@ function Clear-V4SystemProxy {
     Write-V4SystemProxyRegistry -Enabled $false -Server ((Get-V4SystemProxy).server)
 }
 
+function Set-V4RepairServer {
+    param([string]$ExpectedServer, [string]$NewServer, [ref]$WriteAttempted)
+    $current = Get-V4SystemProxy
+    if (-not $current.enabled -or $current.server -ne $ExpectedServer) {
+        throw (New-V4Fault 32 'Windows proxy selection changed before the write')
+    }
+    if ($script:TestMode) {
+        $current = Get-V4SystemProxy
+        if (-not $current.enabled -or $current.server -ne $ExpectedServer) {
+            throw (New-V4Fault 32 'Windows proxy selection changed before the write')
+        }
+        if (-not $script:TestRegistryWriter) { throw 'isolated repair writer is missing' }
+        if ($WriteAttempted) { $WriteAttempted.Value = $true }
+        & $script:TestRegistryWriter $current.enabled $NewServer
+        return
+    }
+    Assert-V4ProductionOperation 'repair enabled proxy target'
+    # Never re-enable the proxy, even if a user disables it during this call.
+    $key = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings'
+    if ($WriteAttempted) { $WriteAttempted.Value = $true }
+    Set-ItemProperty -LiteralPath $key -Name ProxyServer -Value $NewServer -ErrorAction Stop
+    Update-V4WinInet -RequireSuccess
+}
+
 function Update-V4WinInet {
+    param([switch]$RequireSuccess)
     if (-not ('V4Inet.Refresh' -as [type])) {
         Add-Type -MemberDefinition '[DllImport("wininet.dll",SetLastError=true)]public static extern bool InternetSetOption(IntPtr h,int o,IntPtr b,int l);' -Name Refresh -Namespace V4Inet | Out-Null
     }
-    [void][V4Inet.Refresh]::InternetSetOption([IntPtr]::Zero, 39, [IntPtr]::Zero, 0)
-    [void][V4Inet.Refresh]::InternetSetOption([IntPtr]::Zero, 37, [IntPtr]::Zero, 0)
+    $changed = [V4Inet.Refresh]::InternetSetOption([IntPtr]::Zero, 39, [IntPtr]::Zero, 0)
+    $refreshed = [V4Inet.Refresh]::InternetSetOption([IntPtr]::Zero, 37, [IntPtr]::Zero, 0)
+    if ($RequireSuccess -and (-not $changed -or -not $refreshed)) {
+        throw 'Windows could not confirm notification of the proxy change'
+    }
 }
 
 function Get-V4ExitIp {
@@ -1506,11 +1773,12 @@ function Get-V4StateCore {
         [scriptblock]$GetExitIp,
         [string]$SettingsError = '',
         [object]$UiSystemProxy = $null,
-        [object]$UdpProxied = $null
+        [object]$UdpProxied = $null,
+        [ValidateSet('NOT_OBSERVED','PRESENT','UNKNOWN')][string]$AutomaticProxyStatus = 'UNKNOWN'
     )
     $out = [ordered]@{
         ts = (Get-Date).ToString('s')
-        state = 'UNKNOWN'; mode = 'UNKNOWN'; reasons = @()
+        state = 'UNKNOWN'; mode = 'UNKNOWN'; reasons = @(); faults = @()
         clashRunning = (@($AppPids | Where-Object { $_ -gt 0 }).Count -gt 0)
         mixedPort = [bool]$MixedPortOpen
         systemProxy = $(if ($null -eq $SystemProxy) { 'unknown' } elseif ($SystemProxy.enabled) { Get-V4Redacted $SystemProxy.server } else { 'off' })
@@ -1520,6 +1788,9 @@ function Get-V4StateCore {
         exitViaChain = $null
         chainStatus = 'NOT_PROBED'
         windowsTargetsClash = $false
+        windowsTargetsFirstHop = $false
+        automaticProxy = $AutomaticProxyStatus
+        applicationPath = 'NOT_TESTED'
         uiSystemProxy = $(if ($null -eq $UiSystemProxy) { 'unknown' } elseif ($UiSystemProxy) { 'enabled' } else { 'disabled' })
         udpProxied = $(if ($null -eq $UdpProxied) { 'unknown' } elseif ($UdpProxied) { 'enabled' } else { 'disabled' })
         udpDataPlane = 'not_probed'
@@ -1529,6 +1800,7 @@ function Get-V4StateCore {
     $actualProxyEnabled = [bool]($SystemProxy -and $SystemProxy.enabled)
     $uiMismatch = ($null -ne $SystemProxy -and $null -ne $UiSystemProxy -and [bool]$UiSystemProxy -ne $actualProxyEnabled)
     if ($uiMismatch) {
+        $out.faults += 'PROXY_INTENT_MISMATCH'
         $out.reasons += ('UI reports system proxy ' + $(if ($UiSystemProxy) { 'enabled' } else { 'disabled' }) + ', actual HKCU is ' + $(if ($actualProxyEnabled) { 'enabled' } else { 'disabled' }))
     }
     if ($UdpProxied -eq $false) {
@@ -1538,51 +1810,78 @@ function Get-V4StateCore {
     }
     if ($SettingsError) {
         $out.state = 'FAILED'; $out.mode = 'UNKNOWN'
+        $out.faults += 'SETTINGS_UNAVAILABLE'
         $out.reasons += ('settings invalid: ' + $SettingsError)
         return $out
     }
     if (-not $Settings) {
         $out.state = 'FAILED'; $out.mode = 'UNKNOWN'
+        $out.faults += 'SETTINGS_UNAVAILABLE'
         $out.reasons += 'settings.json missing'
         return $out
     }
     $expectedProxy = '127.0.0.1:' + $Settings.mixedPort
     $out.windowsTargetsClash = ($actualProxyEnabled -and $SystemProxy.server -eq $expectedProxy)
+    $out.windowsTargetsFirstHop = ($actualProxyEnabled -and $SystemProxy.server -eq ('127.0.0.1:' + $Settings.hopPort))
     if ($null -eq $SystemProxy) {
+        $out.faults += 'SYSTEM_PROXY_UNVERIFIED'
         $out.reasons += 'Windows proxy state could not be read'
     } elseif (-not $out.windowsTargetsClash) {
+        $out.faults += 'SYSTEM_PROXY_DRIFT'
         $out.reasons += ('Windows proxy is ' + $out.systemProxy + '; expected ' + $expectedProxy)
+    }
+    if ($AutomaticProxyStatus -ne 'NOT_OBSERVED') {
+        $out.faults += 'AUTOMATIC_PROXY_UNVERIFIED'
+        $out.reasons += 'Default LAN automatic proxy is present or could not be read.'
+    }
+    if ($null -eq $UiSystemProxy) {
+        $out.faults += 'CLIENT_INTENT_UNVERIFIED'
+        $out.reasons += 'Saved client proxy mode could not be read.'
     }
     if ($FirstHop) {
         $out.firstHopOk = [bool]$FirstHop.ok
         $out.firstHopStatus = if ($FirstHop.PSObject.Properties['status']) { $FirstHop.status }
             elseif ($out.firstHopOk) { 'CONNECT_OK' } else { 'UNAVAILABLE' }
-        if (-not $out.firstHopOk) { $out.reasons += ('first-hop check failed: ' + $FirstHop.detail) }
+        if (-not $out.firstHopOk) {
+            $out.faults += $(if ($out.firstHopStatus -eq 'TCP_UNAVAILABLE') { 'FIRST_HOP_TCP_UNAVAILABLE' } else { 'FIRST_HOP_CONNECT_FAILED' })
+            $out.reasons += ('first-hop check failed: ' + $FirstHop.detail)
+        }
     }
-    else { $out.reasons += 'first hop probe unavailable' }
-    if (-not $out.clashRunning) { $out.mode = 'RAW'; $out.state = 'FAILED'; $out.reasons += 'clash not running' }
-    elseif (-not $out.mixedPort) { $out.mode = 'NEXIP'; $out.state = 'FAILED'; $out.reasons += 'core not listening' }
+    else { $out.faults += 'FIRST_HOP_NOT_VERIFIED'; $out.reasons += 'first hop probe unavailable' }
+    if (-not $out.clashRunning) {
+        $out.mode = 'RAW'; $out.state = 'FAILED'; $out.faults += 'CLASH_PROCESS_NOT_OBSERVED'
+        $out.reasons += 'no Clash application or core process observed'
+    }
+    elseif (-not $out.mixedPort) {
+        $out.mode = 'NEXIP'; $out.state = 'FAILED'; $out.faults += 'CORE_LISTENER_UNVERIFIED'
+        $out.reasons += 'expected IPv4 core listener could not be verified'
+    }
     else {
         $out.mode = 'NEXIP'
-        if (-not $out.firstHopOk -or -not $GetExitIp) { $out.state = 'DEGRADED' }
+        if (-not $out.firstHopOk -or -not $GetExitIp) {
+            $out.state = 'DEGRADED'
+            if ($out.firstHopOk) { $out.faults += 'CHAIN_EXIT_NOT_TESTED' }
+        }
         else {
-            $out.exitViaChain = & $GetExitIp ('http://' + $expectedProxy)
-            if ($out.exitViaChain -eq $Settings.host) {
+            try { $out.exitViaChain = & $GetExitIp ('http://' + $expectedProxy) }
+            catch { $out.exitViaChain = $null }
+            if ($out.exitViaChain -isnot [string]) { $out.exitViaChain = $null }
+            if ($out.exitViaChain -and $out.exitViaChain -eq $Settings.host) {
                 $out.chainStatus = 'EXPECTED_EXIT'
-                $out.state = if ($out.windowsTargetsClash) { 'HEALTHY' } else { 'DEGRADED' }
+                $out.state = if ($out.faults.Count -eq 0) { 'CHAIN_VERIFIED' } else { 'DEGRADED' }
             }
             elseif ($out.exitViaChain) {
                 $out.chainStatus = 'UNEXPECTED_EXIT'
+                $out.faults += 'EXIT_MISMATCH'
                 $out.state = 'DEGRADED'; $out.reasons += 'Clash HTTPS exit differs from the configured static IPv4'
             }
             else {
                 $out.chainStatus = 'NO_EXIT'
+                $out.faults += 'CHAIN_EXIT_UNVERIFIED'
                 $out.state = 'FAILED'; $out.reasons += 'Clash HTTPS probe returned no IPv4 exit'
             }
         }
     }
-    if ($uiMismatch -and $out.state -ne 'FAILED') { $out.state = 'DEGRADED' }
-    if ($UdpProxied -eq $false -and $out.state -eq 'HEALTHY') { $out.state = 'DEGRADED' }
     return $out
 }
 
@@ -1590,7 +1889,7 @@ function Get-V4State {
     $p = Get-V4Paths
     $s = $null
     $settingsError = ''
-    try { $s = Get-V4Settings }
+    try { $s = Get-V4Settings -StatusOnly }
     catch { $settingsError = Get-V4FaultMessage $_ }
     $owner = Get-V4Owner
     try { $px = Get-V4SystemProxy }
@@ -1598,14 +1897,14 @@ function Get-V4State {
     $pids = Get-V4AppPids
     $mixed = $false
     $hop = $null
-    if ($s) {
+    if ($s -and -not $script:TestMode) {
         $mixed = Test-V4ClashListener -Port $s.mixedPort -ExpectedCore $p.Core
         $hop = Test-V4FirstHop -Port $s.hopPort
     }
     $exitProbe = { param($proxy) Get-V4ExitIp -Proxy $proxy -TimeoutSec 5 }
     $uiProxy = Get-V4UiSystemProxy
     $udpProxy = Get-V4UdpProxied
-    return Get-V4StateCore -Settings $s -Owner $owner -SystemProxy $px -AppPids $pids -MixedPortOpen $mixed -FirstHop $hop -GetExitIp $exitProbe -SettingsError $settingsError -UiSystemProxy $uiProxy -UdpProxied $udpProxy
+    return Get-V4StateCore -Settings $s -Owner $owner -SystemProxy $px -AppPids $pids -MixedPortOpen $mixed -FirstHop $hop -GetExitIp $exitProbe -SettingsError $settingsError -UiSystemProxy $uiProxy -UdpProxied $udpProxy -AutomaticProxyStatus (Get-V4AutomaticProxyStatus)
 }
 
 function Get-V4Integrity {

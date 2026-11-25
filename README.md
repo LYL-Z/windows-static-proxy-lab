@@ -8,6 +8,8 @@ reasoning can be audited independently. It is **not** a "how to evade platform r
 
 ## What is here
 
+The [V6.9 acceptance matrix](docs/V69-ACCEPTANCE.md) records what happened to a live browser request when its proxy stopped mid-response. It includes receiver-side controls, protocol coverage, and the remaining production gates. The [Proxy Doctor operator guide](docs/V69-OPERATOR.md) covers read-only diagnosis and interrupted repairs.
+
 | Path | Contents |
 |---|---|
 | `proxy_diag/` | Round 1: staged protocol probes, 1×RTT "who closed the socket" test, control experiments, raw probe JSON |
@@ -32,6 +34,7 @@ reasoning can be audited independently. It is **not** a "how to evade platform r
 
 ## Honest status
 
+V6.9 candidate `171d060` is not a stable release. Its isolated regression is 114/114, exit 0, 0 skipped. Production scripts were still the `854b6d6` bytes when that run finished.
 V6 (commit 79198fd / evidence 32d8abc): 97/97 isolated tests, 7/7 harness self-tests, Gitleaks 0 findings.
 `PENDING` on real production apply/rollback/boot/sleep/Wi-Fi, 24h/72h soak, and credential rotation.
 **F11 incident:** a lead test probe wrote `ProxyServer=x` to the real HKCU during V6 work and briefly broke browser networking on 2026-11-18. It is recorded in `proxy_v6/INCIDENT-2026-11-18.md`; the production-write latch and FT16–FT21 regression tests are in place.

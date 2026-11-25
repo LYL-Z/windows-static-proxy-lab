@@ -4,16 +4,20 @@
 .EXAMPLE   .\rollback-v4.ps1 -List
            .\rollback-v4.ps1
            .\rollback-v4.ps1 -SnapshotDir .\backup\<stamp>
-  Exit: 0 ok, 33 lock busy, 40 failed, 41 system proxy could not be held.
+  Exit: 0 ok, 32 files restored and a user-disabled proxy was left off,
+        33 lock busy, 40 failed, 41 system proxy could not be held.
 #>
 [CmdletBinding()]
 param([string]$SnapshotDir, [switch]$List, [switch]$KeepSystemProxy)
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'lib\V4.ps1')
-$null = Enable-V4ProductionWrites
-$null = Start-V4Log 'rollback'
+if (-not $List) {
+    $null = Enable-V4ProductionWrites
+    $null = Start-V4Log 'rollback'
+}
 $exit = 0
 $lock = $null
+$userLock = $null
 $mixedPort = 7897
 
 function Get-RollbackSnapshots {
@@ -25,12 +29,6 @@ function Get-RollbackSnapshots {
 }
 
 try {
-    try {
-        $settings = Get-V4Settings
-        $mixedPort = [int]$settings.mixedPort
-    }
-    catch { }
-
     if ($List) {
         $all = @(Get-RollbackSnapshots)
         if (-not $all) { Write-V4Log 'no snapshots' -Level WARN; return }
@@ -40,7 +38,9 @@ try {
         }
         return
     }
-    $lock = Enter-V4Lock
+    try { $mixedPort = [int](Get-V4Settings -StatusOnly).mixedPort } catch { }
+    $userLock = Enter-V4UserMutationLock
+    if ($userLock) { $lock = Enter-V4Lock }
     if (-not $lock) {
         Write-V4Log 'another operation holds the lock' -Level ERROR
         $exit = 33
@@ -50,6 +50,11 @@ try {
     # R2A-01: lock is held until after any补救 restart. Only a failure that
     # actually entered restore may start the app; a pre-restore failure must not.
     try {
+        if (Get-V4RepairReceipt) {
+            Write-V4Log 'interrupted or unreadable repair receipt; review before rollback' -Level ERROR
+            $exit = 34
+            return
+        }
         $restoreAttempted = $false
         try {
             $journal = Get-V4Journal
@@ -68,17 +73,41 @@ try {
             }
             $SnapshotDir = (Get-Item -LiteralPath $SnapshotDir -ErrorAction Stop).FullName
             # Verify the manifest before considering the app "possibly stopped".
-            Test-V4SnapshotManifest -SnapshotDir $SnapshotDir | Out-Null
+            $manifest = Test-V4SnapshotManifest -SnapshotDir $SnapshotDir
             Write-V4Log ('restoring verified snapshot ' + (Split-Path $SnapshotDir -Leaf)) -Level STEP
-            $keptProxy = if ($KeepSystemProxy) { Get-V4SystemProxy } else { $null }
-            if (-not $rollbackJournal -or $journal.data.snapshot -ne $SnapshotDir -or [bool]$journal.data.keepSystemProxy -ne [bool]$KeepSystemProxy) {
-                Write-V4Journal -SnapshotDir $SnapshotDir -Reason 'rollback' -KeepSystemProxy:$KeepSystemProxy
+            $journalMatches = $rollbackJournal -and [string]$journal.data.snapshot -eq $SnapshotDir -and [bool]$journal.data.keepSystemProxy -eq [bool]$KeepSystemProxy
+            if ($KeepSystemProxy -and $journalMatches -and $journal.data.PSObject.Properties.Name -notcontains 'keptEnabled') {
+                Write-V4Log 'rollback journal does not record the proxy selection it intended to keep' -Level ERROR
+                $exit = 41
+                return
+            }
+            $keptProxy = $null
+            if ($KeepSystemProxy) {
+                if ($journalMatches) {
+                    $keptProxy = [pscustomobject]@{ enabled = [bool]$journal.data.keptEnabled; server = [string]$journal.data.keptServer }
+                } else {
+                    $keptProxy = Get-V4SystemProxy
+                }
+            }
+            $snapshotProxy = $manifest.manifest.systemProxy
+            $storedOff = $journalMatches -and $journal.data.PSObject.Properties.Name -contains 'preserveUserOff' -and [bool]$journal.data.preserveUserOff
+            $preserveUserOff = [bool]$storedOff
+            if (-not $KeepSystemProxy -and -not $preserveUserOff -and $snapshotProxy -and [bool]$snapshotProxy.enabled -and -not (Get-V4SystemProxy).enabled) {
+                $preserveUserOff = $true
+            }
+            if (-not $journalMatches -or ($preserveUserOff -and -not $storedOff)) {
+                Write-V4Journal -SnapshotDir $SnapshotDir -Reason 'rollback' -KeepSystemProxy:$KeepSystemProxy -PreserveUserOff:$preserveUserOff -KeptProxy $keptProxy
+            }
+            if ($script:TestMode -and $env:V4_TEST_EXIT_AFTER_JOURNAL -eq '1') {
+                Write-V4Log 'test injection stopped after the rollback journal was durable' -Level WARN
+                $exit = 41
+                return
             }
             $restoreAttempted = $true
             $m = Restore-V4Snapshot -SnapshotDir $SnapshotDir -Port $mixedPort
             Write-V4Log 'files restored and hash-verified' -Level OK
 
-            $restoreProxy = -not $KeepSystemProxy -and $null -ne $m.systemProxy
+            $restoreProxy = -not $KeepSystemProxy -and -not $preserveUserOff -and $null -ne $m.systemProxy
             if ($restoreProxy) {
                 if ($m.systemProxy.enabled) { Set-V4SystemProxy -Server $m.systemProxy.server } else { Clear-V4SystemProxy }
             }
@@ -86,6 +115,30 @@ try {
             # A restart can reassert the UI setting. Preserve the snapshot's
             # established "off" behavior and verify the actual final proxy.
             if ($restoreProxy -and -not $m.systemProxy.enabled) { Clear-V4SystemProxy }
+            if ($preserveUserOff) {
+                $now = Get-V4SystemProxy
+                if ($now.enabled -and [string]$now.server -eq [string]$m.systemProxy.server) { Clear-V4SystemProxy }
+                elseif ($now.enabled) {
+                    Write-V4Log 'a different proxy was enabled during rollback; left unchanged and journal retained' -Level ERROR
+                    $exit = 41
+                    return
+                }
+                $now = Get-V4SystemProxy
+                if ($now.enabled -or -not $ready) {
+                    Write-V4Log 'user-disabled proxy could not be confirmed after rollback; journal retained' -Level ERROR
+                    $exit = $(if ($ready) { 41 } else { 40 })
+                    return
+                }
+                Set-V4Owner -Owner 'rollback' -SystemProxy 'off' -Note ('user-off preserved; snapshot=' + (Split-Path $SnapshotDir -Leaf))
+                if (-not (Clear-V4Journal)) {
+                    Write-V4Log 'user-off was preserved but the journal remains' -Level ERROR
+                    $exit = 40
+                    return
+                }
+                Write-V4Log 'rollback restored files and left the user-disabled proxy off' -Level OK
+                $exit = 32
+                return
+            }
             if (-not $ready) {
                 Write-V4Log 'Clash listener did not become ready; rollback journal retained' -Level ERROR
                 $exit = 40
@@ -124,4 +177,7 @@ catch {
     Write-V4Log ('rollback refused/failed before restore: ' + (Get-V4Redacted $_.Exception.Message)) -Level ERROR
     $exit = 40
 }
-finally { exit $exit }
+finally {
+    if ($userLock) { $userLock.ReleaseMutex(); $userLock.Dispose() }
+    exit $exit
+}

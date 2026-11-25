@@ -1,6 +1,6 @@
 # ISSUE-LEDGER — V6.0
 
-最后更新：2026-11-18T05:52-08:00
+最后更新：2026-11-25。新增：用户关闭代理后，快照回滚和失败恢复不再把同一代理重新打开。隔离回归 `171d060` 为 114/114。生产目录仍未替换。
 状态图例：OPEN / FIXED-PENDING-REVIEW / VERIFIED-CLOSED / WAITING-USER / DEFERRED-BY-USER / ACCEPTED-RISK
 
 ## A. F11 — 生产状态污染事故（CRITICAL，最高优先级）
