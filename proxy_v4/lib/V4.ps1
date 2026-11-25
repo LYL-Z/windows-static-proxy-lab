@@ -1000,6 +1000,78 @@ function Test-V4SnapshotEntrySealed {
     return ($Entry.PSObject.Properties.Name -contains 'cipherSha256' -and -not [string]::IsNullOrWhiteSpace([string]$Entry.cipherSha256))
 }
 
+function Test-V4SnapshotRelativeName {
+    param([string]$Name)
+    if ([string]::IsNullOrWhiteSpace($Name)) { return $false }
+    $name = ([string]$Name).Replace('/', '\')
+    if ($name.StartsWith('\\') -or $name.StartsWith('\') -or $name.Contains(':')) { return $false }
+    $parts = $name.Split([char[]]@('\','/'), [System.StringSplitOptions]::RemoveEmptyEntries)
+    if ($parts.Length -eq 0) { return $false }
+    foreach ($part in $parts) {
+        if ($part -eq '.' -or $part -eq '..') { return $false }
+    }
+    $okRoot = ($parts.Length -eq 1 -and ($script:V4RootConfigFiles -contains $name))
+    $okProfile = ($parts.Length -eq 2 -and $parts[0] -eq 'profiles' -and $parts[1].EndsWith('.yaml'))
+    return [bool]($okRoot -or $okProfile)
+}
+
+function Get-V4SnapshotSchema {
+    param($Manifest)
+    if (-not $Manifest -or $Manifest.PSObject.Properties.Name -notcontains 'schema') { return 2 }
+    $raw = $Manifest.schema
+    if ($null -eq $raw -or [string]::IsNullOrWhiteSpace([string]$raw)) { throw 'snapshot manifest schema is empty' }
+    $parsed = 0
+    if (-not [int]::TryParse([string]$raw, [ref]$parsed)) { throw 'snapshot manifest schema is invalid' }
+    if ($parsed -ne 2 -and $parsed -ne 3) { throw 'snapshot manifest schema is unsupported' }
+    return $parsed
+}
+
+function Test-V4DirectoryInside {
+    param([string]$Child, [string]$Parent)
+    if ([string]::IsNullOrWhiteSpace($Child) -or [string]::IsNullOrWhiteSpace($Parent)) { return $false }
+    try {
+        $childFull = [IO.Path]::GetFullPath($Child).TrimEnd('\')
+        $parentFull = [IO.Path]::GetFullPath($Parent).TrimEnd('\')
+    }
+    catch { return $false }
+    if ($childFull.Length -le $parentFull.Length) { return $false }
+    return $childFull.StartsWith($parentFull + '\', [StringComparison]::OrdinalIgnoreCase)
+}
+
+function Read-V4SnapshotPlain {
+    param([string]$SnapshotDir, $Entry)
+    $src = Join-Path $SnapshotDir ([string]$Entry.name)
+    $stored = [IO.File]::ReadAllBytes($src)
+    $content = $null
+    $ownsStored = $true
+    $result = $null
+    try {
+        if ($Entry.sealed) {
+            if ([string]::IsNullOrWhiteSpace([string]$Entry.cipherSha256)) { throw ('snapshot manifest is missing cipherSha256: ' + $Entry.name) }
+            $cipherHash = Get-V4Sha256Bytes $stored
+            if ($cipherHash.ToLowerInvariant() -ne ([string]$Entry.cipherSha256).ToLowerInvariant()) { throw 'ciphertext changed before restore' }
+            $content = Unprotect-V4SnapshotBytes $stored
+        }
+        else {
+            $content = $stored
+            $ownsStored = $false
+        }
+        $expected = [string]$Entry.sha256
+        if ([string]::IsNullOrWhiteSpace($expected)) { throw ('snapshot plaintext hash is missing: ' + $Entry.name) }
+        if ((Get-V4Sha256Bytes $content).ToLowerInvariant() -ne $expected.ToLowerInvariant()) { throw 'snapshot plaintext hash mismatch before write' }
+        $result = [pscustomobject]@{ name = [string]$Entry.name; bytes = $content; sha256 = $expected }
+        $content = $null
+    }
+    catch {
+        if ($content) { [Array]::Clear($content, 0, $content.Length) }
+        throw
+    }
+    finally {
+        if ($ownsStored -and $stored) { [Array]::Clear($stored, 0, $stored.Length) }
+    }
+    return $result
+}
+
 function New-V4SnapshotFiles {
     param(
         [string]$AppData,
@@ -1087,23 +1159,25 @@ function Test-V4SnapshotManifest {
     if (-not (Test-Path -LiteralPath $mp)) { throw ('snapshot manifest missing: ' + $SnapshotDir) }
     try { $m = Get-Content -LiteralPath $mp -Raw -Encoding UTF8 | ConvertFrom-Json }
     catch { throw 'snapshot manifest is not valid JSON' }
+    $schema = Get-V4SnapshotSchema $m
     $entries = @()
     $names = @()
     foreach ($e in @($m.files)) {
+        $cipherProp = $null
         if (-not $e -or -not $e.name -or -not $e.sha256) { throw 'snapshot manifest has an incomplete file entry' }
         $name = ([string]$e.name).Replace('/', '\')
-        $parts = $name.Split([char[]]@('\','/'), [System.StringSplitOptions]::RemoveEmptyEntries)
-        $okRoot = ($script:V4RootConfigFiles -contains $name)
-        $okProfile = ($parts.Length -eq 2 -and $parts[0] -eq 'profiles' -and $parts[1].EndsWith('.yaml'))
-        if (-not ($okRoot -or $okProfile)) { throw ('snapshot manifest has an unsafe path: ' + $name) }
+        if (-not (Test-V4SnapshotRelativeName $name)) { throw ('snapshot manifest has an unsafe path: ' + $name) }
         if ($names -contains $name) { throw ('snapshot manifest has a duplicate entry: ' + $name) }
+        $sealed = Test-V4SnapshotEntrySealed $e
+        if ($schema -ge 3 -and -not $sealed) { throw ('snapshot manifest is missing cipherSha256: ' + $name) }
         $src = Join-Path $SnapshotDir $name
         if (-not (Test-Path -LiteralPath $src)) { throw ('snapshot incomplete: missing ' + $name) }
-        $sealed = Test-V4SnapshotEntrySealed $e
         if ($sealed) {
-            if (-not $e.cipherSha256) { throw ('sealed snapshot entry has no ciphertext hash: ' + $name) }
+            $cipherProp = $null
+            if ($e.PSObject.Properties.Name -contains 'cipherSha256') { $cipherProp = [string]$e.cipherSha256 }
+            if ([string]::IsNullOrWhiteSpace($cipherProp)) { throw ('snapshot manifest is missing cipherSha256: ' + $name) }
             $cipherHash = (Get-FileHash -LiteralPath $src -Algorithm SHA256).Hash
-            if ($cipherHash.ToLowerInvariant() -ne ([string]$e.cipherSha256).ToLowerInvariant()) { throw ('snapshot ciphertext mismatch: ' + $name) }
+            if ($cipherHash.ToLowerInvariant() -ne $cipherProp.ToLowerInvariant()) { throw ('snapshot ciphertext mismatch: ' + $name) }
             $plain = Unprotect-V4SnapshotBytes ([IO.File]::ReadAllBytes($src))
             try {
                 $hash = Get-V4Sha256Bytes $plain
@@ -1116,16 +1190,13 @@ function Test-V4SnapshotManifest {
             if ($hash.ToLowerInvariant() -ne ([string]$e.sha256).ToLowerInvariant()) { throw ('snapshot hash mismatch: ' + $name) }
         }
         $names += $name
-        $entries += [pscustomobject]@{ name = $name; sha256 = ([string]$e.sha256); sealed = $sealed; cipherSha256 = $(if ($sealed) { [string]$e.cipherSha256 } else { $null }) }
+        $entries += [pscustomobject]@{ name = $name; sha256 = ([string]$e.sha256); sealed = $sealed; cipherSha256 = $(if ($sealed) { $cipherProp } else { $null }) }
     }
     $absent = @()
     foreach ($a in @($m.absent)) {
         if (-not $a) { continue }
         $name = ([string]$a).Replace('/', '\')
-        $parts = $name.Split([char[]]@('\','/'), [System.StringSplitOptions]::RemoveEmptyEntries)
-        $okRoot = ($script:V4RootConfigFiles -contains $name)
-        $okProfile = ($parts.Length -eq 2 -and $parts[0] -eq 'profiles' -and $parts[1].EndsWith('.yaml'))
-        if (-not ($okRoot -or $okProfile)) { throw ('snapshot manifest has an unsafe absent path: ' + $name) }
+        if (-not (Test-V4SnapshotRelativeName $name)) { throw ('snapshot manifest has an unsafe absent path: ' + $name) }
         if ($names -contains $name) { throw ('snapshot manifest lists a file as both present and absent: ' + $name) }
         if ($absent -contains $name) { throw ('snapshot manifest has a duplicate absent entry: ' + $name) }
         $absent += $name
@@ -1137,35 +1208,45 @@ function Test-V4SnapshotManifest {
 
 function Get-V4SnapshotTarget {
     param([string]$Name, [string]$AppData, [string]$ProfilesDir)
-    $name = $Name.Replace('/', '\')
+    $name = ([string]$Name).Replace('/', '\')
+    if (-not (Test-V4SnapshotRelativeName $name)) { throw ('snapshot target has an unsafe path: ' + $name) }
     $parts = $name.Split([char[]]@('\','/'), [System.StringSplitOptions]::RemoveEmptyEntries)
-    if ($parts.Length -eq 2 -and $parts[0] -eq 'profiles') { return (Join-Path $ProfilesDir $parts[1]) }
+    if ($parts.Length -eq 2) { return (Join-Path $ProfilesDir $parts[1]) }
     return (Join-Path $AppData $name)
 }
 
 function Restore-V4Files {
     param([string]$SnapshotDir, [string]$AppData, [string]$ProfilesDir)
     $v = Test-V4SnapshotManifest -SnapshotDir $SnapshotDir
-    $restored = @()
-    $failures = @()
-    foreach ($e in $v.entries) {
-        $target = Get-V4SnapshotTarget -Name $e.name -AppData $AppData -ProfilesDir $ProfilesDir
-        try {
-            $stored = [System.IO.File]::ReadAllBytes((Join-Path $SnapshotDir $e.name))
-            if ($e.sealed) {
-                if ((Get-FileHash -LiteralPath (Join-Path $SnapshotDir $e.name) -Algorithm SHA256).Hash.ToLowerInvariant() -ne ([string]$e.cipherSha256).ToLowerInvariant()) { throw 'ciphertext changed before restore' }
-                $content = Unprotect-V4SnapshotBytes $stored
-            }
-            else { $content = $stored }
-            $expected = $e.sha256
-            if ((Get-V4Sha256Bytes $content).ToLowerInvariant() -ne $expected.ToLowerInvariant()) { throw 'snapshot plaintext hash mismatch before write' }
-            $validator = ({ param($f) if ((Get-FileHash -LiteralPath $f -Algorithm SHA256).Hash.ToLowerInvariant() -ne $expected.ToLowerInvariant()) { throw 'restored hash mismatch' } }).GetNewClosure()
-            try { Set-V4Atomic -TargetPath $target -Bytes $content -Validator $validator | Out-Null }
-            finally { if ($e.sealed) { [Array]::Clear($content, 0, $content.Length) } }
-            if (-not (Protect-V4Acl -Path $target)) { throw 'restored file ACL could not be hardened' }
-            $restored += $e.name
+    # Decrypt and verify every entry before the first target write. A corrupt
+    # ciphertext must not leave a later file in the same snapshot updated.
+    $prepared = New-Object System.Collections.Generic.List[object]
+    try {
+        foreach ($e in $v.entries) { [void]$prepared.Add((Read-V4SnapshotPlain -SnapshotDir $SnapshotDir -Entry $e)) }
+    }
+    catch {
+        for ($i = 0; $i -lt $prepared.Count; $i++) {
+            $item = $prepared[$i]
+            if ($item.bytes) { [Array]::Clear($item.bytes, 0, $item.bytes.Length) }
         }
-        catch { $failures += [pscustomobject]@{ name = $e.name; error = $_.Exception.Message } }
+        throw
+    }
+    $restored = @()
+    $failures = New-Object System.Collections.Generic.List[object]
+    for ($i = 0; $i -lt $prepared.Count; $i++) {
+        $item = $prepared[$i]
+        $target = Get-V4SnapshotTarget -Name $item.name -AppData $AppData -ProfilesDir $ProfilesDir
+        try {
+            $expected = [string]$item.sha256
+            $validator = ({ param($f) if ((Get-FileHash -LiteralPath $f -Algorithm SHA256).Hash.ToLowerInvariant() -ne $expected.ToLowerInvariant()) { throw 'restored hash mismatch' } }).GetNewClosure()
+            Set-V4Atomic -TargetPath $target -Bytes $item.bytes -Validator $validator | Out-Null
+            if (-not (Protect-V4Acl -Path $target)) { throw 'restored file ACL could not be hardened' }
+            $restored += $item.name
+        }
+        catch { [void]$failures.Add([pscustomobject]@{ name = $item.name; error = $_.Exception.Message }) }
+        finally {
+            if ($item.bytes) { [Array]::Clear($item.bytes, 0, $item.bytes.Length) }
+        }
     }
     foreach ($name in $v.absent) {
         $target = Get-V4SnapshotTarget -Name $name -AppData $AppData -ProfilesDir $ProfilesDir
@@ -1173,9 +1254,12 @@ function Restore-V4Files {
             if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Force -ErrorAction Stop }
             $restored += ('absent:' + $name)
         }
-        catch { $failures += [pscustomobject]@{ name = $name; error = $_.Exception.Message } }
+        catch { [void]$failures.Add([pscustomobject]@{ name = $name; error = $_.Exception.Message }) }
     }
-    return [pscustomobject]@{ ok = ($failures.Count -eq 0); manifest = $v.manifest; restored = $restored; failures = $failures }
+    $failureCount = $failures.Count
+    $ok = ($failureCount -eq 0)
+    $failureItems = $failures.ToArray()
+    return [pscustomobject]@{ ok = $ok; manifest = $v.manifest; restored = @($restored); failures = $failureItems }
 }
 
 function Remove-V4ExpiredSnapshots {
@@ -1205,6 +1289,95 @@ function Remove-V4ExpiredSnapshots {
         $removed += $dir.Name
     }
     return $removed
+}
+
+function ConvertTo-V4SealedSnapshot {
+    param(
+        [Parameter(Mandatory = $true)][string]$SnapshotDir,
+        [Parameter(Mandatory = $true)][string]$TestRoot,
+        [switch]$Confirm
+    )
+    # Test-only migration. Real backup directories live outside TEMP and are refused.
+    if (-not $Confirm) { throw 'snapshot seal migration requires -Confirm' }
+    if ([string]::IsNullOrWhiteSpace($env:TEMP)) { throw 'TEMP is not set' }
+    if (-not (Test-V4DirectoryInside $TestRoot $env:TEMP)) { throw 'refusing to seal a snapshot when TestRoot is outside TEMP' }
+    if (-not (Test-V4DirectoryInside $SnapshotDir $env:TEMP)) { throw 'refusing to seal a snapshot outside TEMP' }
+    if (-not (Test-V4DirectoryInside $SnapshotDir $TestRoot)) { throw 'refusing to seal a snapshot outside TestRoot' }
+    $manifestPath = Join-Path $SnapshotDir 'manifest.json'
+    if (-not (Test-Path -LiteralPath $manifestPath)) { throw ('snapshot manifest missing: ' + $SnapshotDir) }
+    $oldManifest = [IO.File]::ReadAllBytes($manifestPath)
+    $staged = New-Object System.Collections.Generic.List[object]
+    try {
+        $v = Test-V4SnapshotManifest -SnapshotDir $SnapshotDir
+        if ((Get-V4SnapshotSchema $v.manifest) -ne 2) { throw 'snapshot seal migration only accepts schema 2' }
+        foreach ($e in $v.entries) {
+            if ($e.sealed) { throw ('schema 2 entry is already sealed: ' + $e.name) }
+            $src = Join-Path $SnapshotDir $e.name
+            $plain = [IO.File]::ReadAllBytes($src)
+            if ((Get-V4Sha256Bytes $plain).ToLowerInvariant() -ne ([string]$e.sha256).ToLowerInvariant()) {
+                [Array]::Clear($plain, 0, $plain.Length)
+                throw ('snapshot plaintext changed before seal: ' + $e.name)
+            }
+            $cipher = Protect-V4SnapshotBytes $plain
+            [void]$staged.Add([pscustomobject]@{
+                name = [string]$e.name
+                src = $src
+                plain = $plain
+                cipher = $cipher
+                sha256 = [string]$e.sha256
+                cipherSha256 = (Get-V4Sha256Bytes $cipher)
+            })
+        }
+        for ($i = 0; $i -lt $staged.Count; $i++) {
+            $s = $staged[$i]
+            Set-V4Atomic -TargetPath $s.src -Bytes $s.cipher | Out-Null
+            if (-not (Protect-V4Acl -Path $s.src)) { throw ('cannot harden sealed snapshot file: ' + $s.name) }
+            $written = (Get-FileHash -LiteralPath $s.src -Algorithm SHA256).Hash
+            if ($written.ToLowerInvariant() -ne $s.cipherSha256.ToLowerInvariant()) { throw ('sealed snapshot ciphertext mismatch: ' + $s.name) }
+        }
+        $m = $v.manifest
+        $created = (Get-Date).ToString('s')
+        if ($m.PSObject.Properties.Name -contains 'createdAt' -and $m.createdAt) {
+            if ($m.createdAt -is [datetime]) { $created = ([datetime]$m.createdAt).ToString('s') }
+            else { $created = [string]$m.createdAt }
+        }
+        $reason = 'migrate'
+        if ($m.PSObject.Properties.Name -contains 'reason' -and $m.reason) { $reason = [string]$m.reason }
+        $fileEntries = @()
+        for ($i = 0; $i -lt $staged.Count; $i++) {
+            $s = $staged[$i]
+            $fileEntries += [ordered]@{ name = $s.name; sha256 = $s.sha256; cipherSha256 = $s.cipherSha256; sealed = $true; bytes = $s.cipher.Length }
+        }
+        $manifest = [ordered]@{
+            schema = 3
+            createdAt = $created
+            reason = $reason
+            files = @($fileEntries)
+            absent = @($v.absent)
+        }
+        if ($m.PSObject.Properties.Name -contains 'systemProxy') { $manifest.systemProxy = $m.systemProxy }
+        if ($m.PSObject.Properties.Name -contains 'clashRunningBefore') { $manifest.clashRunningBefore = [bool]$m.clashRunningBefore }
+        Write-V4File -Path $manifestPath -Content ($manifest | ConvertTo-Json -Depth 7)
+        Test-V4SnapshotManifest -SnapshotDir $SnapshotDir | Out-Null
+        return [pscustomobject]@{ dir = ([IO.Path]::GetFullPath($SnapshotDir)); schema = 3 }
+    }
+    catch {
+        $migrationError = [string]$_.Exception.Message
+        for ($i = 0; $i -lt $staged.Count; $i++) {
+            $s = $staged[$i]
+            try { if ($s.plain) { Set-V4Atomic -TargetPath $s.src -Bytes $s.plain | Out-Null } } catch { }
+        }
+        try { if ($oldManifest) { [IO.File]::WriteAllBytes($manifestPath, $oldManifest) } } catch { }
+        throw $migrationError
+    }
+    finally {
+        for ($i = 0; $i -lt $staged.Count; $i++) {
+            $s = $staged[$i]
+            if ($s.plain) { [Array]::Clear($s.plain, 0, $s.plain.Length) }
+            if ($s.cipher) { [Array]::Clear($s.cipher, 0, $s.cipher.Length) }
+        }
+        if ($oldManifest) { [Array]::Clear($oldManifest, 0, $oldManifest.Length) }
+    }
 }
 
 function Restore-V4Snapshot {
