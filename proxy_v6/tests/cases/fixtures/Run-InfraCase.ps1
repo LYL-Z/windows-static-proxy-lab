@@ -43,6 +43,15 @@ function Get-Sha {
     if (-not (Test-Path -LiteralPath $Path)) { return 'ABSENT' }
     return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash
 }
+function Get-SnapPlainSha {
+    param([string]$SnapshotDir, [string]$Name)
+    $m = Get-Content -LiteralPath (Join-Path $SnapshotDir 'manifest.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+    foreach ($e in @($m.files)) {
+        $n = ([string]$e.name).Replace('/', '\')
+        if ($n -eq $Name) { return ([string]$e.sha256).ToUpperInvariant() }
+    }
+    throw ('snapshot entry missing: ' + $Name)
+}
 function New-TestAppData {
     $app = Join-Path $root 'appdata'
     New-Item -ItemType Directory -Path (Join-Path $app 'profiles') -Force | Out-Null
@@ -605,8 +614,7 @@ Set-V4TestRegistryWriter {
             $app = $fx.app
             $runtime = Join-Path $app 'clash-verge.yaml'
             $profiles = Join-Path $app 'profiles.yaml'
-            $snapProfiles = Join-Path $fx.snap 'profiles.yaml'
-            $expected = Get-Sha $snapProfiles
+            $expected = Get-SnapPlainSha $fx.snap 'profiles.yaml'
             Put-Text $profiles 'changed-before-restore'
             $h = [System.IO.File]::Open($runtime, 'Open', 'ReadWrite', 'None')
             try {
@@ -845,14 +853,13 @@ function Get-V4State {
         }
         'INF-ROLLBACK-01' {
             $fx = New-SnapshotFixture
-            $snapProfiles = Join-Path $fx.snap 'profiles.yaml'
-            $expected = Get-Sha $snapProfiles
+            $expected = Get-SnapPlainSha $fx.snap 'profiles.yaml'
             Write-V4Journal -SnapshotDir $fx.snap -Reason 'rollback-test'
             Put-Text (Join-Path $fx.app 'profiles.yaml') 'changed-live'
             Put-Text (Join-Path $fx.app 'clash-verge.yaml') 'changed-runtime'
             $newer = Join-Path $script:BackupDir 'newer-fallback'
             $null = New-V4SnapshotFiles -AppData $fx.app -ProfilesDir (Join-Path $fx.app 'profiles') -Dir $newer -SystemProxy $null -ClashRunningBefore $false -Reason 'test newer fallback'
-            Assert-Infra ((Get-Sha (Join-Path $newer 'profiles.yaml')) -ne $expected) 'fallback fixture unexpectedly matches journal'
+            Assert-Infra ((Get-SnapPlainSha $newer 'profiles.yaml') -ne $expected) 'fallback fixture unexpectedly matches journal'
             $env:V4_TEST_APPDATA = $fx.app
             try {
                 $rollback = Join-Path $repo 'proxy_v4\rollback-v4.ps1'
@@ -967,7 +974,7 @@ function Start-V4Clash {
                 $journalRetained = $null -ne (Get-V4Journal)
                 Assert-Infra ($code -eq $expected -and $journalRetained) (
                     'rollback exit={0}, expected={1}, journal retained={2}, out={3}' -f $code, $expected, $journalRetained, (($out | Select-Object -Last 4) -join ' | '))
-                Assert-Infra ((Get-Sha (Join-Path $fx.app 'profiles.yaml')) -eq (Get-Sha (Join-Path $fx.snap 'profiles.yaml'))) 'rollback did not restore profiles.yaml'
+                Assert-Infra ((Get-Sha (Join-Path $fx.app 'profiles.yaml')) -eq (Get-SnapPlainSha $fx.snap 'profiles.yaml')) 'rollback did not restore profiles.yaml'
                 Assert-Infra (-not (Test-Path -LiteralPath (Join-Path $root 'config\.lock'))) 'rollback left the lock behind'
                 if ($keep) {
                     Assert-Infra ((Get-V4Journal).data.keepSystemProxy -eq $true) 'pending rollback lost its keep-proxy intent'
@@ -1025,7 +1032,7 @@ function Start-V4Clash {
                 Assert-Infra ($LASTEXITCODE -eq 32) ('resumed rollback exit=' + $LASTEXITCODE + ' out=' + (($out | Select-Object -Last 4) -join ' | '))
                 Assert-Infra ($writes -match 'enabled=0' -and $writes -notmatch 'enabled=1') ('resumed rollback did not only disable: ' + $writes)
                 Assert-Infra ($null -eq (Get-V4Journal)) 'successful user-off rollback left the journal'
-                Assert-Infra ((Get-Sha (Join-Path $fx.app 'profiles.yaml')) -eq (Get-Sha (Join-Path $fx.snap 'profiles.yaml'))) 'files were not restored'
+                Assert-Infra ((Get-Sha (Join-Path $fx.app 'profiles.yaml')) -eq (Get-SnapPlainSha $fx.snap 'profiles.yaml')) 'files were not restored'
                 Assert-Infra (-not (Test-Path -LiteralPath (Join-Path $root 'config\.lock'))) 'rollback left the lock behind'
                 $script:Actual = 'interrupted and resumed rollback kept the user-disabled proxy off'
             }
