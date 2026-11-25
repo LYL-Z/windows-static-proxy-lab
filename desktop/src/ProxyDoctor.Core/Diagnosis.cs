@@ -83,12 +83,40 @@ public static class FaultClassifier
         new(FaultClass.Unknown, "现有证据还不能归入已知故障。不要根据这一项去改系统设置。");
 }
 
+public enum RequestIntent
+{
+    Unspecified,
+    Diagnose,
+    NoModify
+}
+
 public static class RequestRouter
 {
+    public static RequestIntent Route(string? text)
+    {
+        if (IsNoModifyRequest(text)) return RequestIntent.NoModify;
+        if (IsDiagnoseRequest(text)) return RequestIntent.Diagnose;
+        return RequestIntent.Unspecified;
+    }
+
+    public static string IntentToken(RequestIntent intent) => intent switch
+    {
+        RequestIntent.Diagnose => "diagnose",
+        RequestIntent.NoModify => "no-modify",
+        _ => "unspecified"
+    };
+
+    public static bool IsNoModifyRequest(string? text)
+    {
+        var value = (text ?? "").Trim();
+        return value.Contains("保持原配置", StringComparison.Ordinal)
+            && value.Contains("不擅自修改", StringComparison.Ordinal);
+    }
+
     public static bool IsDiagnoseRequest(string? text)
     {
         var value = (text ?? "").Trim();
-        if (value.Length == 0) return false;
+        if (value.Length == 0 || IsNoModifyRequest(value)) return false;
         if (value.Contains("代理", StringComparison.Ordinal) &&
             (value.Contains("没有正常工作", StringComparison.Ordinal) ||
              value.Contains("不正常工作", StringComparison.Ordinal) ||
@@ -103,6 +131,14 @@ public static class RequestRouter
         if (value.Contains("电脑网络配置是否正常", StringComparison.Ordinal))
             return true;
         if (value.Contains("网络故障", StringComparison.Ordinal) && value.Contains("恢复方案", StringComparison.Ordinal))
+            return true;
+        if (value.Contains("全面检查", StringComparison.Ordinal) && value.Contains("我的网络", StringComparison.Ordinal))
+            return true;
+        if (value.Contains("StarSky", StringComparison.OrdinalIgnoreCase) && value.Contains("停止运行", StringComparison.Ordinal))
+            return true;
+        if (value.Contains("Clash", StringComparison.OrdinalIgnoreCase) && value.Contains("没有流量", StringComparison.Ordinal))
+            return true;
+        if (value.Contains("检查异常", StringComparison.Ordinal) && value.Contains("恢复方案", StringComparison.Ordinal))
             return true;
         return false;
     }

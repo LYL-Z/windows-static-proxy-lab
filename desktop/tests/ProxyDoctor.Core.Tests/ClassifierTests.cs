@@ -112,12 +112,35 @@ public class ClassifierTests
     [InlineData("StarSky 已经重新开启，但 Clash 没有流量。")]
     [InlineData("检查我的电脑网络配置是否正常。")]
     [InlineData("检查网络故障并提供恢复方案。")]
-    public void Diagnose_sentences_are_recognized(string text) =>
+    [InlineData("全面检查我的网络")]
+    [InlineData("StarSky 停止运行了")]
+    [InlineData("Clash 没有流量")]
+    [InlineData("检查异常并提供恢复方案")]
+    public void Diagnose_sentences_are_recognized(string text)
+    {
         Assert.True(RequestRouter.IsDiagnoseRequest(text));
+        Assert.Equal(RequestIntent.Diagnose, RequestRouter.Route(text));
+        Assert.Equal("diagnose", RequestRouter.IntentToken(RequestRouter.Route(text)));
+    }
 
     [Fact]
-    public void A_setup_sentence_is_not_a_fault() =>
+    public void A_setup_sentence_is_not_a_fault()
+    {
         Assert.False(RequestRouter.IsDiagnoseRequest("帮我准备代理设置"));
+        Assert.Equal(RequestIntent.Unspecified, RequestRouter.Route("帮我准备代理设置"));
+    }
+
+    [Fact]
+    public void Keep_original_configuration_is_no_modify()
+    {
+        const string text = "保持原配置，不擅自修改";
+        Assert.False(RequestRouter.IsDiagnoseRequest(text));
+        Assert.True(RequestRouter.IsNoModifyRequest(text));
+        Assert.Equal(RequestIntent.NoModify, RequestRouter.Route(text));
+        Assert.Equal("no-modify", RequestRouter.IntentToken(RequestIntent.NoModify));
+        Assert.Equal(RequestIntent.NoModify, RequestRouter.Route("全面检查我的网络，保持原配置，不擅自修改"));
+        Assert.False(RequestRouter.IsDiagnoseRequest("全面检查我的网络，保持原配置，不擅自修改"));
+    }
 
     [Theory]
     [InlineData(1, "127.0.0.1:18080", "127.0.0.1:18080")]
