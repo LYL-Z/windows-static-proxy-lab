@@ -8,6 +8,8 @@ reasoning can be audited independently. It is **not** a "how to evade platform r
 
 ## What is here
 
+The [V6.9 acceptance matrix](docs/V69-ACCEPTANCE.md) records what happened to a live browser request when its proxy stopped mid-response. It includes receiver-side controls, protocol coverage, and the remaining production gates. The [Proxy Doctor operator guide](docs/V69-OPERATOR.md) covers read-only diagnosis and interrupted repairs.
+
 | Path | Contents |
 |---|---|
 | `proxy_diag/` | Round 1: staged protocol probes, 1×RTT "who closed the socket" test, control experiments, raw probe JSON |

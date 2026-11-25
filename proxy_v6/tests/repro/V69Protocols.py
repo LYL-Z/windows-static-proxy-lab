@@ -166,18 +166,92 @@ class EchoUDP(socketserver.BaseRequestHandler):
             sock.sendto(packet, self.client_address)
 
 
+def classify_ipv6(matched, hits, winerror, timed_out):
+    """Separate a verified exchange, an explicit socket denial, and an unknown path.
+
+    A timeout or a missing error is not evidence that a filter blocked the packet.
+    """
+    if matched and hits == 1:
+        return "PASS"
+    if matched or hits:
+        return "FAILED"
+    if winerror == 10013:
+        return "BLOCKED"
+    if winerror in (10047, 10049, 10051, 10065):
+        return "STACK_UNAVAILABLE"
+    if timed_out or winerror in (10060, None):
+        return "UNKNOWN"
+    return "UNKNOWN"
+
+
 def udp6_client(port, challenge):
+    result = {"winerror": None, "timedOut": False, "matched": False}
     try:
         with socket.socket(socket.AF_INET6, socket.SOCK_DGRAM) as sock:
             sock.settimeout(2)
             sock.connect(("::1", int(port)))
             sock.send(challenge.encode())
-            return 0 if sock.recv(256) == challenge.encode() else 3
+            result["matched"] = sock.recv(256) == challenge.encode()
     except TimeoutError:
-        return 4
+        result["timedOut"] = True
     except OSError as exc:
-        print(exc.errno)
-        return 5
+        result["winerror"] = getattr(exc, "winerror", None)
+        result["timedOut"] = result["winerror"] == 10060
+    print(json.dumps(result))
+    if result["matched"]:
+        return 0
+    return 4 if result["timedOut"] else 5
+
+
+def tcp6_connect_error(port):
+    try:
+        with socket.socket(socket.AF_INET6, socket.SOCK_STREAM) as sock:
+            sock.settimeout(2)
+            sock.connect(("::1", int(port)))
+        return {"winerror": None, "timedOut": False, "connected": True}
+    except TimeoutError:
+        return {"winerror": None, "timedOut": True, "connected": False}
+    except OSError as exc:
+        winerror = getattr(exc, "winerror", None)
+        return {"winerror": winerror, "timedOut": winerror == 10060, "connected": False}
+
+
+def ipv6_stack():
+    script = r"""
+$ErrorActionPreference = 'SilentlyContinue'
+$addrs = @(Get-NetIPAddress -AddressFamily IPv6)
+function Count-Class($pred) { @($addrs | Where-Object $pred).Count }
+$loopbackCount = Count-Class { [string]$_.IPAddress -eq '::1' }
+$linkLocalCount = Count-Class { [string]$_.IPAddress -like 'fe80:*' }
+$globalCount = Count-Class {
+  $ip = [string]$_.IPAddress
+  $ip -ne '::1' -and $ip -notlike 'fe80:*' -and $ip -notlike 'fc*:*' -and $ip -notlike 'fd*:*'
+}
+$routeCount = @(Get-NetRoute -AddressFamily IPv6 -DestinationPrefix '::/0').Count
+$tunnelCount = @(Get-NetAdapter -IncludeHidden | Where-Object {
+  $_.Status -eq 'Up' -and $_.InterfaceDescription -match 'sing-tun|wintun|WireGuard|Tunnel'
+}).Count
+$wintunRunning = @(Get-CimInstance Win32_SystemDriver | Where-Object { $_.Name -eq 'wintun' -and $_.State -eq 'Running' }).Count
+'{0},{1},{2},{3},{4}' -f $loopbackCount, $linkLocalCount, $globalCount, $routeCount, [int]($tunnelCount -gt 0 -or $wintunRunning -gt 0)
+"""
+    empty = dict(loopbackAssigned=None, linkLocalAddresses=None, globalUnicastAddresses=None,
+                 defaultRoutes=None, tunnelOrWintunActive=None, publicPathSnapshot="NOT_TESTED")
+    try:
+        run = subprocess.run(["powershell.exe", "-NoProfile", "-Command", script],
+                             capture_output=True, text=True, timeout=40)
+    except (OSError, subprocess.SubprocessError):
+        return empty
+    line = next((item.strip() for item in reversed(run.stdout.splitlines()) if "," in item), "")
+    parts = line.split(",")
+    if run.returncode != 0 or len(parts) != 5 or not all(part in ("0", "1") or part.isdigit() for part in parts):
+        return empty
+    loop, link, global_count, routes, tunnel = (int(part) for part in parts)
+    if global_count == 0 and routes == 0:
+        public = "NO_GLOBAL_ADDRESS_OR_DEFAULT_ROUTE"
+    else:
+        public = "PRESENT_NOT_TESTED"
+    return dict(loopbackAssigned=loop > 0, linkLocalAddresses=link, globalUnicastAddresses=global_count,
+                defaultRoutes=routes, tunnelOrWintunActive=bool(tunnel), publicPathSnapshot=public)
 
 
 def ipv6_test(proto):
@@ -187,20 +261,28 @@ def ipv6_test(proto):
             token = secrets.token_hex(12)
             receiver.challenge, receiver.hits = token, 0
             port = receiver.server_address[1]
+            detail = {"winerror": None, "timedOut": False}
             if proto == "TCP":
                 run = fetch(f"http://[::1]:{port}/{token}")
                 matched = run.stdout == token
+                if not matched:
+                    detail = tcp6_connect_error(port)
             else:
                 run = subprocess.run([sys.executable, __file__, "--udp6", str(port), token],
                                      capture_output=True, text=True, timeout=5)
-                matched = run.returncode == 0
+                try:
+                    detail = json.loads(run.stdout.strip() or "{}")
+                except json.JSONDecodeError:
+                    detail = {"winerror": None, "timedOut": False, "parseError": True}
+                matched = bool(detail.get("matched")) and run.returncode == 0
+            status = classify_ipv6(matched, receiver.hits, detail.get("winerror"), bool(detail.get("timedOut")))
             return dict(protocol=proto, client="curl" if proto == "TCP" else "python",
                         target="IPv6 loopback", receiverRequests=receiver.hits,
-                        matched=matched, exitCode=run.returncode,
-                        status="PASS" if matched and not run.returncode and receiver.hits == 1 else "FAILED")
+                        matched=matched, exitCode=run.returncode, winerror=detail.get("winerror"),
+                        timedOut=bool(detail.get("timedOut")), status=status)
     except OSError as exc:
-        return dict(protocol=proto, target="IPv6 loopback", status="BLOCKED",
-                    setupError=exc.errno, exitCode=None)
+        return dict(protocol=proto, target="IPv6 loopback", status="STACK_UNAVAILABLE",
+                    setupError=getattr(exc, "winerror", None) or exc.errno, exitCode=None)
 
 
 class Stun(socketserver.BaseRequestHandler):
@@ -356,13 +438,33 @@ def site_data_test(chrome):
                 status="PASS" if all(event["markerMatched"] for event in events) else "FAILED")
 
 
+def classify_self_test():
+    expected = (
+        (True, 1, None, False, "PASS"),
+        (False, 0, 10013, False, "BLOCKED"),
+        (False, 0, None, True, "UNKNOWN"),
+        (False, 0, 10060, True, "UNKNOWN"),
+        (False, 0, 10049, False, "STACK_UNAVAILABLE"),
+        (False, 0, 10051, False, "STACK_UNAVAILABLE"),
+        (False, 1, 10013, False, "FAILED"),
+        (True, 0, None, False, "FAILED"),
+        (True, 2, None, False, "FAILED"),
+    )
+    failed = [row for row in expected if classify_ipv6(*row[:4]) != row[4]]
+    print(json.dumps({"checked": len(expected), "failed": len(failed)}))
+    return 1 if failed else 0
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--chrome", type=Path)
+    parser.add_argument("--self-test", action="store_true", help="Check IPv6 result classification only")
     parser.add_argument("--udp6", nargs=2, help=argparse.SUPPRESS)
     args = parser.parse_args()
     if args.udp6:
         return udp6_client(*args.udp6)
+    if args.self_test:
+        return classify_self_test()
     chrome = args.chrome
     if not chrome:
         chrome = next((p for key in ("ProgramFiles", "ProgramFiles(x86)", "LOCALAPPDATA") if key in os.environ
@@ -372,7 +474,7 @@ def main():
     dns, ipv6 = dns_tests(), [ipv6_test(p) for p in ("TCP", "UDP")]
     rtc = [browser_test(chrome, mode) for mode in ("default", "disable_non_proxied_udp")] if chrome else []
     site_data = site_data_test(chrome) if chrome else {"status": "NOT_TESTED"}
-    report = dict(dns=dns, ipv6=ipv6, webRtc=rtc, browserAvailable=bool(chrome),
+    report = dict(dns=dns, ipv6=ipv6, ipv6Stack=ipv6_stack(), webRtc=rtc, browserAvailable=bool(chrome),
                   siteData=site_data, osResolver="NOT_TESTED", browserDoH="NOT_TESTED", production="NOT_TESTED")
     print(json.dumps(report, indent=2))
     # Exit 2 preserves limited/incomplete coverage. It never means "leak blocked".
