@@ -4,16 +4,24 @@
 
 **Windows Static Proxy Lab**
 
-面向 Windows 的网络健康诊断、隐私检查与故障恢复工程
+**Claude 封禁风险研究与账户安全 · Windows 网络诊断、隐私检查与故障恢复**
 
-[快速开始](#快速开始) · [桌面应用](#桌面应用) · [agent-skill](#agent-skill) · [底层工程](#底层工程) · [故障手册](#故障处理) · [开发与验收](#开发与验收)
+[项目起源](#项目起源claude-封禁风险研究) · [快速开始](#快速开始) · [桌面应用](#桌面应用) · [agent-skill](#agent-skill) · [底层工程](#底层工程) · [故障手册](#故障处理) · [开发与验收](#开发与验收)
 
 `Windows 10/11` · `.NET 8 / WPF` · `PowerShell 5.1+` · `Python` · `Source Preview / RC`
 
 </div>
 
 > [!IMPORTANT]
-> 本项目源于 Claude 等 AI 服务的连接故障、网络路径异常与账户安全顾虑，目标是提供可审计的 Windows 网络可靠性和个人隐私工具。它不是 Claude 官方产品，不承诺防止封禁，不替代服务资格或官方申诉，也不实现账号处置、地域资格或身份验证规避。**源代码合并 ≠ 稳定版发布 ≠ 本机生产部署。**
+> 本项目并非 Claude 官方产品，也未获得 Anthropic 的账户风控模型。网络检测不能证明账户不会被封禁；本项目不提供账号处置、地区资格或身份验证规避功能。**源代码合并 ≠ 稳定版发布 ≠ 本机生产部署。**
+
+## 项目起源：Claude 封禁风险研究
+
+本项目最初由作者为研究 Claude 账户封禁风险而建立（早期需求称为「Claude 防封」），而非一个与 Claude 无关的普通代理工具。作者关注网络连接异常、客户端故障、隐私数据暴露以及账户安全之间的关系，并希望在不破坏现有正常网络的前提下，建立有实际观测证据的诊断、监测和故障恢复体系。
+
+Claude 连接稳定性与账户安全问题是项目的研究起点。Desktop、Agent Skill、CLI 与底层事务工程均由这一背景演进而来。原始八项需求、已验证的能力及尚未解决的问题见[历史需求文档](docs/V6.9-EIGHT-REQUIREMENTS.md)和[工程验收矩阵](https://github.com/LYL-Z/windows-static-proxy-lab/blob/a6e65c31bb0bef8b42ba3832fb24fe30cb28cc4e/docs/V69-ACCEPTANCE.md)。项目当前提供的是可验证的网络可靠性与隐私诊断能力，并非已经实现的防封保证。
+
+Claude 服务故障及账户问题分别以[官方服务状态](https://status.claude.com/)与[官方支持](https://support.claude.com/)为准。
 
 ## 项目概览
 
