@@ -98,7 +98,12 @@ $env:V4_FIXTURE_PROXY_WRITE_LOG = Join-Path $work 'proxy-write.log'
 . (Join-Path $work 'lib\V4.ps1')
 if (-not $script:TestMode) { throw 'test mode was not enabled' }
 $null = New-V4SnapshotFiles -AppData $app -ProfilesDir (Join-Path $app 'profiles') -Dir $snap -SystemProxy ([pscustomobject]@{ enabled = $true; server = 'old:8080' }) -ClashRunningBefore $false -Reason 'desktop-isolated'
-$expectedHash = (Get-FileHash -LiteralPath (Join-Path $snap 'profiles.yaml') -Algorithm SHA256).Hash
+$manifestText = Get-Content -LiteralPath (Join-Path $snap 'manifest.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+$expectedHash = ''
+foreach ($entry in @($manifestText.files)) {
+    if (([string]$entry.name).Replace('/', '\') -eq 'profiles.yaml') { $expectedHash = [string]$entry.sha256 }
+}
+if (-not $expectedHash) { throw 'snapshot manifest has no profiles.yaml hash' }
 [System.IO.File]::WriteAllText($profile, "fixture-profile-changed`n")
 
 $stub = @'

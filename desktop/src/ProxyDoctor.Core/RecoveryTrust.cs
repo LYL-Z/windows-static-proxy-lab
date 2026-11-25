@@ -8,7 +8,7 @@ public static class RecoveryTrust
 {
     public const string RollbackSha256 = "32172A5771561BBA9280F7BB11E229DB6D35620C98ED5FFEDF7CE08DFD7DF649";
     public const string LibrarySha256 = "5F19B7539DFBBA8B7D89741D1D34D52FD2A5C929CBD48C6EA86662A913D66C01";
-    public const string ScriptSha256 = "42AAF034CBE3D52971B59AEE726C0E33053A70186B5C142D73D56AA0FAE03194";
+    public const string ScriptSha256 = "4F8CA4BFE9E15CA2DF66C330D4EE29D2603F8B7271CB0D53332A8DE30E61628C";
     public const int ExpectedTransactionExit = 32;
 
     public static bool IsStrictChild(string parent, string child)
