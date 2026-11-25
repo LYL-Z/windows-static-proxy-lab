@@ -120,6 +120,16 @@ public class ClassifierTests
         Assert.False(RequestRouter.IsDiagnoseRequest("帮我准备代理设置"));
 
     [Fact]
+    public void Alert_gate_is_silent_until_the_key_changes()
+    {
+        var gate = new AlertGate();
+        Assert.False(gate.ShouldNotify("Aligned|127.0.0.1:7897"));
+        Assert.False(gate.ShouldNotify("Aligned|127.0.0.1:7897"));
+        Assert.True(gate.ShouldNotify("ProxyDrift|127.0.0.1:11119"));
+        Assert.False(gate.ShouldNotify("ProxyDrift|127.0.0.1:11119"));
+    }
+
+    [Fact]
     public void Both_off_without_a_record_is_not_confirmed_intent()
     {
         var result = FaultClassifier.Classify(new FaultObservation

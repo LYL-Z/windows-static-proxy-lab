@@ -1,5 +1,5 @@
-6CE11C43E5EC3D6D25F93E74325E8E321D21B926724392FFBE5159DAFC382535  ProxyDoctor.exe
+FE1BB05C8A2E6F27B2F517DDE7FB83ED3AD83DD839E98B28E34E8CB81B789D4A  ProxyDoctor.exe
 
-The hash is for the unsigned self-contained win-x64 publish of Windows Proxy Doctor Desktop 1.0.0.
-The publish folder is produced locally and is not stored in git.
+The hash is for the unsigned self-contained win-x64 publish.
+The publish folder is local and is not stored in git.
 There is no Authenticode signature.

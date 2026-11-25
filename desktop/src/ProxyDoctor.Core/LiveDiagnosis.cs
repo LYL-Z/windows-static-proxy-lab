@@ -103,6 +103,7 @@ public static class NetworkReader
     {
         var owners = ReadLoopbackOwners();
         return owners
+            .Where(item => IsProxyProcess(item.ProcessName))
             .Select(item => new ListenerFact(item.Port, item.ProcessName, true))
             .Distinct()
             .ToArray();
@@ -127,6 +128,18 @@ public static class NetworkReader
         return null;
     }
 
+    public static int OtherLoopbackListenerCount()
+    {
+        return ReadLoopbackOwners().Count(item => !IsProxyProcess(item.ProcessName));
+    }
+
+    private static bool IsProxyProcess(string name) =>
+        name.Equals("verge-mihomo", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("mihomo", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("magicspeed", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("clash-verge", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("StarSky", StringComparison.OrdinalIgnoreCase);
+
     private static IEnumerable<(int Port, string ProcessName)> ReadLoopbackOwners()
     {
         var start = new ProcessStartInfo("netstat", "-ano -p tcp")
@@ -137,12 +150,13 @@ public static class NetworkReader
         };
         using var process = Process.Start(start);
         if (process is null) yield break;
+        var read = process.StandardOutput.ReadToEndAsync();
         if (!process.WaitForExit(4000))
         {
             try { process.Kill(entireProcessTree: true); } catch { /* already gone */ }
-            yield break;
         }
-        var output = process.StandardOutput.ReadToEnd();
+        if (!read.Wait(1000)) yield break;
+        var output = read.Result;
         foreach (var line in output.Split('\n'))
         {
             var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);

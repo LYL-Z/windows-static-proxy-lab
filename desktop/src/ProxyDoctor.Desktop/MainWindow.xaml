@@ -90,6 +90,21 @@
               <TextBlock Text="{Binding Advice}" TextWrapping="Wrap" Margin="0,8,0,0" />
             </StackPanel>
           </Border>
+          <ItemsControl ItemsSource="{Binding Checks}" Margin="0,12,0,0">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Border Background="{DynamicResource App.Card}" BorderBrush="{DynamicResource App.Line}" BorderThickness="1" CornerRadius="10" Padding="16" Margin="0,0,0,8">
+                  <StackPanel>
+                    <DockPanel>
+                      <TextBlock DockPanel.Dock="Right" Text="{Binding State}" Foreground="{DynamicResource App.Muted}" />
+                      <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                    </DockPanel>
+                    <TextBlock Text="{Binding Detail}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
         </StackPanel>
 
         <StackPanel x:Name="PrivacyPage" Visibility="Collapsed">

@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ProxyDoctor;
@@ -23,6 +24,10 @@ public partial class ShellViewModel : ObservableObject
     [ObservableProperty] private bool _paused;
     [ObservableProperty] private string _monitor = "监测尚未开始";
 
+    private readonly AlertGate _alerts = new();
+    public ObservableCollection<CheckRow> Checks { get; } = new();
+    public event Action<string>? AlertRequested;
+
     private readonly PeriodicTimer _timer = new(TimeSpan.FromSeconds(20));
     private readonly CancellationTokenSource _monitorStop = new();
     private int _busyGate;
@@ -34,6 +39,7 @@ public partial class ShellViewModel : ObservableObject
         Status = "模式已切换";
         Summary = value ? "演示数据，不是这台电脑的实时结果。上一次实时结果已清除。" : "已离开演示。上一次结果已清除。";
         Proxy = Clients = Listeners = Probes = Capabilities = Events = "—";
+        Checks.Clear();
         Advice = "等待新的采样。";
         Sampled = false;
         OnPropertyChanged(nameof(ModeLabel));
@@ -55,7 +61,13 @@ public partial class ShellViewModel : ObservableObject
                     try
                     {
                         var report = DiagnosticEngine.ReadLocal();
-                        System.Windows.Application.Current?.Dispatcher.Invoke(() => Apply(report));
+                        var key = report.Fault.Class + "|" + report.ProxySelection;
+                        var notify = _alerts.ShouldNotify(key);
+                        System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+                        {
+                            Apply(report);
+                            if (notify) AlertRequested?.Invoke("状态变为 " + report.Fault.Class + "。这是轮询结果，不是瞬时发现。");
+                        });
                     }
                     catch (OperationCanceledException) { break; }
                     catch { /* the next tick records a fresh sample */ }
@@ -83,10 +95,16 @@ public partial class ShellViewModel : ObservableObject
         Status = "正在读取";
         try
         {
-            var report = Demo
-                ? DiagnosticEngine.Demo()
-                : await DiagnosticEngine.ReadLiveAsync(CancellationToken.None);
+            var report = Demo ? DiagnosticEngine.Demo() : DiagnosticEngine.ReadLocal();
+            var checks = Demo ? Array.Empty<CheckResult>() : await CheckRunner.RunAll(CancellationToken.None);
             Apply(report);
+            ReplaceChecks(checks);
+            if (!Demo)
+            {
+                Probes = string.Join("\n", checks.Where(item => item.Id is "https" or "claude-status")
+                    .Select(item => item.Name + "  " + item.Detail));
+                Capabilities = string.Join("\n", checks.Select(item => item.State + "  " + item.Name + "：" + item.Detail));
+            }
         }
         catch (Exception ex)
         {
@@ -144,4 +162,13 @@ public partial class ShellViewModel : ObservableObject
         Capabilities = string.Join("\n", report.Capabilities.Select(item => $"{item.State}  {item.Name}：{item.Detail}"));
         Events = string.Join("\n", report.Events);
     }
+
+    private void ReplaceChecks(IReadOnlyList<CheckResult> checks)
+    {
+        Checks.Clear();
+        foreach (var item in checks)
+            Checks.Add(new CheckRow(item.Name, item.State + "  " + item.SampledAt.ToString("HH:mm:ss"), item.Method + " " + item.Detail));
+    }
 }
+
+public sealed record CheckRow(string Name, string State, string Detail);

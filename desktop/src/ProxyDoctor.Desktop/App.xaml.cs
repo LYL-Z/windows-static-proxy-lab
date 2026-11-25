@@ -17,6 +17,8 @@ public partial class App : System.Windows.Application
         }
         var window = new MainWindow();
         MainWindow = window;
+        if (window.DataContext is ShellViewModel shell)
+            shell.AlertRequested += message => _tray?.ShowBalloonTip(4000, "网络代理医生", message, ToolTipIcon.Warning);
         window.Show();
         _tray = new NotifyIcon
         {
