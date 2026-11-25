@@ -146,6 +146,18 @@ function Get-ProxyDoctorFaultClass($Observation) {
 
 function Resolve-ProxyDoctorUserRequest([string]$Text) {
     $value = if ($null -eq $Text) { '' } else { $Text.Trim() }
+    $keepOriginal = -join @([char]0x4FDD, [char]0x6301, [char]0x539F, [char]0x914D, [char]0x7F6E)
+    $doNotModify = -join @([char]0x4E0D, [char]0x64C5, [char]0x81EA, [char]0x4FEE, [char]0x6539)
+    if ($value.Contains($keepOriginal) -and $value.Contains($doNotModify)) {
+        return [pscustomobject][ordered]@{
+            goal = 'NoModify'
+            intent = 'no-modify'
+            entry = $null
+            classify = $null
+            script = $null
+            authorization = 'do-not-modify'
+        }
+    }
     $proxy = -join @([char]0x4EE3, [char]0x7406)
     $faultPhrases = @(
         -join @([char]0x6CA1, [char]0x6709, [char]0x6B63, [char]0x5E38, [char]0x5DE5, [char]0x4F5C),
@@ -172,9 +184,18 @@ function Resolve-ProxyDoctorUserRequest([string]$Text) {
     $recoveryPlan = -join @([char]0x6062, [char]0x590D, [char]0x65B9, [char]0x6848)
     if ($value.Contains($networkFault) -and $value.Contains($recoveryPlan)) { $fault = $true }
     if ($value -match '(?i)starsky.+clash.+(?:no traffic|without traffic)') { $fault = $true }
+    $fullCheck = -join @([char]0x5168, [char]0x9762, [char]0x68C0, [char]0x67E5)
+    $myNetwork = -join @([char]0x6211, [char]0x7684, [char]0x7F51, [char]0x7EDC)
+    if ($value.Contains($fullCheck) -and $value.Contains($myNetwork)) { $fault = $true }
+    $stopped = -join @([char]0x505C, [char]0x6B62, [char]0x8FD0, [char]0x884C)
+    if ($value.Contains('StarSky') -and $value.Contains($stopped)) { $fault = $true }
+    if ($value.Contains('Clash') -and $value.Contains($noTraffic)) { $fault = $true }
+    $checkAbnormal = -join @([char]0x68C0, [char]0x67E5, [char]0x5F02, [char]0x5E38)
+    if ($value.Contains($checkAbnormal) -and $value.Contains($recoveryPlan)) { $fault = $true }
     if ($fault) {
         return [pscustomobject][ordered]@{
             goal = 'Diagnose'
+            intent = 'diagnose'
             entry = 'scripts/Start-ProxyDoctor.ps1 -Goal Diagnose'
             classify = 'Get-ProxyDoctorFaultClass'
             script = 'scripts/ProxyFaultClass.ps1'
@@ -183,6 +204,7 @@ function Resolve-ProxyDoctorUserRequest([string]$Text) {
     }
     [pscustomobject][ordered]@{
         goal = 'Unspecified'
+        intent = 'unspecified'
         entry = $null
         classify = $null
         script = $null
