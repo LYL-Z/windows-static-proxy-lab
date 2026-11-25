@@ -1,0 +1,7 @@
+77A22C4E841DE6958C512C90F0C098091A42437F2F56F3E0EBFB948614A33966  ProxyDoctor.exe
+E5CC5CFC51FEF313E29D2C5C8719ADFE202F723D8CED99956CB89C6C5F86FBF1  ProxyDoctor.dll
+95E0E8322D41B784E76AC98A93086033796D3C5ED49650B778F9803F171CC741  ProxyDoctor.Core.dll
+
+The hashes are for the unsigned self-contained win-x64 publish.
+The publish folder is local and is not stored in git.
+There is no Authenticode signature.

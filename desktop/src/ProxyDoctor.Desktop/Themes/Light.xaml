@@ -1,0 +1,14 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <SolidColorBrush x:Key="App.Background" Color="#F4EFE6" />
+  <SolidColorBrush x:Key="App.Sidebar" Color="#FBF7F1" />
+  <SolidColorBrush x:Key="App.Card" Color="#FFFCF8" />
+  <SolidColorBrush x:Key="App.Ink" Color="#2C261F" />
+  <SolidColorBrush x:Key="App.Muted" Color="#6E6256" />
+  <SolidColorBrush x:Key="App.Line" Color="#E4D8C8" />
+  <SolidColorBrush x:Key="App.Accent" Color="#8C4A32" />
+  <SolidColorBrush x:Key="App.AccentSoft" Color="#F3E4D8" />
+  <SolidColorBrush x:Key="App.Ok" Color="#0E7A3D" />
+  <SolidColorBrush x:Key="App.Warn" Color="#9A5B00" />
+  <SolidColorBrush x:Key="App.Bad" Color="#B10E1C" />
+</ResourceDictionary>
