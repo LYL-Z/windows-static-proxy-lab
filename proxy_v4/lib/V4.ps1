@@ -201,10 +201,12 @@ function Get-V4RepairReceipt {
         if ($file.PSIsContainer -or ($file.Attributes -band [IO.FileAttributes]::ReparsePoint) -or
             $file.Length -gt 2048 -or -not (Test-V4AclHardened -Path $path -Allowed $allowed)) { throw 'unsafe recovery receipt' }
         $entry = [IO.File]::ReadAllText($file.FullName) | ConvertFrom-Json
-        if ($entry.schema -ne 1 -or $entry.id -notmatch '^[a-f0-9]{32}$' -or $entry.previous -eq $entry.target) { throw 'invalid record' }
+        $schema = $entry.schema
+        if ($schema -is [System.Array] -or $schema -is [string] -or $schema -is [bool] -or $schema -isnot [System.ValueType] -or [int]$schema -ne 1) { throw 'invalid record' }
+        if ($entry.id -isnot [string] -or $entry.previous -isnot [string] -or $entry.target -isnot [string]) { throw 'invalid record' }
+        if ($entry.id -notmatch '\A[a-f0-9]{32}\z' -or $entry.previous -eq $entry.target) { throw 'invalid record' }
         foreach ($server in @($entry.previous, $entry.target)) {
-            if ($server -isnot [string] -or $server -notmatch '^127\.0\.0\.1:([1-9]\d{0,4})$' -or
-                [int]$Matches[1] -gt 65535) { throw 'invalid local proxy target' }
+            if ($server -notmatch '\A127\.0\.0\.1:([1-9]\d{0,4})\z' -or [int]$Matches[1] -gt 65535) { throw 'invalid local proxy target' }
         }
         return $entry
     } catch [System.Management.Automation.ItemNotFoundException] { return $null }
@@ -261,7 +263,7 @@ function Get-V4Journal {
 }
 
 function Write-V4Journal {
-    param([string]$SnapshotDir, [string]$Reason = 'apply', [switch]$KeepSystemProxy)
+    param([string]$SnapshotDir, [string]$Reason = 'apply', [switch]$KeepSystemProxy, $KeptProxy)
     Ensure-V4Dir $script:ConfigDir
     $o = [ordered]@{
         schema = 1
@@ -270,7 +272,14 @@ function Write-V4Journal {
         started = (Get-Date).ToString('o')
         pid = $PID
     }
-    if ($Reason -eq 'rollback') { $o['keepSystemProxy'] = [bool]$KeepSystemProxy }
+    if ($Reason -eq 'rollback') {
+        $o['keepSystemProxy'] = [bool]$KeepSystemProxy
+        if ($KeepSystemProxy) {
+            if ($null -eq $KeptProxy) { throw 'KeepSystemProxy rollback requires the proxy selection to record' }
+            $o['keptEnabled'] = [bool]$KeptProxy.enabled
+            $o['keptServer'] = [string]$KeptProxy.server
+        }
+    }
     Set-V4Atomic -TargetPath (Get-V4JournalPath) -Content ($o | ConvertTo-Json -Depth 4) | Out-Null
 }
 
@@ -334,8 +343,12 @@ function Invoke-V4ApplyTransaction {
         }
         & $ops.SetOwner ('127.0.0.1:' + $Context.Settings.mixedPort) ('mode=' + $Context.Mode)
         if ($journalWritten -and $ops.ClearJournal) {
-            try { if (-not (& $ops.ClearJournal)) { Write-V4RecoveryNote $ops.Log 'transaction succeeded but the journal could not be cleared' 'WARN' } }
-            catch { Write-V4RecoveryNote $ops.Log ('transaction journal clear failed: ' + $_.Exception.Message) 'WARN' }
+            $cleared = $false
+            try { $cleared = [bool](& $ops.ClearJournal) } catch { $cleared = $false }
+            if (-not $cleared) {
+                Write-V4RecoveryNote $ops.Log 'transaction writes are in place but the journal could not be cleared; do not roll them back until that journal is understood' 'ERROR'
+                return [pscustomobject]@{ ok = $false; exitCode = 40; error = 'transaction writes are in place but the journal could not be cleared'; snapshot = $snap; applied = $applied; restored = $false; journalWritten = $journalWritten }
+            }
         }
         return [pscustomobject]@{ ok = $true; exitCode = 0; error = ''; snapshot = $snap; applied = $applied; restored = $false; journalWritten = $journalWritten }
     }
@@ -1226,6 +1239,10 @@ function Set-V4RepairServer {
         throw (New-V4Fault 32 'Windows proxy selection changed before the write')
     }
     if ($script:TestMode) {
+        $current = Get-V4SystemProxy
+        if (-not $current.enabled -or $current.server -ne $ExpectedServer) {
+            throw (New-V4Fault 32 'Windows proxy selection changed before the write')
+        }
         if (-not $script:TestRegistryWriter) { throw 'isolated repair writer is missing' }
         if ($WriteAttempted) { $WriteAttempted.Value = $true }
         & $script:TestRegistryWriter $current.enabled $NewServer

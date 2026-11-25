@@ -167,9 +167,19 @@ try {
                 -not (Test-V4ClashListener -Port $s.mixedPort -ExpectedCore $p.Core -RequireImagePath)) {
                 Fail 32 'Windows proxy selection or expected core could not be reverified after the write'
             }
-            try { Set-V4Owner -Owner 'clash' -SystemProxy $px.server -Note ('repair; previous=' + $prevVal) }
-            catch { Write-V4Log ('repair: owner record failed (proxy is still correct): ' + (Get-V4Redacted $_.Exception.Message)) -Level WARN }
+            $ownerSaved = $false
+            try {
+                Set-V4Owner -Owner 'clash' -SystemProxy $px.server -Note ('repair; previous=' + $prevVal)
+                $ownerSaved = $true
+            } catch {
+                Write-V4Log ('repair: owner record failed: ' + (Get-V4Redacted $_.Exception.Message)) -Level ERROR
+            }
             Complete-V4RepairReceipt $receipt
+            if (-not $ownerSaved) {
+                $exit = 40
+                Write-V4Log 'proxy target was written but the owner record could not be saved' -Level ERROR
+                return
+            }
             Write-V4Log ('VERIFIED_PROXY_TARGET: {0} -> {1}; explicit IPv4 HTTPS matched. Application paths are untested.' -f $prevVal, $px.server) -Level OK
             return
         }

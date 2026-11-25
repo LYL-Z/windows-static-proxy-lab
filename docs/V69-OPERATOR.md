@@ -11,7 +11,9 @@ $config = Read-Host '现有 proxy_v4 配置目录的完整路径'
 powershell.exe -NoProfile -File .\proxy_v4\state-v4.ps1 -ConfigDirectory $config -Samples 3 -IntervalSeconds 5
 ```
 
-出现 `PAUSE_APPLICATIONS` 时，先停止依赖固定出口的应用活动，记下时间和原始告警。网页和桌面程序需要分别核对。前台诊断会进行显式 HTTPS 探测，退出诊断后不会代替应用阻断网络。
+出现 `PAUSE_APPLICATIONS` 时，先停止依赖固定出口的应用活动，记下时间和原始告警。网页和桌面程序需要分别核对。前台诊断会进行显式 HTTPS 探测，退出诊断后不会代替应用阻断网络。告警不是阻断。
+
+只读分类不修改系统。在候选仓库根目录运行 `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\proxy_v6\tests\repro\V69Lifecycle.ps1`。`USER_OFF` 表示用户关闭了代理，不要把它恢复。`ALIGNED` 只说明监听和系统选择一致，不证明应用已经走通。自然语言“检查我的代理为什么没有正常工作”走 Windows Proxy Doctor 的 Diagnose，再调用 `Get-ProxyDoctorFaultClass`。
 
 | 观察 | 下一步 |
 |---|---|

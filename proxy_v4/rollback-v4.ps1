@@ -74,9 +74,22 @@ try {
             # Verify the manifest before considering the app "possibly stopped".
             Test-V4SnapshotManifest -SnapshotDir $SnapshotDir | Out-Null
             Write-V4Log ('restoring verified snapshot ' + (Split-Path $SnapshotDir -Leaf)) -Level STEP
-            $keptProxy = if ($KeepSystemProxy) { Get-V4SystemProxy } else { $null }
-            if (-not $rollbackJournal -or $journal.data.snapshot -ne $SnapshotDir -or [bool]$journal.data.keepSystemProxy -ne [bool]$KeepSystemProxy) {
-                Write-V4Journal -SnapshotDir $SnapshotDir -Reason 'rollback' -KeepSystemProxy:$KeepSystemProxy
+            $journalMatches = $rollbackJournal -and [string]$journal.data.snapshot -eq $SnapshotDir -and [bool]$journal.data.keepSystemProxy -eq [bool]$KeepSystemProxy
+            if ($KeepSystemProxy -and $journalMatches -and $journal.data.PSObject.Properties.Name -notcontains 'keptEnabled') {
+                Write-V4Log 'rollback journal does not record the proxy selection it intended to keep' -Level ERROR
+                $exit = 41
+                return
+            }
+            $keptProxy = $null
+            if ($KeepSystemProxy) {
+                if ($journalMatches) {
+                    $keptProxy = [pscustomobject]@{ enabled = [bool]$journal.data.keptEnabled; server = [string]$journal.data.keptServer }
+                } else {
+                    $keptProxy = Get-V4SystemProxy
+                }
+            }
+            if (-not $journalMatches) {
+                Write-V4Journal -SnapshotDir $SnapshotDir -Reason 'rollback' -KeepSystemProxy:$KeepSystemProxy -KeptProxy $keptProxy
             }
             $restoreAttempted = $true
             $m = Restore-V4Snapshot -SnapshotDir $SnapshotDir -Port $mixedPort
