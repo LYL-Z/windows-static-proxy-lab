@@ -238,6 +238,10 @@ public class ClassifierTests
         var onlyCode = new RecoveryResult(false, true, false, false, 0, 32, 32, false, false, false, true,
             RecoveryResult.IsolationLabel, "", "只有退出码");
         Assert.False(onlyCode.WithVerdict().CompleteSuccess);
+        Assert.False(RecoveryTrust.WritesMatchScenario("enabled=0 server=old:8080\nenabled=1 server=old:8080"));
+        Assert.False(RecoveryTrust.WritesMatchScenario("enabled=0"));
+        Assert.False(RecoveryTrust.WritesMatchScenario("prefix enabled=0 server=old:8080"));
+        Assert.True(RecoveryTrust.WritesMatchScenario("enabled=0 server=old:8080\r\n"));
         Assert.False(RecoveryTrust.IsStrictChild(@"C:\Temp", @"C:\TempEvil"));
         Assert.True(RecoveryTrust.IsStrictChild(@"C:\Temp", @"C:\Temp\child"));
         Assert.False(RecoveryTrust.IsStrictChild(@"C:\Temp", @"C:\Temp\..\Windows"));

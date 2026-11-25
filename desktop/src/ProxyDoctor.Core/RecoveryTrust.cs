@@ -8,7 +8,7 @@ public static class RecoveryTrust
 {
     public const string RollbackSha256 = "32172A5771561BBA9280F7BB11E229DB6D35620C98ED5FFEDF7CE08DFD7DF649";
     public const string LibrarySha256 = "5F19B7539DFBBA8B7D89741D1D34D52FD2A5C929CBD48C6EA86662A913D66C01";
-    public const string ScriptSha256 = "BCA3444170442BB8BFA93D5578BB7C44BDEA0580C8BBA84B58868DDDC98A9924";
+    public const string ScriptSha256 = "42AAF034CBE3D52971B59AEE726C0E33053A70186B5C142D73D56AA0FAE03194";
     public const int ExpectedTransactionExit = 32;
 
     public static bool IsStrictChild(string parent, string child)
@@ -64,10 +64,14 @@ public static class RecoveryTrust
         return HashScript(path).Equals(ScriptSha256, StringComparison.OrdinalIgnoreCase);
     }
 
-    public static bool WritesMatchScenario(string? writes) =>
-        !string.IsNullOrWhiteSpace(writes)
-        && writes.Contains("enabled=0", StringComparison.Ordinal)
-        && !writes.Contains("enabled=1", StringComparison.Ordinal);
+    public const string ExpectedWriteLine = "enabled=0 server=old:8080";
+
+    public static bool WritesMatchScenario(string? writes)
+    {
+        if (string.IsNullOrEmpty(writes)) return false;
+        var lines = writes.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+        return lines.Length == 1 && lines[0].Trim() == ExpectedWriteLine;
+    }
 
     public static bool IsComplete(RecoveryResult result) =>
         result.ScriptStarted

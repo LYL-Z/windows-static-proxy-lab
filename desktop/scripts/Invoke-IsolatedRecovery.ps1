@@ -39,6 +39,22 @@ function Assert-ReviewedHash([string]$Path, [string]$Expected) {
     if (-not $actual.Equals($Expected, [StringComparison]::OrdinalIgnoreCase)) { throw 'reviewed hash mismatch' }
 }
 
+function Copy-ReviewedFile([string]$Source, [string]$Destination, [string]$Expected) {
+    $stream = [System.IO.File]::Open($Source, 'Open', 'Read', 'Read')
+    try {
+        $memory = New-Object System.IO.MemoryStream
+        $stream.CopyTo($memory)
+        $bytes = $memory.ToArray()
+        $sha = [Security.Cryptography.SHA256]::Create()
+        try { $hash = ([BitConverter]::ToString($sha.ComputeHash($bytes))).Replace('-', '') }
+        finally { $sha.Dispose() }
+        if (-not $hash.Equals($Expected, [StringComparison]::OrdinalIgnoreCase)) { throw 'reviewed hash mismatch while copying' }
+        [System.IO.File]::WriteAllBytes($Destination, $bytes)
+    }
+    finally { $stream.Dispose() }
+    Assert-ReviewedHash $Destination $Expected
+}
+
 foreach ($name in @(
     'V4_TEST_APPDATA', 'V4_TEST_RUNTIME', 'V4_TEST_INSTALL', 'V4_TEST_EXE', 'V4_TEST_CORE',
     'V4_TEST_UI_CONFIG', 'V4_TEST_UI_SYSTEM_PROXY', 'V4_TEST_PROXY_ENABLE', 'V4_TEST_PROXY_SERVER',
@@ -71,10 +87,8 @@ New-Item -ItemType Directory -Path (Join-Path $work 'lib') -Force | Out-Null
 $beforeProfile = "fixture-profile-before`n"
 $profile = Join-Path $app 'profiles.yaml'
 [System.IO.File]::WriteAllText($profile, $beforeProfile)
-Copy-Item -LiteralPath $rollbackSource -Destination (Join-Path $work 'rollback-v4.ps1')
-Copy-Item -LiteralPath $librarySource -Destination (Join-Path $work 'lib\V4.ps1')
-Assert-ReviewedHash (Join-Path $work 'rollback-v4.ps1') $ExpectedRollbackSha
-Assert-ReviewedHash (Join-Path $work 'lib\V4.ps1') $ExpectedLibrarySha
+Copy-ReviewedFile $rollbackSource (Join-Path $work 'rollback-v4.ps1') $ExpectedRollbackSha
+Copy-ReviewedFile $librarySource (Join-Path $work 'lib\V4.ps1') $ExpectedLibrarySha
 
 $env:V4_TEST_ROOT = $work
 $env:V4_TEST_APPDATA = $app

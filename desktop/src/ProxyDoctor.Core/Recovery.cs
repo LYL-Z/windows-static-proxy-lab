@@ -20,6 +20,8 @@ public sealed record RecoveryResult(
     string Detail)
 {
     public const string IsolationLabel = "V4_TEST_MODE 是进程内逻辑隔离，不是操作系统强制沙箱。";
+    public const string ScopeLabel = "LiveUnchanged 只比较开始和结束两次读取的 ProxyEnable 与 ProxyServer。它不能证明这两次读取之间没有写入。";
+    public string EvidenceScope { get; init; } = ScopeLabel;
 
     public static RecoveryResult Refused(string detail) => new(
         false, false, false, false, 0, -1, RecoveryTrust.ExpectedTransactionExit,
