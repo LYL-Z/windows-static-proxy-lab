@@ -193,29 +193,25 @@ try {
         Assert-True ($rejectedExit -ne 0 -and -not (Test-Path -LiteralPath $rejectedZip)) 'invalid hash yielded plaintext output'
         Assert-True ((Get-Content -LiteralPath $sentinel) -eq 'existing-file') 'existing temporary file was overwritten or deleted'
     }
-    Check 'recovery-exit-code-alone-is-not-success' {
+    Check 'recovery-verdict-fixtures' {
         . (Join-Path $root 'scripts\RecoveryVerdict.ps1')
-        $onlyCode = [pscustomobject]@{
-            ScriptStarted = $true; Cancelled = $false; TimedOut = $false
-            ProcessExit = 0; TransactionExit = 32; ExpectedTransactionExit = 32
-            ProfileRestored = $false; WritesMatch = $false; JournalClear = $false; LiveUnchanged = $true
+        $fixture = Get-Content -LiteralPath (Join-Path $testDir 'fixtures\recovery-fixtures.json') -Raw | ConvertFrom-Json
+        $required = @(
+            'complete-success', 'exit-code-alone', 'decimal-32.5', 'string-true', 'missing-field',
+            'extra-write-line', 'writesmatch-true-raw-differs', 'cancelled', 'timed-out',
+            'illegal-expected-99', 'empty-object'
+        )
+        $seen = @{}
+        foreach ($case in @($fixture.cases)) {
+            $verdict = Test-ProxyDoctorRecoveryResult $case.result
+            $seen[[string]$case.name] = $true
+            $reasons = @($verdict.Reasons) -join ','
+            Assert-True ($verdict.CompleteSuccess -eq [bool]$case.completeSuccess) ($case.name + ' CompleteSuccess expected ' + $case.completeSuccess + ' actual ' + $verdict.CompleteSuccess + ' reasons=' + $reasons)
+            Assert-True ($verdict.EvidenceScope -eq 'LiveUnchanged compares the proxy selection at the start and end only.') ($case.name + ' LiveUnchanged text changed')
         }
-        $rejected = Test-ProxyDoctorRecoveryResult $onlyCode
-        Assert-True (-not $rejected.CompleteSuccess) 'exit 32 alone was accepted'
-        $complete = [pscustomobject]@{
-            ScriptStarted = $true; Cancelled = $false; TimedOut = $false
-            ProcessExit = 0; TransactionExit = 32; ExpectedTransactionExit = 32
-            ProfileRestored = $true; WritesMatch = $true; JournalClear = $true; LiveUnchanged = $true
+        foreach ($name in $required) {
+            Assert-True ($seen.ContainsKey($name)) ('fixture missing ' + $name)
         }
-        $accepted = Test-ProxyDoctorRecoveryResult $complete
-        Assert-True ($accepted.CompleteSuccess) 'complete evidence was rejected'
-        $textBool = [pscustomobject]$complete
-        $textBool | Add-Member -Force -NotePropertyName ScriptStarted -NotePropertyValue 'true'
-        Assert-True (-not (Test-ProxyDoctorRecoveryResult $textBool).CompleteSuccess) 'string boolean was accepted'
-        $missing = [pscustomobject]@{ ScriptStarted = $true; TransactionExit = 32 }
-        Assert-True (-not (Test-ProxyDoctorRecoveryResult $missing).CompleteSuccess) 'missing fields were accepted'
-        Assert-True (-not (Test-ProxyDoctorRecoveryWrites "enabled=0 server=old:8080`nenabled=1 server=x")) 'extra write was accepted'
-        Assert-True (Test-ProxyDoctorRecoveryWrites "enabled=0 server=old:8080`r`n") 'exact write was rejected'
     }
 }
 finally { Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue }
