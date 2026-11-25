@@ -28,7 +28,7 @@
 | RECOVERY_GATE | PARTIAL | 隔离恢复用例通过。真实 StarSky 自停、重启和睡眠未在本轮复现。 |
 | TRANSACTION_GATE | PASS | 沿用 2026-11-23 对 `05072a3` 的 111/111。本轮没有修改 apply、rollback 或锁。 |
 | SKILL_GATE | PARTIAL | RC2 已有只读诊断入口。V6.9 操作说明还在本分支，没有打进 Skill 安装包。 |
-| PUBLICATION_GATE | WAITING_USER | 分支尚无上游。历史材料里已有终点地址，正式公开前仍要按既有审计处理。本轮没有把凭据写入仓库。 |
+| PUBLICATION_GATE | PARTIAL | Draft PR #4 基于 PR #1 的当前头，尚未合并。历史材料里的终点地址仍按既有审计处理。本轮没有把凭据写入仓库。 |
 | PRODUCTION_GATE | WAITING_USER | 未授权改写生产配置、防火墙、TUN、DNS 或 IPv6 栈。 |
 
 ## 本轮没有关闭的问题
