@@ -1,0 +1,21 @@
+using System.Text.Json;
+using ProxyDoctor;
+
+var demo = args.Contains("--demo");
+var report = demo ? DiagnosticEngine.Demo() : await DiagnosticEngine.ReadLiveAsync(CancellationToken.None);
+var payload = new
+{
+    demo = report.Demo,
+    sampledAt = report.SampledAt,
+    fault = report.Fault.Class.ToString(),
+    advice = report.Fault.Advice,
+    recommendRestore = report.Fault.RecommendRestore,
+    applicationSuccess = report.Fault.ApplicationSuccess,
+    proxy = report.ProxySelection,
+    clients = report.RunningClients,
+    listeners = report.Listeners.Select(item => new { item.Port, item.ProcessName }),
+    probes = report.Probes.Select(item => new { item.Target, item.StatusCode, item.ElapsedMs, item.PathLabel, item.Error }),
+    capabilities = report.Capabilities.Select(item => new { item.Name, state = item.State.ToString(), item.Detail })
+};
+Console.WriteLine(JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true }));
+return report.Fault.Class == FaultClass.Unknown ? 2 : 0;
