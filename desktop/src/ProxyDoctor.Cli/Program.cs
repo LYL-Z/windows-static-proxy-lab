@@ -1,8 +1,17 @@
 using System.Text.Json;
 using ProxyDoctor;
 
+var sentenceAt = Array.IndexOf(args, "--sentences");
+if (sentenceAt >= 0)
+{
+    var text = string.Join(' ', args.Skip(sentenceAt + 1));
+    Console.WriteLine(RequestRouter.IntentToken(RequestRouter.Route(text)));
+    return 0;
+}
+
 if (args.Contains("--isolated-recovery"))
 {
+    Console.Error.WriteLine("Usage: --isolated-recovery exits 0 only when CompleteSuccess is true; otherwise 2.");
     var run = await IsolatedRecovery.ExecuteAsync(IsolatedRecovery.AuthorizationText, CancellationToken.None);
     Console.WriteLine(JsonSerializer.Serialize(run, new JsonSerializerOptions { WriteIndented = true }));
     return run.CompleteSuccess ? 0 : 2;
