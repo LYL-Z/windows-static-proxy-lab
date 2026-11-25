@@ -10,7 +10,7 @@
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <AssemblyName>ProxyDoctor</AssemblyName>
     <Product>Windows Proxy Doctor Desktop</Product>
-    <Version>1.2.0</Version>
+    <Version>1.3.0</Version>
     <Description>网络代理医生</Description>
     <ApplicationIcon />
   </PropertyGroup>

@@ -214,10 +214,40 @@ public class ClassifierTests
         Assert.Equal(32, run.TransactionExit);
         Assert.True(run.LiveUnchanged);
         Assert.True(run.ProfileRestored);
-        Assert.False(run.JournalRemains);
+        Assert.True(run.JournalClear);
         Assert.Contains("enabled=0", run.Writes);
         Assert.DoesNotContain("enabled=1", run.Writes);
+        Assert.True(run.CompleteSuccess, run.Detail);
         Assert.Equal(before, NetworkReader.LiveProxyStamp());
+    }
+
+    [Fact]
+    public async Task Cancelled_recovery_does_not_start_or_count_as_success()
+    {
+        using var cancel = new CancellationTokenSource();
+        cancel.Cancel();
+        var run = await IsolatedRecovery.ExecuteAsync(IsolatedRecovery.AuthorizationText, cancel.Token);
+        Assert.False(run.ScriptStarted);
+        Assert.True(run.Cancelled);
+        Assert.False(run.CompleteSuccess);
+    }
+
+    [Fact]
+    public void Exit_code_alone_is_not_recovery_success()
+    {
+        var onlyCode = new RecoveryResult(false, true, false, false, 0, 32, 32, false, false, false, true,
+            RecoveryResult.IsolationLabel, "", "只有退出码");
+        Assert.False(onlyCode.WithVerdict().CompleteSuccess);
+        Assert.False(RecoveryTrust.IsStrictChild(@"C:\Temp", @"C:\TempEvil"));
+        Assert.True(RecoveryTrust.IsStrictChild(@"C:\Temp", @"C:\Temp\child"));
+        Assert.False(RecoveryTrust.IsStrictChild(@"C:\Temp", @"C:\Temp\..\Windows"));
+    }
+
+    [Fact]
+    public void Trusted_engine_and_script_match_the_reviewed_hashes()
+    {
+        Assert.NotNull(IsolatedRecovery.FindScript());
+        Assert.NotNull(IsolatedRecovery.FindEngineRoot());
     }
 
     [Fact]

@@ -5,7 +5,7 @@ if (args.Contains("--isolated-recovery"))
 {
     var run = await IsolatedRecovery.ExecuteAsync(IsolatedRecovery.AuthorizationText, CancellationToken.None);
     Console.WriteLine(JsonSerializer.Serialize(run, new JsonSerializerOptions { WriteIndented = true }));
-    return run.ScriptStarted ? run.TransactionExit : 2;
+    return run.CompleteSuccess ? 0 : 2;
 }
 
 var demo = args.Contains("--demo");

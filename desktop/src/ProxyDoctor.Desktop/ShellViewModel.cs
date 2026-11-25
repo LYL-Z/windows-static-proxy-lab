@@ -69,7 +69,7 @@ public partial class ShellViewModel : ObservableObject
                     if (Interlocked.Exchange(ref _busyGate, 1) == 1) continue;
                     try
                     {
-                        var report = DiagnosticEngine.ReadLocal();
+                        var report = DiagnosticEngine.ReadLocal(persistEvent: false);
                         var key = report.Fault.Class + "|" + report.ProxySelection;
                         var notify = _alerts.ShouldNotify(key);
                         var seen = Volatile.Read(ref _epoch);
@@ -120,10 +120,14 @@ public partial class ShellViewModel : ObservableObject
                             UpstreamLine = check.State + "  " + check.SampledAt.ToString("HH:mm:ss") + "  " + check.Detail
                                 + "。连续失败 " + _upstreamStreak.Consecutive + "，抖动 " + _upstreamStreak.Flaps + "，这次是 " + kind + "。";
                             RenderChannels();
-                            if (failed)
+                            if (failed && kind == "new")
                             {
-                                Monitor = "上游通道失败。本地监听即使仍在，也不能显示成正常。";
-                                AlertRequested?.Invoke("上游 HTTPS 失败。这不是本地心跳，延迟至少到这次 90 秒采样。");
+                                Monitor = "上游通道失败。本地监听即使仍在，也不能显示成正常。相同失败不会每个周期重复通知。";
+                                AlertRequested?.Invoke("上游 HTTPS 失败。这不是本地心跳。90 秒采样看不到更短的中断。");
+                            }
+                            else if (failed)
+                            {
+                                Monitor = "上游通道仍失败。这是重复失败，不再重复通知。本地监听不能显示成正常。";
                             }
                             else Monitor = "上游通道 " + check.SampledAt.ToString("HH:mm:ss") + " 有响应。一次响应不是应用已恢复。从发起到返回约 " + (DateTimeOffset.Now - started).TotalMilliseconds.ToString("0") + " ms。";
                         });
@@ -221,7 +225,7 @@ public partial class ShellViewModel : ObservableObject
         RecoveryLog = "正在临时目录里运行 rollback-v4.ps1。当前 Windows 代理不会被写入。";
         try
         {
-            var run = await IsolatedRecovery.ExecuteAsync(IsolatedRecovery.AuthorizationText, CancellationToken.None);
+            var run = await IsolatedRecovery.ExecuteAsync(IsolatedRecovery.AuthorizationText, _monitorStop.Token);
             RecoveryLog = FormatRun(run);
             EventLog.Append(run.ScriptStarted
                 ? "隔离回滚退出 " + run.TransactionExit + "。当前 Windows 代理" + (run.LiveUnchanged ? "未变" : "指纹发生变化") + "。"
@@ -336,19 +340,22 @@ public partial class ShellViewModel : ObservableObject
             + "\n协议检查只在人工点击时采样，不借用本地心跳的时间。";
     }
 
-    private static string FormatRun(RecoveryRun run)
+    private static string FormatRun(RecoveryResult run)
     {
         if (!run.ScriptStarted) return run.Detail;
         return string.Join(Environment.NewLine,
         [
-            "真实 rollback-v4.ps1 已在临时目录执行，临时目录随后删除。",
-            "事务退出码 " + run.TransactionExit + "。进程退出码 " + run.ProcessExit + "。",
-            run.LiveUnchanged ? "执行前后，当前用户的 ProxyEnable 和 ProxyServer 相同。" : "执行前后，当前用户的代理指纹不同。请先停止使用恢复。",
+            run.CompleteSuccess ? "隔离事务证据齐全。" : "证据不齐全，不能记成恢复成功。",
+            run.Isolation,
+            "事务退出码 " + run.TransactionExit + "，预期 " + run.ExpectedTransactionExit + "。进程退出码 " + run.ProcessExit + "。",
+            run.LiveUnchanged ? "执行前后，当前用户的 ProxyEnable 和 ProxyServer 相同。" : "执行前后，当前用户的代理指纹不同。",
             run.ProfileRestored ? "隔离配置文件已按快照哈希恢复。" : "隔离配置文件没有恢复到快照哈希。",
-            run.JournalRemains ? "事务日志还在。这不是成功收口。" : "事务日志已清除。",
+            run.JournalClear ? "事务日志已清除。" : "事务日志还在或没有读到这项证据。",
+            run.WritesMatch ? "隔离写入符合这次场景。" : "隔离写入不符合这次场景。",
             "隔离写入：" + (string.IsNullOrWhiteSpace(run.Writes) ? "没有" : run.Writes.Trim()),
+            (run.Cancelled ? "执行被取消。" : "") + (run.TimedOut ? "执行超时。" : ""),
             "脚本尾部：" + run.Detail,
-            "重启 StarSky 或 Clash 没有发生，也不能从这次退出码推断加速已经恢复。"
+            IsolatedRecovery.ManualGuidance
         ]);
     }
 }

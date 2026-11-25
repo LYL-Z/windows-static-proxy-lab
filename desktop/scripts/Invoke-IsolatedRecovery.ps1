@@ -1,42 +1,69 @@
 #Requires -Version 5.1
 <#
-  Runs the real proxy_v4 rollback script inside a temporary test root.
-  V4_TEST_MODE is forced on. The script refuses to use a work directory
-  outside TEMP, and the appended library stub throws unless test mode is on.
-  It does not read or write the live HKCU proxy.
+  Runs the reviewed proxy_v4 rollback script inside a temporary test root.
+  V4_TEST_MODE is process-local logic, not an OS sandbox.
+  The caller must pass the reviewed SHA-256 of rollback-v4.ps1 and V4.ps1.
+  This script does not read or write the live HKCU proxy.
 #>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][string]$EngineRoot,
-    [Parameter(Mandatory = $true)][string]$WorkRoot
+    [Parameter(Mandatory = $true)][string]$WorkRoot,
+    [Parameter(Mandatory = $true)][string]$ExpectedRollbackSha,
+    [Parameter(Mandatory = $true)][string]$ExpectedLibrarySha
 )
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
-$trace = Join-Path $env:TEMP 'proxy-doctor-trace.txt'
-function Trace([string]$Message) {
-    Add-Content -LiteralPath $trace -Value ((Get-Date).ToString('HH:mm:ss.fff') + ' ' + $Message)
-}
-Trace ('start pid=' + $PID + ' test=' + $env:V4_TEST_MODE + ' ps=' + $PSVersionTable.PSVersion + ' powershell=' + (Get-Command powershell.exe).Source)
 
-function Fail([string]$Message) {
-    @{ ok = $false; exitCode = 40; detail = $Message; scriptStarted = $true; liveRegistryTouched = $false } |
-        ConvertTo-Json -Compress | Set-Content -LiteralPath (Join-Path $WorkRoot 'result.json') -Encoding UTF8
-    exit 2
+function Test-StrictChild([string]$Parent, [string]$Child) {
+    $parentFull = [System.IO.Path]::GetFullPath($Parent).TrimEnd('\', '/')
+    $childFull = [System.IO.Path]::GetFullPath($Child).TrimEnd('\', '/')
+    $prefix = $parentFull + [System.IO.Path]::DirectorySeparatorChar
+    if (-not $childFull.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) { return $false }
+    $cursor = $childFull
+    while ($cursor.Length -ge $parentFull.Length) {
+        $item = Get-Item -LiteralPath $cursor -Force
+        if (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) { return $false }
+        if ($cursor.Equals($parentFull, [StringComparison]::OrdinalIgnoreCase)) { break }
+        $next = Split-Path -Parent $cursor
+        if (-not $next -or $next.Equals($cursor, [StringComparison]::OrdinalIgnoreCase)) { return $false }
+        $cursor = $next
+    }
+    return $true
 }
+
+function Assert-ReviewedHash([string]$Path, [string]$Expected) {
+    $item = Get-Item -LiteralPath $Path -Force
+    if (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'refusing a reparse point' }
+    $actual = (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash
+    if (-not $actual.Equals($Expected, [StringComparison]::OrdinalIgnoreCase)) { throw 'reviewed hash mismatch' }
+}
+
+foreach ($name in @(
+    'V4_TEST_APPDATA', 'V4_TEST_RUNTIME', 'V4_TEST_INSTALL', 'V4_TEST_EXE', 'V4_TEST_CORE',
+    'V4_TEST_UI_CONFIG', 'V4_TEST_UI_SYSTEM_PROXY', 'V4_TEST_PROXY_ENABLE', 'V4_TEST_PROXY_SERVER',
+    'V4_TEST_ROOT', 'V4_TEST_START_LOG', 'V4_TEST_EXIT_AFTER_JOURNAL', 'PROXY_DOCTOR_ENGINE'
+)) {
+    Remove-Item -Path "Env:$name" -ErrorAction SilentlyContinue
+}
+$env:V4_TEST_MODE = '1'
 
 $work = [System.IO.Path]::GetFullPath($WorkRoot)
 $engine = [System.IO.Path]::GetFullPath($EngineRoot)
 $temp = [System.IO.Path]::GetFullPath($env:TEMP)
-if (-not $work.StartsWith($temp, [StringComparison]::OrdinalIgnoreCase)) { throw 'work root must stay inside TEMP' }
-if ($work.StartsWith($engine, [StringComparison]::OrdinalIgnoreCase)) { throw 'work root must not sit inside the engine' }
+if (-not (Test-StrictChild $temp $work)) { throw 'work root is not contained in TEMP' }
+if ((Test-StrictChild $engine $work) -or (Test-StrictChild $work $engine)) { throw 'work root overlaps the engine' }
 $rollbackSource = Join-Path $engine 'proxy_v4\rollback-v4.ps1'
 $librarySource = Join-Path $engine 'proxy_v4\lib\V4.ps1'
-if (-not (Test-Path -LiteralPath $rollbackSource) -or -not (Test-Path -LiteralPath $librarySource)) {
-    throw 'engine root does not contain proxy_v4 rollback and V4.ps1'
-}
+Assert-ReviewedHash $rollbackSource $ExpectedRollbackSha
+Assert-ReviewedHash $librarySource $ExpectedLibrarySha
 
-$env:V4_TEST_MODE = '1'
-$env:V4_TEST_ROOT = $work
+$trace = Join-Path $work 'trace.log'
+function Trace([string]$Message) {
+    Add-Content -LiteralPath $trace -Value ((Get-Date).ToString('HH:mm:ss.fff') + ' ' + $Message)
+}
+Trace 'start'
+
 $app = Join-Path $work 'appdata'
 $snap = Join-Path $work 'snapshot'
 New-Item -ItemType Directory -Path (Join-Path $app 'profiles') -Force | Out-Null
@@ -46,15 +73,17 @@ $profile = Join-Path $app 'profiles.yaml'
 [System.IO.File]::WriteAllText($profile, $beforeProfile)
 Copy-Item -LiteralPath $rollbackSource -Destination (Join-Path $work 'rollback-v4.ps1')
 Copy-Item -LiteralPath $librarySource -Destination (Join-Path $work 'lib\V4.ps1')
+Assert-ReviewedHash (Join-Path $work 'rollback-v4.ps1') $ExpectedRollbackSha
+Assert-ReviewedHash (Join-Path $work 'lib\V4.ps1') $ExpectedLibrarySha
 
+$env:V4_TEST_ROOT = $work
 $env:V4_TEST_APPDATA = $app
 $env:V4_TEST_PROXY_ENABLE = '0'
 $env:V4_TEST_PROXY_SERVER = 'old:8080'
 $env:V4_FIXTURE_PROXY_WRITE_LOG = Join-Path $work 'proxy-write.log'
-Trace 'snapshot-begin'
-. $librarySource
+. (Join-Path $work 'lib\V4.ps1')
+if (-not $script:TestMode) { throw 'test mode was not enabled' }
 $null = New-V4SnapshotFiles -AppData $app -ProfilesDir (Join-Path $app 'profiles') -Dir $snap -SystemProxy ([pscustomobject]@{ enabled = $true; server = 'old:8080' }) -ClashRunningBefore $false -Reason 'desktop-isolated'
-Trace 'snapshot-end'
 $expectedHash = (Get-FileHash -LiteralPath (Join-Path $snap 'profiles.yaml') -Algorithm SHA256).Hash
 [System.IO.File]::WriteAllText($profile, "fixture-profile-changed`n")
 
@@ -94,13 +123,13 @@ if ($null -eq $code) { $code = 40 }
 $writes = if (Test-Path -LiteralPath $env:V4_FIXTURE_PROXY_WRITE_LOG) { (Get-Content -LiteralPath $env:V4_FIXTURE_PROXY_WRITE_LOG -Raw) } else { '' }
 $restoredHash = if (Test-Path -LiteralPath $profile) { (Get-FileHash -LiteralPath $profile -Algorithm SHA256).Hash } else { '' }
 $tail = @($output | Select-Object -Last 8) -join ' | '
+$traceTail = if (Test-Path -LiteralPath $trace) { (@(Get-Content -LiteralPath $trace | Select-Object -Last 6) -join ' | ') } else { '' }
 $result = [ordered]@{
-    ok = ($code -eq 32)
     exitCode = [int]$code
     writes = [string]$writes
     journalRemains = [bool](Test-Path -LiteralPath (Join-Path $work 'config\transaction.json'))
     profileRestored = ($restoredHash -eq $expectedHash)
-    detail = $tail
+    detail = ($tail + ' || ' + $traceTail)
     scriptStarted = $true
     liveRegistryTouched = $false
 }

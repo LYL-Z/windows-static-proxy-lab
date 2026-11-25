@@ -1,4 +1,4 @@
-# Windows Proxy Doctor Desktop 1.2
+# Windows Proxy Doctor Desktop 1.3
 
 中文名：网络代理医生。它以当前用户权限运行。故障分类与已合并的 Windows Proxy Doctor Skill 一致。
 

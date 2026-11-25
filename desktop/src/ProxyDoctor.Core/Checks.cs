@@ -75,15 +75,17 @@ public static class CheckRunner
     private static async Task<CheckResult> Https(DateTimeOffset at, CancellationToken cancellationToken)
     {
         var probes = await HttpsProbe.SampleAsync(cancellationToken);
-        var first = probes.FirstOrDefault();
-        var detail = first is null
+        var detail = probes.Count == 0
             ? "没有采样。"
-            : first.StatusCode is null
-                ? first.Target + " " + (first.Error ?? "无状态码") + "，" + first.ElapsedMs + " ms"
-                : first.Target + " HTTP " + first.StatusCode + "，" + first.ElapsedMs + " ms";
-        return new CheckResult("https", "HTTPS", "看默认代理路径能否拿到响应头。一次 200 不是整机保护。",
-            "HttpClient 默认代理，只读响应头。", first?.StatusCode is null ? EvidenceState.Unknown : EvidenceState.Verified,
-            detail, at, false);
+            : string.Join("；", probes.Select(item => item.StatusCode is null
+                ? item.Target + " " + (item.Error ?? "无状态码") + "，" + item.ElapsedMs + " ms"
+                : item.Target + " HTTP " + item.StatusCode + "，" + item.ElapsedMs + " ms"));
+        var any = probes.Any(item => item.StatusCode is not null);
+        var all = probes.Count > 0 && probes.All(item => item.StatusCode is >= 200 and <= 399);
+        var state = all ? EvidenceState.Verified : any ? EvidenceState.Partial : EvidenceState.Unknown;
+        return new CheckResult("https", "HTTPS", "分别记录每个目标。一个站点的响应不能代表其他站点或所有应用。",
+            "HttpClient 默认代理，只读响应头。90 秒周期采样看不到更短的中断。", state,
+            detail + "。这只说明这次默认代理路径，不是整机保护。", at, false);
     }
 
     private static async Task<CheckResult> Claude(DateTimeOffset at, CancellationToken cancellationToken)
@@ -105,8 +107,8 @@ public static class CheckRunner
             var answers = await System.Net.Dns.GetHostAddressesAsync("example.com");
             return new CheckResult("dns", "系统 DNS", "问系统解析器，不判断泄漏是否已经修复。",
                 "Dns.GetHostAddresses(example.com)。这是当前电脑的实时解析，不是实验室结论，也不是生产保护。",
-                answers.Length > 0 ? EvidenceState.Verified : EvidenceState.Unknown,
-                at.ToString("HH:mm:ss") + " example.com 得到 " + answers.Length + " 个地址，" + watch.ElapsedMilliseconds + " ms。有应答不等于没有泄漏。",
+                answers.Length > 0 ? EvidenceState.Partial : EvidenceState.Unknown,
+                at.ToString("HH:mm:ss") + " example.com 得到 " + answers.Length + " 个地址，" + watch.ElapsedMilliseconds + " ms。有应答只说明解析器可用，没有证明解析路径。",
                 at, false);
         }
         catch (Exception ex) when (ex is System.Net.Sockets.SocketException or ArgumentException)

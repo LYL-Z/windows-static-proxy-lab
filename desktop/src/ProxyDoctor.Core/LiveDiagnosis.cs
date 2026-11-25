@@ -251,12 +251,12 @@ public static class HttpsProbe
 
 public static class DiagnosticEngine
 {
-    public static DiagnosticReport ReadLocal()
+    public static DiagnosticReport ReadLocal(bool persistEvent = true)
     {
         var listeners = NetworkReader.ReadListeners();
         var observation = NetworkReader.ReadObservation(listeners);
         var fault = FaultClassifier.Classify(observation);
-        return Build(false, observation, fault, NetworkReader.DescribeSelection(), NetworkReader.AutomaticProxySet(),
+        return Build(false, observation, fault, NetworkReader.DescribeSelection(), NetworkReader.AutomaticProxySet(), persistEvent,
             listeners.Rows, NetworkReader.ReadClients(),
             [],
             [new CapabilityFact("本地心跳", listeners.Complete ? EvidenceState.Partial : EvidenceState.Unknown,
@@ -282,7 +282,7 @@ public static class DiagnosticEngine
             new("WebRTC", EvidenceState.NotVerified, $"{DateTimeOffset.Now:HH:mm:ss} 这次没有启动浏览器，也没有接收端计数。"),
             new("整机网络阻断", EvidenceState.NotVerified, "没有在本次检查中安装防火墙规则。进程守卫不是整机阻断。")
         };
-        return Build(false, observation, fault, NetworkReader.DescribeSelection(), NetworkReader.AutomaticProxySet(),
+        return Build(false, observation, fault, NetworkReader.DescribeSelection(), NetworkReader.AutomaticProxySet(), true,
             listeners.Rows, NetworkReader.ReadClients(), probes, capabilities);
     }
 
@@ -300,7 +300,7 @@ public static class DiagnosticEngine
             FirstHopExpected = true,
             FirstHopOpen = true
         };
-        return Build(true, observation, FaultClassifier.Classify(observation), "127.0.0.1:7897", false,
+        return Build(true, observation, FaultClassifier.Classify(observation), "127.0.0.1:7897", false, false,
             [new ListenerFact(7897, "verge-mihomo", true), new ListenerFact(11119, "magicspeed", true)],
             ["StarSky", "clash-verge", "verge-mihomo", "magicspeed"],
             [new ProbeFact("https://www.baidu.com", null, 0, null, "演示，未发送请求")],
@@ -308,11 +308,11 @@ public static class DiagnosticEngine
     }
 
     private static DiagnosticReport Build(bool demo, FaultObservation observation, FaultResult fault, string selection,
-        bool automatic, IReadOnlyList<ListenerFact> listeners, IReadOnlyList<string> clients, IReadOnlyList<ProbeFact> probes,
+        bool automatic, bool persistEvent, IReadOnlyList<ListenerFact> listeners, IReadOnlyList<string> clients, IReadOnlyList<ProbeFact> probes,
         IReadOnlyList<CapabilityFact> capabilities)
     {
         var line = $"{DateTimeOffset.Now:HH:mm:ss} 完成一次只读采样。分类 {fault.Class}。";
-        if (!demo) EventLog.Append(line);
+        if (!demo && persistEvent) EventLog.Append(line);
         var events = new List<string> { line };
         events.AddRange(EventLog.Recent());
         if (fault.Class == FaultClass.Aligned)
