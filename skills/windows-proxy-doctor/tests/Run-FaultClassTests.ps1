@@ -71,9 +71,10 @@ try {
     Check 'fixture-unknown' {
         Assert-Class (Get-ProxyDoctorFaultClass -Observation (Read-Fault 'fault-unknown.json')) 'UNKNOWN'
     }
-    Check 'both-toggles-off-is-user-off' {
+    Check 'both-toggles-off-without-a-record-is-not-confirmed-intent' {
         $result = Get-ProxyDoctorFaultClass -Observation @{ proxyEnabled = $false; uiEnabled = $false; pacConfigured = $false; coreRunning = $false }
-        Assert-Class $result 'USER_OFF'
+        Assert-Class $result 'OBSERVED_OFF'
+        Assert-True ($result.recommendRestore -eq $false) 'an unconfirmed off state recommended a restore'
     }
     Check 'explicit-denial-of-user-off-is-drift' {
         $result = Get-ProxyDoctorFaultClass -Observation @{
@@ -169,10 +170,10 @@ try {
         $facts | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $fixture -Encoding UTF8
         $wizard = Join-Path $root 'scripts\Start-ProxyDoctor.ps1'
         $result = & $wizard -TestFixture $fixture -Goal Diagnose -Json | ConvertFrom-Json
-        Assert-Class $result.faultClass 'USER_OFF'
+        Assert-Class $result.faultClass 'OBSERVED_OFF'
         Assert-True ($result.mode -eq 'Diagnose' -and $result.verification.application -eq 'NOT_TESTED') 'diagnose path treated classification as application success'
         $text = (& $wizard -TestFixture $fixture -Goal Diagnose | Out-String)
-        Assert-True ($text.Contains('USER_OFF. ' + $note)) 'text diagnose output omitted the class and alert sentence'
+        Assert-True ($text.Contains('OBSERVED_OFF. ' + $note)) 'text diagnose output omitted the class and alert sentence'
         $setup = & $wizard -TestFixture $fixture -Goal Setup -Json | ConvertFrom-Json
         Assert-True ($null -eq $setup.PSObject.Properties['faultClass']) 'setup goal invented a fault class'
     }

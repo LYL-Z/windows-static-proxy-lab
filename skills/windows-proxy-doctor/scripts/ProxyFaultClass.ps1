@@ -118,6 +118,9 @@ function Get-ProxyDoctorFaultClass($Observation) {
         if ($field.userTurnedProxyOff.Value -eq $false) {
             return (New-ProxyDoctorFaultResult 'PROXY_DRIFT' 'Windows and the saved client choice are off, but the user did not turn the proxy off. Confirm who changed them before any edit.')
         }
+        if ($field.userTurnedProxyOff.Value -ne $true) {
+            return (New-ProxyDoctorFaultResult 'OBSERVED_OFF' 'Windows and the saved client choice are off. No recorded user decision was supplied, so do not turn the proxy on and do not treat this as confirmed intent.')
+        }
         return (New-ProxyDoctorFaultResult 'USER_OFF' 'The user turned the proxy off. Keep the proxy off.')
     }
     if ($field.proxyEnabled.Value -ne $field.uiEnabled.Value -or $field.proxyTargetsExpected.Value -eq $false) {
