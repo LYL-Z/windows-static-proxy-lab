@@ -1,6 +1,7 @@
+using System.Globalization;
 using System.IO;
 using System.Windows;
-using System.Windows.Media;
+using System.Windows.Data;
 using System.Windows.Media.Imaging;
 
 namespace ProxyDoctor.Desktop;
@@ -17,8 +18,6 @@ public partial class MainWindow : Window
         {
             if (args.PropertyName == nameof(ShellViewModel.Dark))
                 ApplyTheme(_model.Dark);
-            if (args.PropertyName == nameof(ShellViewModel.Section))
-                ShowSection(_model.Section);
         };
         Loaded += async (_, _) =>
         {
@@ -45,22 +44,13 @@ public partial class MainWindow : Window
         });
     }
 
-    private void ShowSection(string section)
-    {
-        OverviewPage.Visibility = section == "overview" ? Visibility.Visible : Visibility.Collapsed;
-        PrivacyPage.Visibility = section == "privacy" ? Visibility.Visible : Visibility.Collapsed;
-        RecoveryPage.Visibility = section == "recovery" ? Visibility.Visible : Visibility.Collapsed;
-        MonitorPage.Visibility = section == "monitor" ? Visibility.Visible : Visibility.Collapsed;
-        EventsPage.Visibility = section == "events" ? Visibility.Visible : Visibility.Collapsed;
-    }
-
     private void SaveCapture()
     {
         var path = App.CapturePath;
         if (string.IsNullOrWhiteSpace(path)) return;
         var width = Math.Max(1, (int)ActualWidth);
         var height = Math.Max(1, (int)ActualHeight);
-        var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+        var bitmap = new RenderTargetBitmap(width, height, 96, 96, System.Windows.Media.PixelFormats.Pbgra32);
         bitmap.Render(this);
         var encoder = new PngBitmapEncoder();
         encoder.Frames.Add(BitmapFrame.Create(bitmap));
@@ -68,4 +58,49 @@ public partial class MainWindow : Window
         using var stream = File.Create(path);
         encoder.Save(stream);
     }
+}
+
+public sealed class SectionVisibilityConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
+        string.Equals(value as string, parameter as string, StringComparison.Ordinal)
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}
+
+public sealed class SectionMatchConverter : IMultiValueConverter
+{
+    public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (values.Length < 2) return false;
+        return string.Equals(values[0]?.ToString(), values[1]?.ToString(), StringComparison.Ordinal);
+    }
+
+    public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}
+
+public sealed class InverseBooleanConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
+        value is not true;
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+        value is not true;
+}
+
+public sealed class IdleLiveConverter : IMultiValueConverter
+{
+    public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+    {
+        var busy = values.Length > 0 && values[0] is true;
+        var demo = values.Length > 1 && values[1] is true;
+        return !busy && !demo;
+    }
+
+    public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
 }

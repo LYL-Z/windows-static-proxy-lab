@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Text.Json;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ProxyDoctor;
@@ -26,6 +27,7 @@ public partial class ShellViewModel : ObservableObject
     [ObservableProperty] private string _recoveryLog = "还没有预览。授权之前不会运行恢复脚本。";
     [ObservableProperty] private string _channels = "本地心跳、上游和协议检查还没有各自的采样。";
     [ObservableProperty] private string _upstreamLine = "上游通道还没有采样。本地监听正常不等于上游可用。";
+    [ObservableProperty] private string _clientLine = "还没有把进程、监听和上游放在一起看。";
 
     private readonly AlertGate _alerts = new();
     public ObservableCollection<CheckRow> Checks { get; } = new();
@@ -51,10 +53,26 @@ public partial class ShellViewModel : ObservableObject
         Checks.Clear();
         Advice = "等待新的采样。";
         Sampled = false;
+        ClientLine = value
+            ? "演示数据不判断这台电脑的客户端。进程和端口来自固定样例。"
+            : "已离开演示。上一次客户端结论已清除。";
         OnPropertyChanged(nameof(ModeLabel));
     }
 
-    partial void OnPausedChanged(bool value) => OnPropertyChanged(nameof(ModeLabel));
+    public string PauseLabel => Paused ? "继续监测" : "暂停监测";
+
+    partial void OnPausedChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ModeLabel));
+        OnPropertyChanged(nameof(PauseLabel));
+    }
+
+    partial void OnSectionChanged(string value)
+    {
+        if (value is "overview" or "checks" or "monitor" or "privacy" or "clients" or "recovery" or "events")
+            return;
+        Section = "overview";
+    }
 
     public void StartMonitor()
     {
@@ -160,6 +178,12 @@ public partial class ShellViewModel : ObservableObject
     private void Show(string section) => Section = section;
 
     [RelayCommand]
+    private void TogglePause() => Paused = !Paused;
+
+    [RelayCommand]
+    private void RefreshEvents() => Events = FormatEvents(EventLog.Recent());
+
+    [RelayCommand]
     private async Task DiagnoseAsync()
     {
         if (Busy || Interlocked.Exchange(ref _busyGate, 1) == 1) return;
@@ -252,10 +276,14 @@ public partial class ShellViewModel : ObservableObject
         try
         {
             var result = await CheckRunner.RunOne(id, CancellationToken.None);
-            var row = new CheckRow(result.Id, result.Name, result.State + "  " + result.SampledAt.ToString("HH:mm:ss"), result.Method + " " + result.Detail);
+            var row = new CheckRow(result.Id, result.Name, result.State.ToString(), result.State + "  " + result.SampledAt.ToString("HH:mm:ss"), result.Method + " " + result.Detail, result.Purpose);
             var index = Checks.ToList().FindIndex(item => item.Id == id);
             if (index >= 0) Checks[index] = row;
             else Checks.Add(row);
+            if (id == "selection")
+                Proxy = result.State + "  " + result.SampledAt.ToString("HH:mm:ss") + "  " + result.Detail;
+            if (id == "listeners")
+                Listeners = result.State + "  " + result.SampledAt.ToString("HH:mm:ss") + "  " + result.Detail;
             if (id == "https")
             {
                 UpstreamLine = result.State + "  " + result.SampledAt.ToString("HH:mm:ss") + "  " + result.Detail;
@@ -263,6 +291,8 @@ public partial class ShellViewModel : ObservableObject
                 RenderChannels();
             }
             EventLog.Append("重测 " + result.Name + "：" + result.State + "。");
+            Events = FormatEvents(EventLog.Recent());
+            RenderClientLine();
         }
         finally
         {
@@ -300,20 +330,25 @@ public partial class ShellViewModel : ObservableObject
         Listeners = report.Listeners.Count == 0
             ? "没有发现代理回环监听"
             : string.Join("；", report.Listeners.Select(item => $"{item.Port} {item.ProcessName}"));
-        if (!replaceRemote) return;
+        if (!replaceRemote)
+        {
+            RenderClientLine();
+            return;
+        }
         Probes = string.Join("\n", report.Probes.Select(item =>
             item.StatusCode is null
                 ? $"{item.Target}  {item.PathLabel}  {item.Error ?? "无状态码"}"
                 : $"{item.Target}  HTTP {item.StatusCode}  {item.ElapsedMs} ms  {item.PathLabel}"));
         Capabilities = string.Join("\n", report.Capabilities.Select(item => $"{item.State}  {item.Name}：{item.Detail}"));
-        Events = string.Join("\n", report.Events);
+        Events = FormatEvents(report.Events);
+        RenderClientLine();
     }
 
     private void ReplaceChecks(IReadOnlyList<CheckResult> checks)
     {
         Checks.Clear();
         foreach (var item in checks)
-            Checks.Add(new CheckRow(item.Id, item.Name, item.State + "  " + item.SampledAt.ToString("HH:mm:ss"), item.Method + " " + item.Detail));
+            Checks.Add(new CheckRow(item.Id, item.Name, item.State.ToString(), item.State + "  " + item.SampledAt.ToString("HH:mm:ss"), item.Method + " " + item.Detail, item.Purpose));
     }
 
     private void NoteLocal(DiagnosticReport report)
@@ -338,6 +373,59 @@ public partial class ShellViewModel : ObservableObject
               + sample.Ttl.TotalSeconds.ToString("0") + " 秒。 " + sample.Evidence;
         Channels = "本地心跳  " + Line(_localSample) + "\n上游 HTTPS  " + Line(_upstreamSample)
             + "\n协议检查只在人工点击时采样，不借用本地心跳的时间。";
+        RenderClientLine();
+    }
+
+    private void RenderClientLine()
+    {
+        if (Demo)
+        {
+            ClientLine = "演示数据不判断这台电脑的客户端。进程和端口来自固定样例。";
+            return;
+        }
+        if (!Sampled)
+        {
+            ClientLine = "还没有采样。只读检查之后才会比较进程、监听和上游。";
+            return;
+        }
+        var process = Clients.Contains("StarSky", StringComparison.OrdinalIgnoreCase);
+        var port = Listeners.Contains("verge-mihomo", StringComparison.OrdinalIgnoreCase);
+        bool? upstream = _upstreamSample is null ? null : _upstreamSample.State == EvidenceState.Verified;
+        ClientLine = ClientLayers.Decide(process, port, upstream, IntentStore.Read() == true);
+    }
+
+    private static string FormatEvents(IEnumerable<string> lines)
+    {
+        var formatted = new List<string>();
+        foreach (var line in lines)
+        {
+            var text = FormatEventLine(line);
+            if (text.Length > 0) formatted.Add(text);
+        }
+        return formatted.Count == 0 ? "还没有写入本机会话记录。" : string.Join("\n", formatted);
+    }
+
+    private static string FormatEventLine(string line)
+    {
+        var text = line.Trim();
+        if (text.Length == 0) return "";
+        if (!text.StartsWith('{')) return text;
+        try
+        {
+            using var document = JsonDocument.Parse(text);
+            var root = document.RootElement;
+            var message = root.TryGetProperty("message", out var messageValue) ? messageValue.GetString() : null;
+            if (string.IsNullOrWhiteSpace(message)) return text;
+            if (root.TryGetProperty("at", out var atValue)
+                && atValue.ValueKind == JsonValueKind.String
+                && DateTimeOffset.TryParse(atValue.GetString(), out var when))
+                return when.ToLocalTime().ToString("HH:mm:ss") + "  " + message;
+            return message;
+        }
+        catch (JsonException)
+        {
+            return text;
+        }
     }
 
     private static string FormatRun(RecoveryResult run)
@@ -361,4 +449,4 @@ public partial class ShellViewModel : ObservableObject
     }
 }
 
-public sealed record CheckRow(string Id, string Name, string State, string Detail);
+public sealed record CheckRow(string Id, string Name, string Evidence, string State, string Detail, string Purpose);
