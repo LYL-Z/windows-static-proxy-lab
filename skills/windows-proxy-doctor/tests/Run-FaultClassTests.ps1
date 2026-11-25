@@ -1,4 +1,4 @@
-#Requires -Version 5.1
+﻿#Requires -Version 5.1
 <#
 Fixture classification tests. Synthetic JSON and in-memory objects only.
 Does not read HKCU, WinHTTP, process lists, or the network.
@@ -133,9 +133,12 @@ try {
         $exact = Text 0x68C0,0x67E5,0x6211,0x7684,0x4EE3,0x7406,0x4E3A,0x4EC0,0x4E48,0x6CA1,0x6709,0x6B63,0x5E38,0x5DE5,0x4F5C
         $equivalent = Text 0x8BF7,0x4EE3,0x7406,0x65E0,0x6CD5,0x6B63,0x5E38,0x5DE5,0x4F5C
         $setup = Text 0x5E2E,0x6211,0x51C6,0x5907,0x4EE3,0x7406,0x8BBE,0x7F6E
-        foreach ($sample in @($exact, $equivalent, 'why isn''t my proxy working', 'why is my proxy not working')) {
+        $reopened = 'StarSky' + (Text 0x5DF2,0x7ECF,0x91CD,0x65B0,0x5F00,0x542F) + '，但 Clash ' + (Text 0x6CA1,0x6709,0x6D41,0x91CF)
+        $config = (Text 0x68C0,0x67E5,0x6211,0x7684) + (Text 0x7535,0x8111,0x7F51,0x7EDC,0x914D,0x7F6E,0x662F,0x5426,0x6B63,0x5E38)
+        $plan = (Text 0x68C0,0x67E5) + (Text 0x7F51,0x7EDC,0x6545,0x969C) + (Text 0x5E76,0x63D0,0x4F9B) + (Text 0x6062,0x590D,0x65B9,0x6848)
+        foreach ($sample in @($exact, $equivalent, 'why isn''t my proxy working', 'why is my proxy not working', $reopened, $config, $plan, 'StarSky is back but Clash has no traffic')) {
             $route = Resolve-ProxyDoctorUserRequest $sample
-            Assert-True ($route.goal -eq 'Diagnose' -and $route.entry -eq 'scripts/Start-ProxyDoctor.ps1 -Goal Diagnose' -and $route.classify -eq 'Get-ProxyDoctorFaultClass') ('route missed: ' + $sample)
+            Assert-True ($route.goal -eq 'Diagnose' -and $route.entry -eq 'scripts/Start-ProxyDoctor.ps1 -Goal Diagnose' -and $route.classify -eq 'Get-ProxyDoctorFaultClass' -and $route.authorization -eq 'read-only until the user accepts one specific change') ('route missed: ' + $sample)
         }
         foreach ($sample in @($setup, 'help me prepare proxy settings', 'why is my proxy working', '')) {
             $route = Resolve-ProxyDoctorUserRequest $sample

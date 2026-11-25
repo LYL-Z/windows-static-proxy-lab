@@ -160,12 +160,22 @@ function Resolve-ProxyDoctorUserRequest([string]$Text) {
     if ($value -match '(?i)why\s+(?:is|does)\s+(?:my\s+|the\s+)?proxy\s+not\s+(?:work|working)\b') { $fault = $true }
     if ($value -match '(?i)\bproxy\s+(?:is\s+not|isn''t|does\s+not|doesn''t)\s+working\b') { $fault = $true }
     if ($value -match '(?i)\b(?:check|diagnose)\b.{0,48}\bproxy\b.{0,48}\b(?:not working|broken)\b') { $fault = $true }
+    $reopened = -join @([char]0x5DF2, [char]0x7ECF, [char]0x91CD, [char]0x65B0, [char]0x5F00, [char]0x542F)
+    $noTraffic = -join @([char]0x6CA1, [char]0x6709, [char]0x6D41, [char]0x91CF)
+    if ($value.Contains('StarSky') -and $value.Contains('Clash') -and $value.Contains($reopened) -and $value.Contains($noTraffic)) { $fault = $true }
+    $configCheck = -join @([char]0x7535, [char]0x8111, [char]0x7F51, [char]0x7EDC, [char]0x914D, [char]0x7F6E, [char]0x662F, [char]0x5426, [char]0x6B63, [char]0x5E38)
+    if ($value.Contains($configCheck)) { $fault = $true }
+    $networkFault = -join @([char]0x7F51, [char]0x7EDC, [char]0x6545, [char]0x969C)
+    $recoveryPlan = -join @([char]0x6062, [char]0x590D, [char]0x65B9, [char]0x6848)
+    if ($value.Contains($networkFault) -and $value.Contains($recoveryPlan)) { $fault = $true }
+    if ($value -match '(?i)starsky.+clash.+(?:no traffic|without traffic)') { $fault = $true }
     if ($fault) {
         return [pscustomobject][ordered]@{
             goal = 'Diagnose'
             entry = 'scripts/Start-ProxyDoctor.ps1 -Goal Diagnose'
             classify = 'Get-ProxyDoctorFaultClass'
             script = 'scripts/ProxyFaultClass.ps1'
+            authorization = 'read-only until the user accepts one specific change'
         }
     }
     [pscustomobject][ordered]@{
@@ -173,5 +183,6 @@ function Resolve-ProxyDoctorUserRequest([string]$Text) {
         entry = $null
         classify = $null
         script = $null
+        authorization = $null
     }
 }
