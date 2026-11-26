@@ -3,7 +3,10 @@ using Microsoft.Win32;
 
 namespace ProxyDoctor;
 
-public sealed record ListenerFact(int Port, string ProcessName, bool Loopback);
+public sealed record ListenerFact(int Port, string ProcessName, bool Loopback)
+{
+    public bool Ipv4 { get; init; } = true;
+}
 
 public sealed record ProbeFact(string Target, int? StatusCode, long ElapsedMs, string? Error, string PathLabel);
 
@@ -54,7 +57,7 @@ public static class NetworkReader
             return new FaultObservation { InvalidEvidence = true };
 
         var enable = key.GetValue("ProxyEnable");
-        bool? proxyEnabled = enable is int number ? number == 1 : null;
+        bool? proxyEnabled = enable is int number && number is 0 or 1 ? number == 1 : null;
         var server = key.GetValue("ProxyServer") as string;
         var auto = key.GetValue("AutoConfigURL") as string;
         listeners ??= ReadListeners();
@@ -70,7 +73,7 @@ public static class NetworkReader
         var hopExpected = hopOpen == true || clients.Any(name =>
             name.Equals("magicspeed", StringComparison.OrdinalIgnoreCase) ||
             name.Equals("StarSky", StringComparison.OrdinalIgnoreCase));
-        var coreRunning = clients.Any(name => name.Equals("verge-mihomo", StringComparison.OrdinalIgnoreCase));
+        var coreRunning = clients.Any(IsCore);
 
         return new FaultObservation
         {
@@ -98,6 +101,7 @@ public static class NetworkReader
     public static string FormatProxyServer(int enable, string? server)
     {
         if (enable == 0) return "OFF";
+        if (enable != 1) return "UNKNOWN";
         return TryParseLoopback(server, out var text) ? text : "TARGET_OTHER";
     }
 
@@ -115,12 +119,13 @@ public static class NetworkReader
 
     public static ListenerFact? ChooseCore(IReadOnlyList<ListenerFact> listeners, string? proxyServer)
     {
-        var cores = listeners.Where(item => item.ProcessName.Equals("verge-mihomo", StringComparison.OrdinalIgnoreCase)).ToArray();
+        var cores = listeners.Where(item => item.Ipv4 && IsCore(item.ProcessName)).ToArray();
         if (cores.Length == 0) return null;
         if (cores.Length == 1) return cores[0];
         if (!TryParseLoopback(proxyServer, out var selected)) return null;
         var port = int.Parse(selected.Split(':')[1], System.Globalization.CultureInfo.InvariantCulture);
-        return cores.FirstOrDefault(item => item.Port == port);
+        var matching = cores.Where(item => item.Port == port).ToArray();
+        return matching.Length == 1 ? matching[0] : null;
     }
 
     public static bool AutomaticProxySet()
@@ -131,8 +136,15 @@ public static class NetworkReader
 
     public static IReadOnlyList<string> ReadClients()
     {
-        string[] names = ["StarSky", "magicspeed", "clash-verge", "verge-mihomo"];
-        return names.Where(name => Process.GetProcessesByName(name).Length > 0).ToArray();
+        string[] names = ["StarSky", "magicspeed", "clash-verge", "verge-mihomo", "mihomo"];
+        return names.Where(ProcessExists).ToArray();
+    }
+
+    private static bool ProcessExists(string name)
+    {
+        var matches = Process.GetProcessesByName(name);
+        foreach (var process in matches) process.Dispose();
+        return matches.Length > 0;
     }
 
     public static ListenerSnapshot ReadListeners()
@@ -140,7 +152,7 @@ public static class NetworkReader
         var read = ReadLoopbackOwners();
         var rows = read.Rows
             .Where(item => IsProxyProcess(item.ProcessName))
-            .Select(item => new ListenerFact(item.Port, item.ProcessName, true))
+            .Select(item => new ListenerFact(item.Port, item.ProcessName, true) { Ipv4 = item.Ipv4 })
             .Distinct()
             .ToArray();
         return new ListenerSnapshot(rows, read.Complete);
@@ -172,15 +184,18 @@ public static class NetworkReader
     }
 
     private static bool IsProxyProcess(string name) =>
-        name.Equals("verge-mihomo", StringComparison.OrdinalIgnoreCase) ||
-        name.Equals("mihomo", StringComparison.OrdinalIgnoreCase) ||
+        IsCore(name) ||
         name.Equals("magicspeed", StringComparison.OrdinalIgnoreCase) ||
         name.Equals("clash-verge", StringComparison.OrdinalIgnoreCase) ||
         name.Equals("StarSky", StringComparison.OrdinalIgnoreCase);
 
+    private static bool IsCore(string name) =>
+        name.Equals("verge-mihomo", StringComparison.OrdinalIgnoreCase) ||
+        name.Equals("mihomo", StringComparison.OrdinalIgnoreCase);
+
     private static RawListeners ReadLoopbackOwners()
     {
-        var start = new ProcessStartInfo("netstat", "-ano -p tcp")
+        var start = new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "netstat.exe"), "-ano")
         {
             RedirectStandardOutput = true,
             UseShellExecute = false,
@@ -196,7 +211,7 @@ public static class NetworkReader
         }
         if (!read.Wait(1000)) return new RawListeners([], false);
         var output = read.Result;
-        var rows = new List<(int Port, string ProcessName)>();
+        var rows = new List<(int Port, string ProcessName, bool Ipv4)>();
         foreach (var line in output.Split('\n'))
         {
             var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -211,16 +226,16 @@ public static class NetworkReader
             if (!int.TryParse(portText, out var port)) continue;
             if (!int.TryParse(parts[^1], out var pid)) continue;
             string name;
-            try { name = Process.GetProcessById(pid).ProcessName; }
+            try { using var owner = Process.GetProcessById(pid); name = owner.ProcessName; }
             catch { name = "unknown"; }
-            rows.Add((port, name));
+            rows.Add((port, name, local.StartsWith("127.0.0.1:", StringComparison.Ordinal)));
         }
-        return new RawListeners(rows, exited);
+        return new RawListeners(rows, exited && process.ExitCode == 0);
     }
 }
 
 public sealed record ListenerSnapshot(IReadOnlyList<ListenerFact> Rows, bool Complete);
-public sealed record RawListeners(IReadOnlyList<(int Port, string ProcessName)> Rows, bool Complete);
+public sealed record RawListeners(IReadOnlyList<(int Port, string ProcessName, bool Ipv4)> Rows, bool Complete);
 
 public static class HttpsProbe
 {

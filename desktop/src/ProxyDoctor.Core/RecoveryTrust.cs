@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using Microsoft.Win32.SafeHandles;
 
 namespace ProxyDoctor;
@@ -74,15 +75,95 @@ public static class RecoveryTrust
     }
 
     public static bool IsComplete(RecoveryResult result) =>
-        result.ScriptStarted
-        && !result.Cancelled
-        && !result.TimedOut
-        && result.ProcessExit == 0
-        && result.TransactionExit == result.ExpectedTransactionExit
-        && result.ProfileRestored
-        && result.WritesMatch
-        && result.JournalClear
-        && result.LiveUnchanged;
+        Verdict(
+            result.ScriptStarted,
+            result.Cancelled,
+            result.TimedOut,
+            result.ProcessExit,
+            result.TransactionExit,
+            result.ExpectedTransactionExit,
+            result.ProfileRestored,
+            result.WritesMatch,
+            result.JournalClear,
+            result.LiveUnchanged,
+            !string.IsNullOrEmpty(result.Writes),
+            result.Writes);
+
+    public static bool IsComplete(JsonElement result)
+    {
+        if (result.ValueKind != JsonValueKind.Object) return false;
+        if (!TryReadBool(result, "ScriptStarted", out var started)
+            || !TryReadBool(result, "Cancelled", out var cancelled)
+            || !TryReadBool(result, "TimedOut", out var timedOut)
+            || !TryReadBool(result, "ProfileRestored", out var profile)
+            || !TryReadBool(result, "WritesMatch", out var writesMatch)
+            || !TryReadBool(result, "JournalClear", out var journal)
+            || !TryReadBool(result, "LiveUnchanged", out var live)
+            || !TryReadInt32(result, "ProcessExit", out var process)
+            || !TryReadInt32(result, "TransactionExit", out var transaction)
+            || !TryReadInt32(result, "ExpectedTransactionExit", out var expected))
+            return false;
+
+        if (result.EnumerateObject().Any(item => item.Name != "Writes" &&
+            item.Name.Equals("Writes", StringComparison.OrdinalIgnoreCase))) return false;
+        var rawPresent = result.TryGetProperty("Writes", out var writesElement);
+        if (rawPresent && writesElement.ValueKind != JsonValueKind.String) return false;
+        return Verdict(
+            started,
+            cancelled,
+            timedOut,
+            process,
+            transaction,
+            expected,
+            profile,
+            writesMatch,
+            journal,
+            live,
+            rawPresent,
+            rawPresent ? writesElement.GetString() : null);
+    }
+
+    private static bool IsAllowedTransactionExit(int exitCode) =>
+        exitCode is 0 or 32 or 33 or 34 or 40 or 41;
+
+    private static bool Verdict(
+        bool started,
+        bool cancelled,
+        bool timedOut,
+        int process,
+        int transaction,
+        int expected,
+        bool profile,
+        bool writesMatch,
+        bool journal,
+        bool live,
+        bool rawWritesPresent,
+        string? writes)
+    {
+        if (!started || cancelled || timedOut) return false;
+        if (process != 0) return false;
+        if (transaction != expected || !IsAllowedTransactionExit(expected)) return false;
+        if (!profile || !writesMatch || !journal || !live) return false;
+        if (rawWritesPresent && !WritesMatchScenario(writes)) return false;
+        return true;
+    }
+
+    private static bool TryReadBool(JsonElement result, string name, out bool value)
+    {
+        value = false;
+        if (!result.TryGetProperty(name, out var property)) return false;
+        if (property.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) return false;
+        value = property.GetBoolean();
+        return true;
+    }
+
+    private static bool TryReadInt32(JsonElement result, string name, out int value)
+    {
+        value = 0;
+        if (!result.TryGetProperty(name, out var property)) return false;
+        if (property.ValueKind != JsonValueKind.Number) return false;
+        return property.TryGetInt32(out value);
+    }
 }
 
 internal static partial class Native
