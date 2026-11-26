@@ -1,6 +1,8 @@
 # 故障处理手册
 
-先问用户哪个应用出错、何时开始、最近是否操作过设置。保留旧配置和故障证据。使用 `Start-ProxyDoctor.ps1 -Goal Diagnose` 和环境发现，在对应层取证。对「检查我的代理为什么没有正常工作」、「StarSky 已经重新开启，但 Clash 没有流量」、「检查我的电脑网络配置是否正常」、「检查网络故障并提供恢复方案」、「全面检查我的网络」、「StarSky 停止运行了」、「Clash 没有流量」或「检查异常并提供恢复方案」，在该命令之后调用 `scripts/ProxyFaultClass.ps1` 中的 `Get-ProxyDoctorFaultClass`。这些入口只读；用户拒绝某一次具体修改后，诊断继续。「保持原配置，不擅自修改」是明确的不修改意图：保持当前配置，不应用变更。它只对传入的观察分类为 `USER_OFF`、`PROXY_DRIFT`、`CORE_DOWN`、`FIRST_HOP_DOWN`、`ALIGNED` 或 `UNKNOWN`，不修改系统设置。`USER_OFF` 表示用户关闭了代理，不要建议恢复。`ALIGNED` 只表示本地选择与监听一致，不是应用访问成功。An alert or UI status is not proof the network was blocked. 下表的原因均为排查方向，验收随实际证据更新。使用与用户故障相关、获准的公开测试地址。
+先问用户哪个应用出错、何时开始、最近是否操作过设置。保留旧配置和故障证据。用户说「检查我的网络」、「检查我的代理为什么没有正常工作」、「StarSky 已经重新开启，但 Clash 没有流量」、「检查我的电脑网络配置是否正常」、「检查网络故障并提供恢复方案」、「全面检查我的网络」、「StarSky 停止运行了」、「Clash 没有流量」或「检查异常并提供恢复方案」时，使用 `Start-ProxyDoctor.ps1 -Goal Diagnose -Json`。查看 `faultClass`，其依据来自 `scripts/ProxyFaultClass.ps1` 中的 `Get-ProxyDoctorFaultClass`。
+
+「保持原配置，不擅自修改」或「不要修改」表达不修改意图，路由标记为 `no-modify`。用户同时要求检查时执行必要的只读步骤。`USER_OFF` 表示有证据表明用户主动关闭了代理。`OBSERVED_OFF` 表示确实观察到关闭，但意图未知。两种情况均保留当前选择，不要建议恢复代理。`ALIGNED` 表示本地选择与监听一致，实际应用需要独立复验。An alert or UI status is not proof the network was blocked. 下表列出可排查方向，使用与故障相关且获准的公开测试目标。
 
 | 现象 | 必要检测与证据 | 可能原因 | 所需授权与恢复 | 验收 |
 | --- | --- | --- | --- | --- |

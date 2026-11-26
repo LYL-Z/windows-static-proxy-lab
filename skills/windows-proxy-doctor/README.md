@@ -1,11 +1,11 @@
-# Windows Proxy Doctor 2.0.0 RC2
+# CAB Skill · Windows Proxy Doctor 2.0.0 RC2
 
 Windows 10/11 的新手设置向导和网络故障诊断 Skill。RC2 的证据范围及剩余发布门槛见 [验收清单](RELEASE-GATE.md)。
 
 ## 第一次使用
 
-1. 对照随包提供的 SHA-256，再解压。把内层 `windows-proxy-doctor` 整个文件夹复制到 Codex 项目的 `.agents/skills/` 或客户端文档指定的 Skill 目录。确认文件夹内直接包含 `SKILL.md` 和 `scripts/`。重新打开 Codex 会话即可检查发现结果。 [Codex Skills 文档](https://developers.openai.com/codex/skills) · [Agent Skills 目录规范](https://agentskills.io/specification)
-2. 对 Agent 说「用 Windows Proxy Doctor 检查我的网络」或「帮我准备代理设置」。说明现有网络是否有故障即可。Agent 会先用当前权限读取环境，不需要购买软件或服务。
+1. 对照随包提供的 SHA-256，再解压。把内层 `windows-proxy-doctor` 整个文件夹复制到 Codex 项目的 `.agents/skills/` 或客户端文档指定的 Skill 目录。使用源码时可直接复制仓库中的 `skills/windows-proxy-doctor` 目录。确认安装目录内直接包含 `SKILL.md` 和 `scripts/`，然后重新打开 Codex 会话。 [Codex Skills 文档](https://developers.openai.com/codex/skills) · [Agent Skills 目录规范](https://agentskills.io/specification)
+2. 对 Agent 说「用 Windows Proxy Doctor 检查我的网络」或「帮我准备代理设置」。说明现有网络是否有故障即可。Agent 会先用当前权限读取环境。你也可以说「检查我的网络，保持原配置」，只检查已有设置。
 3. 看到需要你操作的步骤时，核对改动、涉及的费用或权限、预期结果和回退方式。拒绝安装或改动后仍可继续诊断。账号、支付和凭据留在服务或客户端自己的界面中处理。 [新手指南](references/getting-started.md)
 
 升级时先停止前台监测，保留原版本文件夹的副本，再把候选装入干净的 Skill 目录。重新加载并跑一次只读检查。需要退回时换回原目录。卸载时停止监测并从客户端移除该 Skill 文件夹，私人检查点或备份按自己的保留计划处理。 [升级、卸载与回退](references/getting-started.md#升级卸载与回退)
@@ -20,6 +20,7 @@ powershell.exe -NoProfile -File .\scripts\Start-ProxyDoctor.ps1 -Goal Diagnose -
 powershell.exe -NoProfile -File .\scripts\Get-ProxyDoctorEnvironment.ps1 -Json
 powershell.exe -NoProfile -File .\tests\Run-Tests.ps1
 powershell.exe -NoProfile -File .\tests\Run-OnboardingTests.ps1
+powershell.exe -NoProfile -File .\tests\Run-FaultClassTests.ps1
 ```
 
 当前环境发现不要求指定端口。旧版的独立 Snapshot 和 Watch 脚本保留自身参数默认值。使用它们前，确认 `-MixedPort` 和可选 `-FirstHopPort` 与本机监听一致。Snapshot 的保存意图来自标准用户配置位置，可执行程序位置、代理规则和应用行为需独立确认。 [环境发现](references/environment-discovery.md)

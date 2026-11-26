@@ -199,7 +199,8 @@ try {
         $required = @(
             'complete-success', 'exit-code-alone', 'decimal-32.5', 'string-true', 'missing-field',
             'extra-write-line', 'writesmatch-true-raw-differs', 'cancelled', 'timed-out',
-            'illegal-expected-99', 'empty-object'
+            'illegal-expected-99', 'empty-object', 'raw-write-changed-case',
+            'wrong-cased-required-field', 'wrong-cased-raw-write-field'
         )
         $seen = @{}
         foreach ($case in @($fixture.cases)) {

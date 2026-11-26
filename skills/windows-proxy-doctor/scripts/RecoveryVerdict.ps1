@@ -3,9 +3,15 @@
   Judges an isolated recovery result. A transaction exit code alone is not success.
   This does not run rollback and does not read the live Windows proxy.
 #>
+function Get-RecoveryProperty {
+    param($Result, [string]$Name)
+    $property = $Result.PSObject.Properties[$Name]
+    if ($null -ne $property -and [string]::Equals($property.Name, $Name, [StringComparison]::Ordinal)) { return $property }
+}
+
 function Test-RecoveryBool {
     param($Result, [string]$Name, $Reasons)
-    $property = $Result.PSObject.Properties[$Name]
+    $property = Get-RecoveryProperty $Result $Name
     if (-not $property) { $Reasons.Add('missing ' + $Name); return $false }
     if ($property.Value -isnot [bool]) { $Reasons.Add('bad type ' + $Name); return $false }
     return [bool]$property.Value
@@ -13,7 +19,7 @@ function Test-RecoveryBool {
 
 function Test-RecoveryInt {
     param($Result, [string]$Name, $Reasons)
-    $property = $Result.PSObject.Properties[$Name]
+    $property = Get-RecoveryProperty $Result $Name
     if (-not $property) { $Reasons.Add('missing ' + $Name); return $null }
     $value = $property.Value
     $parsed = $null
@@ -36,7 +42,7 @@ function Test-ProxyDoctorRecoveryWrites {
     param([string]$Writes)
     if ([string]::IsNullOrEmpty($Writes)) { return $false }
     $lines = @($Writes -split "`r`n|`n|`r" | Where-Object { $_ -ne '' })
-    return ($lines.Count -eq 1 -and $lines[0].Trim() -eq 'enabled=0 server=old:8080')
+    return ($lines.Count -eq 1 -and [string]::Equals($lines[0].Trim(), 'enabled=0 server=old:8080', [StringComparison]::Ordinal))
 }
 
 function Test-ProxyDoctorRecoveryResult {
@@ -63,7 +69,9 @@ function Test-ProxyDoctorRecoveryResult {
             if (-not $profile) { $reasons.Add('profile hash') }
             if (-not $writes) { $reasons.Add('writes') }
             $writesProperty = $Result.PSObject.Properties['Writes']
-            if ($writesProperty) {
+            if ($writesProperty -and -not [string]::Equals($writesProperty.Name, 'Writes', [StringComparison]::Ordinal)) {
+                $reasons.Add('bad name Writes')
+            } elseif ($writesProperty) {
                 $rawWrites = $writesProperty.Value
                 if ($rawWrites -isnot [string] -or -not (Test-ProxyDoctorRecoveryWrites $rawWrites)) {
                     $reasons.Add('raw writes')

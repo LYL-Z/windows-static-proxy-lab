@@ -138,10 +138,11 @@ try {
         $config = (Text 0x68C0,0x67E5,0x6211,0x7684) + (Text 0x7535,0x8111,0x7F51,0x7EDC,0x914D,0x7F6E,0x662F,0x5426,0x6B63,0x5E38)
         $plan = (Text 0x68C0,0x67E5) + (Text 0x7F51,0x7EDC,0x6545,0x969C) + (Text 0x5E76,0x63D0,0x4F9B) + (Text 0x6062,0x590D,0x65B9,0x6848)
         $fullNetwork = Text 0x5168,0x9762,0x68C0,0x67E5,0x6211,0x7684,0x7F51,0x7EDC
+        $network = Text 0x68C0,0x67E5,0x6211,0x7684,0x7F51,0x7EDC
         $stopped = 'StarSky ' + (Text 0x505C,0x6B62,0x8FD0,0x884C,0x4E86)
         $clashQuiet = 'Clash ' + (Text 0x6CA1,0x6709,0x6D41,0x91CF)
         $abnormalPlan = (Text 0x68C0,0x67E5,0x5F02,0x5E38,0x5E76,0x63D0,0x4F9B) + (Text 0x6062,0x590D,0x65B9,0x6848)
-        foreach ($sample in @($exact, $equivalent, 'why isn''t my proxy working', 'why is my proxy not working', $reopened, $config, $plan, 'StarSky is back but Clash has no traffic', $fullNetwork, $stopped, $clashQuiet, $abnormalPlan)) {
+        foreach ($sample in @($exact, $equivalent, 'why isn''t my proxy working', 'why is my proxy not working', $reopened, $config, $plan, 'StarSky is back but Clash has no traffic', $fullNetwork, $network, 'check my network', $stopped, $clashQuiet.ToUpperInvariant(), $abnormalPlan)) {
             $route = Resolve-ProxyDoctorUserRequest $sample
             Assert-True ($route.goal -eq 'Diagnose' -and $route.intent -eq 'diagnose' -and $route.entry -eq 'scripts/Start-ProxyDoctor.ps1 -Goal Diagnose' -and $route.classify -eq 'Get-ProxyDoctorFaultClass' -and $route.authorization -eq 'read-only until the user accepts one specific change') ('route missed: ' + $sample)
         }
@@ -154,6 +155,9 @@ try {
         Assert-True ($held.goal -eq 'NoModify' -and $held.intent -eq 'no-modify' -and $held.authorization -eq 'do-not-modify' -and $null -eq $held.entry -and $null -eq $held.classify -and $null -eq $held.script) 'keep-config sentence was not an explicit no-modify route'
         $heldWithCheck = Resolve-ProxyDoctorUserRequest ($fullNetwork + '，' + $keep)
         Assert-True ($heldWithCheck.goal -eq 'NoModify' -and $heldWithCheck.intent -eq 'no-modify' -and $null -eq $heldWithCheck.classify) 'a do-not-modify sentence was routed into diagnosis'
+        $doNotChange = Text 0x4E0D,0x8981,0x4FEE,0x6539
+        $heldWithCheck = Resolve-ProxyDoctorUserRequest ($network + ', ' + $doNotChange)
+        Assert-True ($heldWithCheck.goal -eq 'NoModify' -and $null -eq $heldWithCheck.entry) 'short do-not-modify wording lost its precedence'
     }
     Check 'docs-point-at-classifier' {
         $skill = Get-Content -LiteralPath (Join-Path $root 'SKILL.md') -Raw -Encoding UTF8

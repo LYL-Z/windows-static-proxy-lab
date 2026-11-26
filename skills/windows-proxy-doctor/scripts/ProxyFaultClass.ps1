@@ -148,7 +148,8 @@ function Resolve-ProxyDoctorUserRequest([string]$Text) {
     $value = if ($null -eq $Text) { '' } else { $Text.Trim() }
     $keepOriginal = -join @([char]0x4FDD, [char]0x6301, [char]0x539F, [char]0x914D, [char]0x7F6E)
     $doNotModify = -join @([char]0x4E0D, [char]0x64C5, [char]0x81EA, [char]0x4FEE, [char]0x6539)
-    if ($value.Contains($keepOriginal) -and $value.Contains($doNotModify)) {
+    $doNotChange = -join @([char]0x4E0D, [char]0x8981, [char]0x4FEE, [char]0x6539)
+    if ($value.Contains($keepOriginal) -or $value.Contains($doNotModify) -or $value.Contains($doNotChange)) {
         return [pscustomobject][ordered]@{
             goal = 'NoModify'
             intent = 'no-modify'
@@ -177,19 +178,20 @@ function Resolve-ProxyDoctorUserRequest([string]$Text) {
     if ($value -match '(?i)\b(?:check|diagnose)\b.{0,48}\bproxy\b.{0,48}\b(?:not working|broken)\b') { $fault = $true }
     $reopened = -join @([char]0x5DF2, [char]0x7ECF, [char]0x91CD, [char]0x65B0, [char]0x5F00, [char]0x542F)
     $noTraffic = -join @([char]0x6CA1, [char]0x6709, [char]0x6D41, [char]0x91CF)
-    if ($value.Contains('StarSky') -and $value.Contains('Clash') -and $value.Contains($reopened) -and $value.Contains($noTraffic)) { $fault = $true }
+    $mentionsStarSky = $value.IndexOf('StarSky', [StringComparison]::OrdinalIgnoreCase) -ge 0
+    $mentionsClash = $value.IndexOf('Clash', [StringComparison]::OrdinalIgnoreCase) -ge 0
+    if ($mentionsStarSky -and $mentionsClash -and $value.Contains($reopened) -and $value.Contains($noTraffic)) { $fault = $true }
     $configCheck = -join @([char]0x7535, [char]0x8111, [char]0x7F51, [char]0x7EDC, [char]0x914D, [char]0x7F6E, [char]0x662F, [char]0x5426, [char]0x6B63, [char]0x5E38)
     if ($value.Contains($configCheck)) { $fault = $true }
     $networkFault = -join @([char]0x7F51, [char]0x7EDC, [char]0x6545, [char]0x969C)
     $recoveryPlan = -join @([char]0x6062, [char]0x590D, [char]0x65B9, [char]0x6848)
     if ($value.Contains($networkFault) -and $value.Contains($recoveryPlan)) { $fault = $true }
     if ($value -match '(?i)starsky.+clash.+(?:no traffic|without traffic)') { $fault = $true }
-    $fullCheck = -join @([char]0x5168, [char]0x9762, [char]0x68C0, [char]0x67E5)
-    $myNetwork = -join @([char]0x6211, [char]0x7684, [char]0x7F51, [char]0x7EDC)
-    if ($value.Contains($fullCheck) -and $value.Contains($myNetwork)) { $fault = $true }
+    $checkMyNetwork = -join @([char]0x68C0, [char]0x67E5, [char]0x6211, [char]0x7684, [char]0x7F51, [char]0x7EDC)
+    if ($value.Contains($checkMyNetwork) -or $value -match '(?i)\bcheck (?:my|the) network\b') { $fault = $true }
     $stopped = -join @([char]0x505C, [char]0x6B62, [char]0x8FD0, [char]0x884C)
-    if ($value.Contains('StarSky') -and $value.Contains($stopped)) { $fault = $true }
-    if ($value.Contains('Clash') -and $value.Contains($noTraffic)) { $fault = $true }
+    if ($mentionsStarSky -and $value.Contains($stopped)) { $fault = $true }
+    if ($mentionsClash -and $value.Contains($noTraffic)) { $fault = $true }
     $checkAbnormal = -join @([char]0x68C0, [char]0x67E5, [char]0x5F02, [char]0x5E38)
     if ($value.Contains($checkAbnormal) -and $value.Contains($recoveryPlan)) { $fault = $true }
     if ($fault) {
