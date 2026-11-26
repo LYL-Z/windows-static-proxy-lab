@@ -56,6 +56,7 @@ try {
     $pending = Get-V4Journal
     if ($pending) {
         if ($pending.corrupt) { Fail 34 'config\transaction.json is corrupt; inspect it before retrying' }
+        if ($pending.preparation) { Fail 34 'snapshot preparation interrupted; review current intent before rollback-v4.ps1 -ResolvePreparation' }
         Fail 34 ('unfinished transaction; run rollback-v4.ps1 -SnapshotDir ' + [string]$pending.data.snapshot)
     }
 
@@ -267,6 +268,7 @@ try {
     }.GetNewClosure()
 
     $ops = [pscustomobject]@{
+        RecordsPreparation = $true
         Snapshot = ({ param($reason) New-V4Snapshot -Reason $reason -Port $s.mixedPort }).GetNewClosure()
         Restore = ({ param($d) Restore-V4Snapshot -SnapshotDir $d -NoProcessControl | Out-Null }).GetNewClosure()
         WriteAtomic = { param($t, $c, $v) Set-V4Atomic -TargetPath $t -Content $c -Validator $v | Out-Null }

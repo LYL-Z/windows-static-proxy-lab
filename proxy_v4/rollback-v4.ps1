@@ -4,11 +4,16 @@
 .EXAMPLE   .\rollback-v4.ps1 -List
            .\rollback-v4.ps1
            .\rollback-v4.ps1 -SnapshotDir .\backup\<stamp>
+           .\rollback-v4.ps1 -ResolvePreparation ResumeClient
+           .\rollback-v4.ps1 -ResolvePreparation KeepCurrent
   Exit: 0 ok, 32 files restored and a user-disabled proxy was left off,
-        33 lock busy, 40 failed, 41 system proxy could not be held.
+        33 lock busy, 34 review pending, 40 failed, 41 proxy selection precludes action.
 #>
 [CmdletBinding()]
-param([string]$SnapshotDir, [switch]$List, [switch]$KeepSystemProxy)
+param(
+    [string]$SnapshotDir, [switch]$List, [switch]$KeepSystemProxy,
+    [ValidateSet('ResumeClient','KeepCurrent')][string]$ResolvePreparation
+)
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'lib\V4.ps1')
 if (-not $List) {
@@ -29,6 +34,11 @@ function Get-RollbackSnapshots {
 }
 
 try {
+    if ($ResolvePreparation -and ($List -or $SnapshotDir -or $PSBoundParameters.ContainsKey('KeepSystemProxy'))) {
+        Write-V4Log '-ResolvePreparation must be used separately' -Level ERROR
+        $exit = 34
+        return
+    }
     if ($List) {
         $all = @(Get-RollbackSnapshots)
         if (-not $all) { Write-V4Log 'no snapshots' -Level WARN; return }
@@ -58,6 +68,27 @@ try {
         $restoreAttempted = $false
         try {
             $journal = Get-V4Journal
+            if ($ResolvePreparation -or ($journal -and $journal.preparation)) {
+                if (-not $ResolvePreparation -or -not $journal -or $journal.corrupt -or -not $journal.preparation) {
+                    Write-V4Log 'review the valid preparation journal before choosing ResumeClient or KeepCurrent' -Level ERROR
+                    $exit = 34
+                    return
+                }
+                if ($ResolvePreparation -eq 'ResumeClient') {
+                    $exit = Resume-V4PreparationClient -Preparation $journal.data
+                    if ($exit -ne 0) {
+                        Write-V4Log 'client resume refused or unverified; preparation journal retained' -Level ERROR
+                        return
+                    }
+                }
+                if (-not (Clear-V4Journal)) {
+                    Write-V4Log 'preparation journal could not be retired' -Level ERROR
+                    $exit = 40
+                    return
+                }
+                Write-V4Log ('snapshot preparation resolved: ' + $ResolvePreparation + '; application paths remain untested') -Level OK
+                return
+            }
             $rollbackJournal = $journal -and -not $journal.corrupt -and $journal.data.reason -eq 'rollback'
             if ($rollbackJournal -and -not $PSBoundParameters.ContainsKey('KeepSystemProxy')) {
                 $KeepSystemProxy = [bool]$journal.data.keepSystemProxy
