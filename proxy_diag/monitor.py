@@ -20,7 +20,7 @@ import socket
 import ssl
 import time
 
-HOST = os.environ.get("PX_HOST", "72.245.197.103")
+HOST = os.environ.get("PX_HOST", "127.0.0.1")
 PORT = int(os.environ.get("PX_PORT", "9506"))
 USER = os.environ.get("PX_USER", "")
 PW = os.environ.get("PX_PASS", "")

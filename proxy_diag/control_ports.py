@@ -6,6 +6,7 @@ open?  If yes, then the 9506 session teardown must come from the remote side.
 Each target is connected, left idle for 4 s, and we record whether the socket
 stays open, gets closed by the peer, or is reset.
 """
+import os
 import socket
 import time
 
@@ -16,7 +17,7 @@ TARGETS = [
     ("223.5.5.5", 53, "AliDNS over TCP"),
     ("114.114.114.114", 53, "114DNS over TCP"),
     ("github.com", 22, "GitHub SSH - sends banner"),
-    ("72.245.197.103", 9506, "TARGET static proxy"),
+    (os.environ["PX_HOST"], 9506, "TARGET static proxy"),
 ]
 
 print("%-22s %-6s %-10s %s" % ("target", "conn", "idle 4s", "verdict/detail"))
