@@ -1,6 +1,6 @@
 # Windows Proxy Doctor 2.0.0 RC2 发布门槛
 
-候选可在隔离项目试用。以 [Draft PR #2](https://github.com/LYL-Z/windows-static-proxy-lab/pull/2) 对应提交的验收记录为准。
+候选可在隔离项目试用。查看 RC2 原始集成与严格恢复契约的变更记录。当前候选以自身的提交与验收结果为准。 [RC2 PR #2](https://github.com/LYL-Z/windows-static-proxy-lab/pull/2) · [恢复契约 PR #6](https://github.com/LYL-Z/windows-static-proxy-lab/pull/6)
 
 | 门槛 | 通过所需证据 |
 | --- | --- |

@@ -1,0 +1,380 @@
+{
+  "cases": [
+    {
+      "name": "complete-success",
+      "completeSuccess": true,
+      "result": {
+        "ScriptStarted": true,
+        "Cancelled": false,
+        "TimedOut": false,
+        "ProcessExit": 0,
+        "TransactionExit": 32,
+        "ExpectedTransactionExit": 32,
+        "ProfileRestored": true,
+        "WritesMatch": true,
+        "JournalClear": true,
+        "LiveUnchanged": true,
+        "Writes": "enabled=0 server=old:8080"
+      }
+    },
+    {
+      "name": "raw-write-changed-case",
+      "completeSuccess": false,
+      "result": {
+        "ScriptStarted": true,
+        "Cancelled": false,
+        "TimedOut": false,
+        "ProcessExit": 0,
+        "TransactionExit": 32,
+        "ExpectedTransactionExit": 32,
+        "ProfileRestored": true,
+        "WritesMatch": true,
+        "JournalClear": true,
+        "LiveUnchanged": true,
+        "Writes": "Enabled=0 server=old:8080"
+      }
+    },
+    {
+      "name": "wrong-cased-required-field",
+      "completeSuccess": false,
+      "result": {
+        "scriptStarted": true,
+        "Cancelled": false,
+        "TimedOut": false,
+        "ProcessExit": 0,
+        "TransactionExit": 32,
+        "ExpectedTransactionExit": 32,
+        "ProfileRestored": true,
+        "WritesMatch": true,
+        "JournalClear": true,
+        "LiveUnchanged": true,
+        "Writes": "enabled=0 server=old:8080"
+      }
+    },
+    {
+      "name": "wrong-cased-raw-write-field",
+      "completeSuccess": false,
+      "result": {
+        "ScriptStarted": true,
+        "Cancelled": false,
+        "TimedOut": false,
+        "ProcessExit": 0,
+        "TransactionExit": 32,
+        "ExpectedTransactionExit": 32,
+        "ProfileRestored": true,
+        "WritesMatch": true,
+        "JournalClear": true,
+        "LiveUnchanged": true,
+        "writes": "enabled=0 server=old:8080"
+      }
+    },
+    {
+      "name": "exit-code-alone",
+      "completeSuccess": false,
+      "result": {
+        "ScriptStarted": true,
+        "Cancelled": false,
+        "TimedOut": false,
+        "ProcessExit": 0,
+        "TransactionExit": 32,
+        "ExpectedTransactionExit": 32,
+        "ProfileRestored": false,
+        "WritesMatch": false,
+        "JournalClear": false,
+        "LiveUnchanged": true
+      }
+    },
+    {
+      "name": "decimal-32.5",
+      "completeSuccess": false,
+      "result": {
+        "ScriptStarted": true,
+        "Cancelled": false,
+        "TimedOut": false,
+        "ProcessExit": 0,
+        "TransactionExit": 32.5,
+        "ExpectedTransactionExit": 32,
+        "ProfileRestored": true,
+        "WritesMatch": true,
+        "JournalClear": true,
+        "LiveUnchanged": true,
+        "Writes": "enabled=0 server=old:8080"
+      }
+    },
+    {
+      "name": "string-true",
+      "completeSuccess": false,
+      "result": {
+        "ScriptStarted": "true",
+        "Cancelled": false,
+        "TimedOut": false,
+        "ProcessExit": 0,
+        "TransactionExit": 32,
+        "ExpectedTransactionExit": 32,
+        "ProfileRestored": true,
+        "WritesMatch": true,
+        "JournalClear": true,
+        "LiveUnchanged": true,
+        "Writes": "enabled=0 server=old:8080"
+      }
+    },
+    {
+      "name": "missing-field",
+      "completeSuccess": false,
+      "result": {
+        "ScriptStarted": true,
+        "Cancelled": false,
+        "TimedOut": false,
+        "ProcessExit": 0,
+        "TransactionExit": 32,
+        "ExpectedTransactionExit": 32,
+        "ProfileRestored": true,
+        "WritesMatch": true,
+        "LiveUnchanged": true,
+        "Writes": "enabled=0 server=old:8080"
+      }
+    },
+    {
+      "name": "extra-write-line",
+      "completeSuccess": false,
+      "result": {
+        "ScriptStarted": true,
+        "Cancelled": false,
+        "TimedOut": false,
+        "ProcessExit": 0,
+        "TransactionExit": 32,
+        "ExpectedTransactionExit": 32,
+        "ProfileRestored": true,
+        "WritesMatch": true,
+        "JournalClear": true,
+        "LiveUnchanged": true,
+        "Writes": "enabled=0 server=old:8080\nenabled=1 server=old:8080"
+      }
+    },
+    {
+      "name": "writesmatch-true-raw-differs",
+      "completeSuccess": false,
+      "result": {
+        "ScriptStarted": true,
+        "Cancelled": false,
+        "TimedOut": false,
+        "ProcessExit": 0,
+        "TransactionExit": 32,
+        "ExpectedTransactionExit": 32,
+        "ProfileRestored": true,
+        "WritesMatch": true,
+        "JournalClear": true,
+        "LiveUnchanged": true,
+        "Writes": "enabled=0 server=other:8080"
+      }
+    },
+    {
+      "name": "cancelled",
+      "completeSuccess": false,
+      "result": {
+        "ScriptStarted": true,
+        "Cancelled": true,
+        "TimedOut": false,
+        "ProcessExit": 0,
+        "TransactionExit": 32,
+        "ExpectedTransactionExit": 32,
+        "ProfileRestored": true,
+        "WritesMatch": true,
+        "JournalClear": true,
+        "LiveUnchanged": true,
+        "Writes": "enabled=0 server=old:8080"
+      }
+    },
+    {
+      "name": "timed-out",
+      "completeSuccess": false,
+      "result": {
+        "ScriptStarted": true,
+        "Cancelled": false,
+        "TimedOut": true,
+        "ProcessExit": 0,
+        "TransactionExit": 32,
+        "ExpectedTransactionExit": 32,
+        "ProfileRestored": true,
+        "WritesMatch": true,
+        "JournalClear": true,
+        "LiveUnchanged": true,
+        "Writes": "enabled=0 server=old:8080"
+      }
+    },
+    {
+      "name": "illegal-expected-99",
+      "completeSuccess": false,
+      "result": {
+        "ScriptStarted": true,
+        "Cancelled": false,
+        "TimedOut": false,
+        "ProcessExit": 0,
+        "TransactionExit": 99,
+        "ExpectedTransactionExit": 99,
+        "ProfileRestored": true,
+        "WritesMatch": true,
+        "JournalClear": true,
+        "LiveUnchanged": true,
+        "Writes": "enabled=0 server=old:8080"
+      }
+    },
+    {
+      "name": "empty-object",
+      "completeSuccess": false,
+      "result": {}
+    },
+    {
+      "name": "success-without-raw-writes",
+      "completeSuccess": true,
+      "result": {
+        "ScriptStarted": true,
+        "Cancelled": false,
+        "TimedOut": false,
+        "ProcessExit": 0,
+        "TransactionExit": 32,
+        "ExpectedTransactionExit": 32,
+        "ProfileRestored": true,
+        "WritesMatch": true,
+        "JournalClear": true,
+        "LiveUnchanged": true
+      }
+    },
+    {
+      "name": "trailing-newline-write",
+      "completeSuccess": true,
+      "result": {
+        "ScriptStarted": true,
+        "Cancelled": false,
+        "TimedOut": false,
+        "ProcessExit": 0,
+        "TransactionExit": 32,
+        "ExpectedTransactionExit": 32,
+        "ProfileRestored": true,
+        "WritesMatch": true,
+        "JournalClear": true,
+        "LiveUnchanged": true,
+        "Writes": "enabled=0 server=old:8080\r\n"
+      }
+    },
+    {
+      "name": "allowed-expected-0",
+      "completeSuccess": true,
+      "result": {
+        "ScriptStarted": true,
+        "Cancelled": false,
+        "TimedOut": false,
+        "ProcessExit": 0,
+        "TransactionExit": 0,
+        "ExpectedTransactionExit": 0,
+        "ProfileRestored": true,
+        "WritesMatch": true,
+        "JournalClear": true,
+        "LiveUnchanged": true,
+        "Writes": "enabled=0 server=old:8080"
+      }
+    },
+    {
+      "name": "allowed-expected-33",
+      "completeSuccess": true,
+      "result": {
+        "ScriptStarted": true,
+        "Cancelled": false,
+        "TimedOut": false,
+        "ProcessExit": 0,
+        "TransactionExit": 33,
+        "ExpectedTransactionExit": 33,
+        "ProfileRestored": true,
+        "WritesMatch": true,
+        "JournalClear": true,
+        "LiveUnchanged": true,
+        "Writes": "enabled=0 server=old:8080"
+      }
+    },
+    {
+      "name": "allowed-expected-34",
+      "completeSuccess": true,
+      "result": {
+        "ScriptStarted": true,
+        "Cancelled": false,
+        "TimedOut": false,
+        "ProcessExit": 0,
+        "TransactionExit": 34,
+        "ExpectedTransactionExit": 34,
+        "ProfileRestored": true,
+        "WritesMatch": true,
+        "JournalClear": true,
+        "LiveUnchanged": true,
+        "Writes": "enabled=0 server=old:8080"
+      }
+    },
+    {
+      "name": "allowed-expected-40",
+      "completeSuccess": true,
+      "result": {
+        "ScriptStarted": true,
+        "Cancelled": false,
+        "TimedOut": false,
+        "ProcessExit": 0,
+        "TransactionExit": 40,
+        "ExpectedTransactionExit": 40,
+        "ProfileRestored": true,
+        "WritesMatch": true,
+        "JournalClear": true,
+        "LiveUnchanged": true,
+        "Writes": "enabled=0 server=old:8080"
+      }
+    },
+    {
+      "name": "allowed-expected-41",
+      "completeSuccess": true,
+      "result": {
+        "ScriptStarted": true,
+        "Cancelled": false,
+        "TimedOut": false,
+        "ProcessExit": 0,
+        "TransactionExit": 41,
+        "ExpectedTransactionExit": 41,
+        "ProfileRestored": true,
+        "WritesMatch": true,
+        "JournalClear": true,
+        "LiveUnchanged": true,
+        "Writes": "enabled=0 server=old:8080"
+      }
+    },
+    {
+      "name": "outside-int32",
+      "completeSuccess": false,
+      "result": {
+        "ScriptStarted": true,
+        "Cancelled": false,
+        "TimedOut": false,
+        "ProcessExit": 0,
+        "TransactionExit": 4294967328,
+        "ExpectedTransactionExit": 4294967328,
+        "ProfileRestored": true,
+        "WritesMatch": true,
+        "JournalClear": true,
+        "LiveUnchanged": true,
+        "Writes": "enabled=0 server=old:8080"
+      }
+    },
+    {
+      "name": "raw-ok-flag-false",
+      "completeSuccess": false,
+      "result": {
+        "ScriptStarted": true,
+        "Cancelled": false,
+        "TimedOut": false,
+        "ProcessExit": 0,
+        "TransactionExit": 32,
+        "ExpectedTransactionExit": 32,
+        "ProfileRestored": true,
+        "WritesMatch": false,
+        "JournalClear": true,
+        "LiveUnchanged": true,
+        "Writes": "enabled=0 server=old:8080"
+      }
+    }
+  ]
+}
