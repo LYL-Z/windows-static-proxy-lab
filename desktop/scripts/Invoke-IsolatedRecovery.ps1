@@ -130,7 +130,8 @@ $saved = $ErrorActionPreference
 $ErrorActionPreference = 'Continue'
 Trace 'child-begin'
 try {
-    $output = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $copied -SnapshotDir $snap 2>&1
+    $nativePowerShell = Join-Path ([Environment]::SystemDirectory) 'WindowsPowerShell\v1.0\powershell.exe'
+    $output = & $nativePowerShell -NoProfile -ExecutionPolicy Bypass -File $copied -SnapshotDir $snap 2>&1
     $code = $LASTEXITCODE
 }
 finally {
