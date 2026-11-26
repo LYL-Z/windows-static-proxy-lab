@@ -16,9 +16,20 @@ function Test-RecoveryInt {
     $property = $Result.PSObject.Properties[$Name]
     if (-not $property) { $Reasons.Add('missing ' + $Name); return $null }
     $value = $property.Value
-    if ($value -is [string] -or $value -is [bool] -or $value -is [array]) { $Reasons.Add('bad type ' + $Name); return $null }
-    if ($value -isnot [int] -and $value -isnot [long] -and $value -isnot [decimal]) { $Reasons.Add('bad type ' + $Name); return $null }
-    return [int]$value
+    $parsed = $null
+    $integral = $false
+    if ($value -is [int]) {
+        $parsed = $value
+        $integral = $true
+    }
+    elseif ($value -is [long]) {
+        if ($value -ge [int64][int]::MinValue -and $value -le [int64][int]::MaxValue) {
+            $parsed = [int]$value
+            $integral = $true
+        }
+    }
+    if (-not $integral) { $Reasons.Add('bad type ' + $Name); return $null }
+    return $parsed
 }
 
 function Test-ProxyDoctorRecoveryWrites {
@@ -48,9 +59,16 @@ function Test-ProxyDoctorRecoveryResult {
             if ($cancelled) { $reasons.Add('cancelled') }
             if ($timedOut) { $reasons.Add('timed out') }
             if ($process -ne 0) { $reasons.Add('wrapper exit') }
-            if ($null -eq $transaction -or $null -eq $expected -or $transaction -ne $expected) { $reasons.Add('transaction exit') }
+            if (($expected -notin @(0, 32, 33, 34, 40, 41)) -or ($transaction -ne $expected)) { $reasons.Add('transaction exit') }
             if (-not $profile) { $reasons.Add('profile hash') }
             if (-not $writes) { $reasons.Add('writes') }
+            $writesProperty = $Result.PSObject.Properties['Writes']
+            if ($writesProperty) {
+                $rawWrites = $writesProperty.Value
+                if ($rawWrites -isnot [string] -or -not (Test-ProxyDoctorRecoveryWrites $rawWrites)) {
+                    $reasons.Add('raw writes')
+                }
+            }
             if (-not $journal) { $reasons.Add('journal') }
             if (-not $live) { $reasons.Add('live proxy') }
         }
