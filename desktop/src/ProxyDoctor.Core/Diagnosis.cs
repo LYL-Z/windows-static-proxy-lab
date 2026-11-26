@@ -110,7 +110,8 @@ public static class RequestRouter
     {
         var value = (text ?? "").Trim();
         return value.Contains("保持原配置", StringComparison.Ordinal)
-            && value.Contains("不擅自修改", StringComparison.Ordinal);
+            || value.Contains("不擅自修改", StringComparison.Ordinal)
+            || value.Contains("不要修改", StringComparison.Ordinal);
     }
 
     public static bool IsDiagnoseRequest(string? text)
@@ -132,7 +133,7 @@ public static class RequestRouter
             return true;
         if (value.Contains("网络故障", StringComparison.Ordinal) && value.Contains("恢复方案", StringComparison.Ordinal))
             return true;
-        if (value.Contains("全面检查", StringComparison.Ordinal) && value.Contains("我的网络", StringComparison.Ordinal))
+        if (value.Contains("检查我的网络", StringComparison.Ordinal))
             return true;
         if (value.Contains("StarSky", StringComparison.OrdinalIgnoreCase) && value.Contains("停止运行", StringComparison.Ordinal))
             return true;
@@ -140,6 +141,7 @@ public static class RequestRouter
             return true;
         if (value.Contains("检查异常", StringComparison.Ordinal) && value.Contains("恢复方案", StringComparison.Ordinal))
             return true;
-        return false;
+        return System.Text.RegularExpressions.Regex.IsMatch(value, @"\bcheck (?:my|the) network\b|why\s+(?:isn't|is not|doesn't|does not)\s+(?:my\s+|the\s+)?proxy\s+(?:work|working)\b|why\s+(?:is|does)\s+(?:my\s+|the\s+)?proxy\s+not\s+(?:work|working)\b|\bproxy\s+(?:is\s+not|isn't|does\s+not|doesn't)\s+working\b|\b(?:check|diagnose)\b.{0,48}\bproxy\b.{0,48}\b(?:not working|broken)\b|starsky.+clash.+(?:no traffic|without traffic)",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
     }
 }

@@ -104,6 +104,8 @@ public static class RecoveryTrust
             || !TryReadInt32(result, "ExpectedTransactionExit", out var expected))
             return false;
 
+        if (result.EnumerateObject().Any(item => item.Name != "Writes" &&
+            item.Name.Equals("Writes", StringComparison.OrdinalIgnoreCase))) return false;
         var rawPresent = result.TryGetProperty("Writes", out var writesElement);
         if (rawPresent && writesElement.ValueKind != JsonValueKind.String) return false;
         return Verdict(

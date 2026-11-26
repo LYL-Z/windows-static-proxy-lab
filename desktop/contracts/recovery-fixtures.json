@@ -18,6 +18,57 @@
       }
     },
     {
+      "name": "raw-write-changed-case",
+      "completeSuccess": false,
+      "result": {
+        "ScriptStarted": true,
+        "Cancelled": false,
+        "TimedOut": false,
+        "ProcessExit": 0,
+        "TransactionExit": 32,
+        "ExpectedTransactionExit": 32,
+        "ProfileRestored": true,
+        "WritesMatch": true,
+        "JournalClear": true,
+        "LiveUnchanged": true,
+        "Writes": "Enabled=0 server=old:8080"
+      }
+    },
+    {
+      "name": "wrong-cased-required-field",
+      "completeSuccess": false,
+      "result": {
+        "scriptStarted": true,
+        "Cancelled": false,
+        "TimedOut": false,
+        "ProcessExit": 0,
+        "TransactionExit": 32,
+        "ExpectedTransactionExit": 32,
+        "ProfileRestored": true,
+        "WritesMatch": true,
+        "JournalClear": true,
+        "LiveUnchanged": true,
+        "Writes": "enabled=0 server=old:8080"
+      }
+    },
+    {
+      "name": "wrong-cased-raw-write-field",
+      "completeSuccess": false,
+      "result": {
+        "ScriptStarted": true,
+        "Cancelled": false,
+        "TimedOut": false,
+        "ProcessExit": 0,
+        "TransactionExit": 32,
+        "ExpectedTransactionExit": 32,
+        "ProfileRestored": true,
+        "WritesMatch": true,
+        "JournalClear": true,
+        "LiveUnchanged": true,
+        "writes": "enabled=0 server=old:8080"
+      }
+    },
+    {
       "name": "exit-code-alone",
       "completeSuccess": false,
       "result": {

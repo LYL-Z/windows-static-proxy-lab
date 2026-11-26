@@ -97,7 +97,8 @@ public static class IsolatedRecovery
             if (RecoveryTrust.IsReparsePoint(work) || !RecoveryTrust.ContainedAfterResolve(Path.GetTempPath(), work))
                 return RecoveryResult.Refused("临时目录没有通过包含关系和重解析点检查。没有启动脚本。") with { LiveUnchanged = true };
 
-            var start = new ProcessStartInfo("powershell.exe")
+            var shell = Path.Combine(Environment.SystemDirectory, "WindowsPowerShell", "v1.0", "powershell.exe");
+            var start = new ProcessStartInfo(shell)
             {
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
@@ -106,7 +107,8 @@ public static class IsolatedRecovery
             };
             foreach (var key in start.Environment.Keys.Where(item =>
                          item.StartsWith("V4_", StringComparison.OrdinalIgnoreCase) ||
-                         item.Equals("PROXY_DOCTOR_ENGINE", StringComparison.OrdinalIgnoreCase)).ToArray())
+                         item.Equals("PROXY_DOCTOR_ENGINE", StringComparison.OrdinalIgnoreCase) ||
+                         item.Equals("PSModulePath", StringComparison.OrdinalIgnoreCase)).ToArray())
                 start.Environment.Remove(key);
             start.Environment["V4_TEST_MODE"] = "1";
             start.ArgumentList.Add("-NoProfile");

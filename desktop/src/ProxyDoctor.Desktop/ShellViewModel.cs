@@ -1,5 +1,8 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.Net.NetworkInformation;
 using System.Text.Json;
+using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ProxyDoctor;
@@ -29,16 +32,16 @@ public partial class ShellViewModel : ObservableObject
     [ObservableProperty] private string _upstreamLine = "上游通道还没有采样。本地监听正常不等于上游可用。";
     [ObservableProperty] private string _clientLine = "还没有把进程、监听和上游放在一起看。";
 
-    private readonly AlertGate _alerts = new();
     public ObservableCollection<CheckRow> Checks { get; } = new();
     public event Action<string>? AlertRequested;
 
-    private readonly PeriodicTimer _timer = new(TimeSpan.FromSeconds(20));
-    private readonly PeriodicTimer _upstreamTimer = new(TimeSpan.FromSeconds(90));
+    private readonly Dispatcher _dispatcher = Dispatcher.CurrentDispatcher;
+    private readonly DispatcherTimer _refresh = new() { Interval = TimeSpan.FromSeconds(1) };
     private readonly CancellationTokenSource _monitorStop = new();
-    private readonly FaultStreak _upstreamStreak = new();
-    private ChannelSample? _localSample;
-    private ChannelSample? _upstreamSample;
+    private MonitorEngine _monitorEngine = new();
+    private DiagnosticReport? _latestLocal;
+    private int _monitorStarted;
+    private int _networkChangePending;
     private int _busyGate;
     private int _epoch;
 
@@ -51,6 +54,11 @@ public partial class ShellViewModel : ObservableObject
         Summary = value ? "演示数据，不是这台电脑的实时结果。上一次实时结果已清除。" : "已离开演示。上一次结果已清除。";
         Proxy = Clients = Listeners = Probes = Capabilities = Events = "—";
         Checks.Clear();
+        _latestLocal = null;
+        _monitorEngine = new MonitorEngine();
+        if (Volatile.Read(ref _monitorStarted) == 1 && !value && !Paused)
+            _monitorEngine.Start(DateTimeOffset.Now);
+        RenderChannels();
         Advice = "等待新的采样。";
         Sampled = false;
         ClientLine = value
@@ -63,6 +71,14 @@ public partial class ShellViewModel : ObservableObject
 
     partial void OnPausedChanged(bool value)
     {
+        Interlocked.Increment(ref _epoch);
+        if (!Demo && Volatile.Read(ref _monitorStarted) == 1)
+        {
+            if (value) _monitorEngine.Pause(DateTimeOffset.Now);
+            else _monitorEngine.Start(DateTimeOffset.Now);
+        }
+        PersistEvent(value ? "监测已暂停。" : "监测已继续。");
+        RenderChannels();
         OnPropertyChanged(nameof(ModeLabel));
         OnPropertyChanged(nameof(PauseLabel));
     }
@@ -76,102 +92,83 @@ public partial class ShellViewModel : ObservableObject
 
     public void StartMonitor()
     {
-        Monitor = "监测运行中。本地状态每 20 秒读一次。上游 HTTPS 每 90 秒单独采样，失败会单独告警。";
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                while (await _timer.WaitForNextTickAsync(_monitorStop.Token))
-                {
-                    if (Paused || Demo) continue;
-                    if (Interlocked.Exchange(ref _busyGate, 1) == 1) continue;
-                    try
-                    {
-                        var report = DiagnosticEngine.ReadLocal(persistEvent: false);
-                        var key = report.Fault.Class + "|" + report.ProxySelection;
-                        var notify = _alerts.ShouldNotify(key);
-                        var seen = Volatile.Read(ref _epoch);
-                        System.Windows.Application.Current?.Dispatcher.Invoke(() =>
-                        {
-                            if (!SampleGate.Accept(seen, Volatile.Read(ref _epoch), Paused, Demo)) return;
-                            Apply(report, replaceRemote: false);
-                            NoteLocal(report);
-                            if (notify) AlertRequested?.Invoke("状态变为 " + report.Fault.Class + "。这是 20 秒轮询，不是瞬时发现。监听正常不等于上游可用。");
-                        });
-                    }
-                    catch (OperationCanceledException) { break; }
-                    catch (Exception ex)
-                    {
-                        System.Windows.Application.Current?.Dispatcher.Invoke(() =>
-                        {
-                            Monitor = "监测失败：" + ex.GetType().Name + "。上一次完整检查已保留，但不能当成当前正常。";
-                            _localSample = FailedChannel("local", "本地心跳", TimeSpan.FromSeconds(20), TimeSpan.FromSeconds(60), ex.GetType().Name);
-                            RenderChannels();
-                        });
-                    }
-                    finally { Interlocked.Exchange(ref _busyGate, 0); }
-                }
-            }
-            catch (OperationCanceledException) { }
-        });
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                while (await _upstreamTimer.WaitForNextTickAsync(_monitorStop.Token))
-                {
-                    if (Paused || Demo) continue;
-                    if (Interlocked.Exchange(ref _busyGate, 1) == 1) continue;
-                    try
-                    {
-                        var started = DateTimeOffset.Now;
-                        var check = await CheckRunner.RunOne("https", _monitorStop.Token);
-                        var failed = check.State != EvidenceState.Verified;
-                        var kind = _upstreamStreak.Observe(failed ? check.Detail : null);
-                        var seen = Volatile.Read(ref _epoch);
-                        System.Windows.Application.Current?.Dispatcher.Invoke(() =>
-                        {
-                            if (!SampleGate.Accept(seen, Volatile.Read(ref _epoch), Paused, Demo)) return;
-                            _upstreamSample = new ChannelSample("upstream", "上游 HTTPS", check.SampledAt,
-                                TimeSpan.FromSeconds(90), TimeSpan.FromSeconds(180), check.State,
-                                check.Detail + "。采样耗时计入检查结果。", failed ? check.Detail : null);
-                            UpstreamLine = check.State + "  " + check.SampledAt.ToString("HH:mm:ss") + "  " + check.Detail
-                                + "。连续失败 " + _upstreamStreak.Consecutive + "，抖动 " + _upstreamStreak.Flaps + "，这次是 " + kind + "。";
-                            RenderChannels();
-                            if (failed && kind == "new")
-                            {
-                                Monitor = "上游通道失败。本地监听即使仍在，也不能显示成正常。相同失败不会每个周期重复通知。";
-                                AlertRequested?.Invoke("上游 HTTPS 失败。这不是本地心跳。90 秒采样看不到更短的中断。");
-                            }
-                            else if (failed)
-                            {
-                                Monitor = "上游通道仍失败。这是重复失败，不再重复通知。本地监听不能显示成正常。";
-                            }
-                            else Monitor = "上游通道 " + check.SampledAt.ToString("HH:mm:ss") + " 有响应。一次响应不是应用已恢复。从发起到返回约 " + (DateTimeOffset.Now - started).TotalMilliseconds.ToString("0") + " ms。";
-                        });
-                    }
-                    catch (OperationCanceledException) { break; }
-                    catch (Exception ex)
-                    {
-                        System.Windows.Application.Current?.Dispatcher.Invoke(() =>
-                        {
-                            Monitor = "上游监测失败：" + ex.GetType().Name + "。不能把上一次成功当成当前正常。";
-                            _upstreamSample = FailedChannel("upstream", "上游 HTTPS", TimeSpan.FromSeconds(90), TimeSpan.FromSeconds(180), ex.GetType().Name);
-                            RenderChannels();
-                        });
-                    }
-                    finally { Interlocked.Exchange(ref _busyGate, 0); }
-                }
-            }
-            catch (OperationCanceledException) { }
-        });
+        if (Interlocked.CompareExchange(ref _monitorStarted, 1, 0) != 0) return;
+        if (!Paused && !Demo) _monitorEngine.Start(DateTimeOffset.Now);
+        _refresh.Tick += RefreshMonitor;
+        _refresh.Start();
+        NetworkChange.NetworkAddressChanged += NetworkAddressChanged;
+        _ = PollAsync(MonitorEngine.LocalHeartbeat, SampleLocalAsync);
+        _ = PollAsync(MonitorEngine.UpstreamHttps, SampleHttpsAsync);
+        Monitor = "本地每 20 秒采样。地址变化会提示补测。上游 HTTPS 每 90 秒采样。协议检查按需执行。";
+        PersistEvent("监测已开始。");
     }
 
     public void StopMonitor()
     {
+        if (Interlocked.CompareExchange(ref _monitorStarted, 2, 1) != 1) return;
+        Interlocked.Increment(ref _epoch);
+        NetworkChange.NetworkAddressChanged -= NetworkAddressChanged;
+        _refresh.Stop();
+        _refresh.Tick -= RefreshMonitor;
+        _monitorEngine.Stop(DateTimeOffset.Now);
         _monitorStop.Cancel();
-        _timer.Dispose();
-        _upstreamTimer.Dispose();
+        PersistEvent("监测已停止。");
+    }
+
+    private void NetworkAddressChanged(object? sender, EventArgs e) =>
+        Interlocked.Exchange(ref _networkChangePending, 1);
+
+    private async void RefreshMonitor(object? sender, EventArgs e)
+    {
+        RenderChannels();
+        if (Paused || Demo || Busy || Volatile.Read(ref _monitorStarted) != 1 ||
+            Interlocked.Exchange(ref _networkChangePending, 0) == 0) return;
+        await SampleLocalAsync();
+    }
+
+    private async Task PollAsync(MonitorChannelDefinition channel, Func<Task> sample)
+    {
+        using var timer = new PeriodicTimer(channel.Interval);
+        try
+        {
+            while (await timer.WaitForNextTickAsync(_monitorStop.Token))
+                await sample();
+        }
+        catch (OperationCanceledException) when (_monitorStop.IsCancellationRequested) { }
+    }
+
+    private bool CanPublish(int epoch) => Volatile.Read(ref _monitorStarted) == 1 &&
+        SampleGate.Accept(epoch, Volatile.Read(ref _epoch), Paused, Demo);
+
+    private async Task SampleLocalAsync() =>
+        await SampleAsync(MonitorEngine.LocalChannelId, async (epoch, watch) =>
+        {
+            var report = await Task.Run(() => DiagnosticEngine.ReadLocal(persistEvent: false), _monitorStop.Token);
+            if (!CanPublish(epoch)) return;
+            Apply(report, replaceRemote: false);
+            NoteLocal(report, watch.Elapsed);
+        });
+
+    private async Task SampleHttpsAsync() =>
+        await SampleAsync(MonitorEngine.UpstreamChannelId, async (epoch, watch) =>
+        {
+            var check = await CheckRunner.RunOne("https", _monitorStop.Token);
+            if (CanPublish(epoch)) NoteHttps(check, watch.Elapsed);
+        });
+
+    private async Task SampleAsync(string channel, Func<int, Stopwatch, Task> sample)
+    {
+        var epoch = Volatile.Read(ref _epoch);
+        if (!CanPublish(epoch) || Interlocked.Exchange(ref _busyGate, 1) == 1) return;
+        var watch = Stopwatch.StartNew();
+        try { await sample(epoch, watch); }
+        catch (OperationCanceledException) when (_monitorStop.IsCancellationRequested) { }
+        catch (Exception ex)
+        {
+            if (CanPublish(epoch))
+                Record(channel, new MonitorSample(EvidenceState.Fault, "采样失败", ex.GetType().Name, watch.Elapsed), DateTimeOffset.Now);
+        }
+        finally { Interlocked.Exchange(ref _busyGate, 0); }
     }
 
     [RelayCommand]
@@ -193,8 +190,11 @@ public partial class ShellViewModel : ObservableObject
         var demo = Demo;
         try
         {
-            var report = demo ? DiagnosticEngine.Demo() : DiagnosticEngine.ReadLocal();
-            var checks = demo ? Array.Empty<CheckResult>() : await CheckRunner.RunAll(CancellationToken.None);
+            var watch = Stopwatch.StartNew();
+            var report = demo ? DiagnosticEngine.Demo() : await Task.Run(() => DiagnosticEngine.ReadLocal(), _monitorStop.Token);
+            var localLatency = watch.Elapsed;
+            var checks = demo ? Array.Empty<CheckResult>() :
+                await Task.Run(() => CheckRunner.RunAll(_monitorStop.Token), _monitorStop.Token);
             if (!SampleGate.Accept(seen, Volatile.Read(ref _epoch), false, false) || Demo != demo) return;
             Apply(report, replaceRemote: true);
             ReplaceChecks(checks);
@@ -204,14 +204,10 @@ public partial class ShellViewModel : ObservableObject
                     .Select(item => item.Name + "  " + item.Detail));
                 Capabilities = string.Join("\n", checks.Select(item => item.State + "  " + item.Name + "：" + item.Detail));
                 var https = checks.FirstOrDefault(item => item.Id == "https");
-                if (https is not null)
-                {
-                    var failed = https.State != EvidenceState.Verified;
-                    _upstreamStreak.Observe(failed ? https.Detail : null);
-                    _upstreamSample = new ChannelSample("upstream", "上游 HTTPS", https.SampledAt, TimeSpan.FromSeconds(90), TimeSpan.FromSeconds(180), https.State, https.Detail, failed ? https.Detail : null);
-                    UpstreamLine = https.State + "  " + https.SampledAt.ToString("HH:mm:ss") + "  " + https.Detail;
-                }
-                NoteLocal(report);
+                if (https is not null && https.Elapsed is { } elapsed) NoteHttps(https, elapsed);
+                NoteLocal(report, localLatency);
+                Record(MonitorEngine.ProtocolChannelId, new MonitorSample(EvidenceState.Partial,
+                    "协议样本请逐项查看。", null, watch.Elapsed - localLatency), DateTimeOffset.Now);
             }
         }
         catch (Exception ex)
@@ -230,19 +226,18 @@ public partial class ShellViewModel : ObservableObject
     [RelayCommand]
     private void PreviewRecovery()
     {
-        var process = !Demo && Clients.Contains("StarSky", StringComparison.OrdinalIgnoreCase);
-        var port = !Demo && Listeners.Contains("verge-mihomo", StringComparison.OrdinalIgnoreCase);
-        bool? upstream = _upstreamSample is null ? null : _upstreamSample.State == EvidenceState.Verified;
+        var process = !Demo && _latestLocal?.Observation.CoreRunning == true;
+        var port = !Demo && _latestLocal?.Observation.MixedPortOpen == true;
         RecoveryLog = IsolatedRecovery.Preview(
             Enum.TryParse<FaultClass>(Status, out var fault) ? fault : FaultClass.Unknown,
-            IntentStore.Read() == true, process, port, upstream);
+            IntentStore.Read() == true, process, port, null);
         Section = "recovery";
     }
 
     [RelayCommand]
     private async Task RunIsolatedRecoveryAsync()
     {
-        if (Busy || Interlocked.Exchange(ref _busyGate, 1) == 1) return;
+        if (Demo || Busy || Interlocked.Exchange(ref _busyGate, 1) == 1) return;
         Busy = true;
         Interlocked.Increment(ref _epoch);
         Section = "recovery";
@@ -273,9 +268,12 @@ public partial class ShellViewModel : ObservableObject
         if (Demo || Busy || string.IsNullOrWhiteSpace(id)) return;
         if (Interlocked.Exchange(ref _busyGate, 1) == 1) return;
         Busy = true;
+        var epoch = Volatile.Read(ref _epoch);
+        var watch = Stopwatch.StartNew();
         try
         {
-            var result = await CheckRunner.RunOne(id, CancellationToken.None);
+            var result = await Task.Run(() => CheckRunner.RunOne(id, _monitorStop.Token), _monitorStop.Token);
+            if (!SampleGate.Accept(epoch, Volatile.Read(ref _epoch), false, Demo)) return;
             var row = new CheckRow(result.Id, result.Name, result.State.ToString(), result.State + "  " + result.SampledAt.ToString("HH:mm:ss"), result.Method + " " + result.Detail, result.Purpose);
             var index = Checks.ToList().FindIndex(item => item.Id == id);
             if (index >= 0) Checks[index] = row;
@@ -284,16 +282,15 @@ public partial class ShellViewModel : ObservableObject
                 Proxy = result.State + "  " + result.SampledAt.ToString("HH:mm:ss") + "  " + result.Detail;
             if (id == "listeners")
                 Listeners = result.State + "  " + result.SampledAt.ToString("HH:mm:ss") + "  " + result.Detail;
-            if (id == "https")
-            {
-                UpstreamLine = result.State + "  " + result.SampledAt.ToString("HH:mm:ss") + "  " + result.Detail;
-                _upstreamSample = new ChannelSample("upstream", "上游 HTTPS", result.SampledAt, TimeSpan.FromSeconds(90), TimeSpan.FromSeconds(180), result.State, result.Detail, result.State == EvidenceState.Verified ? null : result.Detail);
-                RenderChannels();
-            }
-            EventLog.Append("重测 " + result.Name + "：" + result.State + "。");
-            Events = FormatEvents(EventLog.Recent());
+            if (id == "https") NoteHttps(result, result.Elapsed ?? watch.Elapsed);
+            if (id is "ipv4" or "ipv6" or "udp" or "dns" or "doh" or "webrtc")
+                Record(MonitorEngine.ProtocolChannelId,
+                    new MonitorSample(result.State, result.Name + "。逐项证据见检查页。", null, watch.Elapsed), result.SampledAt);
+            PersistEvent("重测 " + result.Name + " " + result.State + "。");
             RenderClientLine();
         }
+        catch (OperationCanceledException) when (_monitorStop.IsCancellationRequested) { }
+        catch (Exception ex) { PersistEvent("检查失败 " + ex.GetType().Name + "。"); }
         finally
         {
             Busy = false;
@@ -304,6 +301,7 @@ public partial class ShellViewModel : ObservableObject
     [RelayCommand]
     private async Task RecordOffAsync()
     {
+        if (Demo) return;
         IntentStore.Write(true);
         EventLog.Append("用户在本程序里记录了关闭代理的意图。没有改 Windows 代理。");
         await DiagnoseAsync();
@@ -312,6 +310,7 @@ public partial class ShellViewModel : ObservableObject
     [RelayCommand]
     private async Task ClearIntentAsync()
     {
+        if (Demo) return;
         IntentStore.Clear();
         EventLog.Append("用户清除了本程序里的关闭记录。没有改 Windows 代理。");
         await DiagnoseAsync();
@@ -319,6 +318,7 @@ public partial class ShellViewModel : ObservableObject
 
     private void Apply(DiagnosticReport report, bool replaceRemote)
     {
+        _latestLocal = report.Demo ? null : report;
         Sampled = true;
         Status = report.Fault.Class.ToString();
         Advice = report.Fault.Advice;
@@ -351,28 +351,63 @@ public partial class ShellViewModel : ObservableObject
             Checks.Add(new CheckRow(item.Id, item.Name, item.State.ToString(), item.State + "  " + item.SampledAt.ToString("HH:mm:ss"), item.Method + " " + item.Detail, item.Purpose));
     }
 
-    private void NoteLocal(DiagnosticReport report)
+    private void NoteLocal(DiagnosticReport report, TimeSpan elapsed)
     {
-        var failed = report.Capabilities.Any(item => item.Name == "本地心跳" && item.State == EvidenceState.Unknown);
-        _localSample = new ChannelSample("local", "本地心跳", report.SampledAt, TimeSpan.FromSeconds(20), TimeSpan.FromSeconds(60),
-            failed ? EvidenceState.Unknown : EvidenceState.Partial,
-            report.Fault.Class + " " + report.ProxySelection, failed ? "监听读取不完整" : null);
-        RenderChannels();
+        var fault = report.Fault.Class;
+        var failure = fault is FaultClass.ProxyDrift or FaultClass.CoreDown or FaultClass.FirstHopDown or FaultClass.Unknown;
+        var state = fault switch
+        {
+            FaultClass.ProxyDrift or FaultClass.CoreDown or FaultClass.FirstHopDown => EvidenceState.Fault,
+            FaultClass.Unknown => EvidenceState.Unknown,
+            _ => EvidenceState.Partial
+        };
+        Record(MonitorEngine.LocalChannelId, new MonitorSample(state, fault.ToString(),
+            failure ? fault.ToString() : null, elapsed), report.SampledAt);
     }
 
-    private static ChannelSample FailedChannel(string id, string name, TimeSpan interval, TimeSpan ttl, string failure) =>
-        new(id, name, DateTimeOffset.Now, interval, ttl, EvidenceState.Fault, failure, failure);
+    private void NoteHttps(CheckResult result, TimeSpan elapsed) =>
+        Record(MonitorEngine.UpstreamChannelId, new MonitorSample(result.State, result.Detail,
+            result.State == EvidenceState.Verified ? null : "HTTPS " + result.State, elapsed), result.SampledAt);
+
+    private void Record(string channel, MonitorSample sample, DateTimeOffset at)
+    {
+        var outcome = _monitorEngine.Record(channel, sample, at);
+        RenderChannels();
+        if (!outcome.Notify) return;
+        var name = _monitorEngine.Read(channel, at).Name;
+        var message = outcome.Transition == MonitorTransition.Recovered
+            ? name + " 已收到新的采样。请核对具体应用。"
+            : name + " 出现异常 " + sample.Failure + "。";
+        Monitor = message;
+        PersistEvent(message);
+        AlertRequested?.Invoke(message);
+    }
+
+    private void PersistEvent(string message)
+    {
+        if (Demo) return;
+        try
+        {
+            EventLog.Append(message);
+            Events = FormatEvents(EventLog.Recent());
+        }
+        catch (Exception ex) when (ex is System.IO.IOException or UnauthorizedAccessException or TimeoutException)
+        {
+            Events = "本机事件记录不可用 " + ex.GetType().Name + "。";
+        }
+    }
 
     private void RenderChannels()
     {
-        var now = DateTimeOffset.Now;
-        string Line(ChannelSample? sample) => sample is null
-            ? "尚无采样"
-            : sample.Display(now, false) + "  " + sample.SampledAt.ToString("HH:mm:ss")
-              + "  间隔 " + sample.Interval.TotalSeconds.ToString("0") + " 秒，有效 "
-              + sample.Ttl.TotalSeconds.ToString("0") + " 秒。 " + sample.Evidence;
-        Channels = "本地心跳  " + Line(_localSample) + "\n上游 HTTPS  " + Line(_upstreamSample)
-            + "\n协议检查只在人工点击时采样，不借用本地心跳的时间。";
+        var snapshot = _monitorEngine.Snapshot(DateTimeOffset.Now);
+        string Line(MonitorChannelSnapshot sample) => sample.SampledAt is not { } at
+            ? sample.Name + "  尚无采样"
+            : $"{sample.Name}  {(sample.Expired ? "已过期" : sample.DisplayState.ToString())}  {at:HH:mm:ss}  "
+              + $"{sample.Latency?.TotalMilliseconds:0} ms  有效 {sample.Ttl.TotalSeconds:0} 秒  "
+              + (sample.Expired ? "等待新的采样。" : sample.Evidence)
+              + $"  连续失败 {sample.ConsecutiveFailures}  状态变化 {sample.Flaps}";
+        Channels = string.Join("\n", snapshot.Channels.Select(Line));
+        UpstreamLine = Line(snapshot.Channels.Single(item => item.Id == MonitorEngine.UpstreamChannelId));
         RenderClientLine();
     }
 
@@ -383,15 +418,22 @@ public partial class ShellViewModel : ObservableObject
             ClientLine = "演示数据不判断这台电脑的客户端。进程和端口来自固定样例。";
             return;
         }
-        if (!Sampled)
+        if (_latestLocal is not { } report ||
+            DateTimeOffset.Now - report.SampledAt > MonitorEngine.LocalHeartbeat.Ttl)
         {
             ClientLine = "还没有采样。只读检查之后才会比较进程、监听和上游。";
             return;
         }
-        var process = Clients.Contains("StarSky", StringComparison.OrdinalIgnoreCase);
-        var port = Listeners.Contains("verge-mihomo", StringComparison.OrdinalIgnoreCase);
-        bool? upstream = _upstreamSample is null ? null : _upstreamSample.State == EvidenceState.Verified;
-        ClientLine = ClientLayers.Decide(process, port, upstream, IntentStore.Read() == true);
+        var observation = report.Observation;
+        var hopRunning = report.RunningClients.Any(item => item is "StarSky" or "magicspeed");
+        var userOff = observation.UserTurnedProxyOff == true;
+        string Describe(string name, bool running, bool? listening) =>
+            listening is null && !userOff
+                ? name + " 监听证据不完整。"
+                : name + " " + ClientLifecycle.Classify(running, listening == true, null, null, userOff).State;
+        ClientLine = Describe("StarSky", hopRunning, observation.FirstHopOpen) + "\n"
+            + Describe("Clash 核心", observation.CoreRunning == true, observation.MixedPortOpen) + "\n"
+            + "默认路径 HTTPS 单独显示。要恢复加速，请先在客户端界面确认状态，随后重新检查真实应用路径。";
     }
 
     private static string FormatEvents(IEnumerable<string> lines)
@@ -414,8 +456,10 @@ public partial class ShellViewModel : ObservableObject
         {
             using var document = JsonDocument.Parse(text);
             var root = document.RootElement;
-            var message = root.TryGetProperty("message", out var messageValue) ? messageValue.GetString() : null;
-            if (string.IsNullOrWhiteSpace(message)) return text;
+            if (root.ValueKind != JsonValueKind.Object || !root.TryGetProperty("message", out var messageValue) ||
+                messageValue.ValueKind != JsonValueKind.String) return "";
+            var message = messageValue.GetString();
+            if (string.IsNullOrWhiteSpace(message)) return "";
             if (root.TryGetProperty("at", out var atValue)
                 && atValue.ValueKind == JsonValueKind.String
                 && DateTimeOffset.TryParse(atValue.GetString(), out var when))
@@ -424,7 +468,7 @@ public partial class ShellViewModel : ObservableObject
         }
         catch (JsonException)
         {
-            return text;
+            return "";
         }
     }
 
