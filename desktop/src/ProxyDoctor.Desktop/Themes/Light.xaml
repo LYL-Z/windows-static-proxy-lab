@@ -7,6 +7,7 @@
   <SolidColorBrush x:Key="App.Muted" Color="#6E6256" />
   <SolidColorBrush x:Key="App.Line" Color="#E4D8C8" />
   <SolidColorBrush x:Key="App.Accent" Color="#8C4A32" />
+  <SolidColorBrush x:Key="App.OnAccent" Color="#FFFCF8" />
   <SolidColorBrush x:Key="App.AccentSoft" Color="#F3E4D8" />
   <SolidColorBrush x:Key="App.Ok" Color="#0E7A3D" />
   <SolidColorBrush x:Key="App.Warn" Color="#9A5B00" />

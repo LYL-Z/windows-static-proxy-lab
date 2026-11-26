@@ -11,4 +11,3 @@ Counts: registered=0 executed=0 passed=0 failed=0 skipped=0 available=0
 [NO-TESTS] no test executed; a green result is not permitted (exit 2).
 Evidence: C:\CAB-Lab\AppData\Local\Temp\v6-empty-3729d7502ca243e58c9961b85903c438\evidence.json
 RESULT: NO_TESTS_EXECUTED EXIT 2
-

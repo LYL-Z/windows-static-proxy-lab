@@ -24,4 +24,3 @@ Output: C:\CAB-Lab\publish\proxy_v6\evidence\selftest\negative-exit1
 SELFTEST COUNTS: selected=7 checks=7 passed=6 failed=1
 SELFTEST EVIDENCE: C:\CAB-Lab\publish\proxy_v6\evidence\selftest\negative-exit1\selftest.json
 SELFTEST RESULT: SELFTEST_FAIL EXIT 1
-

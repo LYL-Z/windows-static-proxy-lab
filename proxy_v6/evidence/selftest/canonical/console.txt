@@ -23,4 +23,3 @@ Output: C:\CAB-Lab\publish\proxy_v6\evidence\selftest\canonical
 SELFTEST COUNTS: selected=7 checks=7 passed=7 failed=0
 SELFTEST EVIDENCE: C:\CAB-Lab\publish\proxy_v6\evidence\selftest\canonical\selftest.json
 SELFTEST RESULT: SELFTEST_PASS EXIT 0
-

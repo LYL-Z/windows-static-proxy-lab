@@ -254,4 +254,3 @@
 4. **真实环境范式**：真实 apply/rollback/boot/24h/72h 未执行，继续 DEFERRED-BY-USER；LONG_RUN 不在本次；凭据轮换 BLOCKED-USER。
 
 **明确不接受**：把隔离 97/97 当作真实生产 apply/rollback/boot 验证；本轮未执行/验证真实 HKCU/网络/Clash。
-

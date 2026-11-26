@@ -244,4 +244,3 @@ F11 latch 只覆盖 `proxy_v4/lib/V4.ps1` 的系统代理函数。以下 tracked
 - final.json：head=79198fd、dirty=false、97/97、0 skipped；selftest：head=79198fd、dirty=false、7/7。未独立运行全量 97/FT；FT 读取真实 HKCU/WinHTTP，受“不触碰真实 HKCU”约束。
 - **无新增 HIGH**：C-02 已关闭；F12、C-04、C-08、R3-02 补偿路径未发现新的生产 HIGH。当前剩余为 MEDIUM（R5-01 allowlist 过宽、R3-01 旧写入面、R3-02 非原子）与已披露的 C-01/C-12 用户决策/LOW（C-13/C-14、C-04 继承残余）。
 - 最终安全状态：**SHORT_RUN_ACCEPTED WITH CONDITIONS**。条件：用户书面接受 C-01/C-12；R3-01 旧脚本退役/门闩；R5-01 allowlist 收窄并重扫。无 C-02 HIGH 阻断；不是无条件发布，LONG_RUN 仍 DEFERRED，服务资格仍 NOT_READY，凭据轮换仍 BLOCKED-USER。
-

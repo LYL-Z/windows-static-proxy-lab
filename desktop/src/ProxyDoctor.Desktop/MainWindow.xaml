@@ -113,41 +113,50 @@
       <StackPanel MaxWidth="860" HorizontalAlignment="Left">
         <DockPanel Margin="0,0,0,16">
           <Button DockPanel.Dock="Right" Content="只读检查" Command="{Binding DiagnoseCommand}" MinWidth="120"
-                  IsEnabled="{Binding Busy, Converter={StaticResource NotBusy}}" />
+                  VerticalAlignment="Top" Margin="20,0,0,0" MinHeight="38"
+                  Foreground="{DynamicResource App.OnAccent}" IsEnabled="{Binding Busy, Converter={StaticResource NotBusy}}" />
           <StackPanel>
             <TextBlock Text="{Binding Status}" FontSize="28" FontWeight="SemiBold" />
-            <TextBlock Text="{Binding Summary}" Foreground="{DynamicResource App.Muted}" TextWrapping="Wrap" Margin="0,6,80,0" />
-            <TextBlock Text="{Binding UpstreamLine}" TextWrapping="Wrap" Margin="0,8,80,0" />
+            <TextBlock Text="{Binding Summary}" Foreground="{DynamicResource App.Muted}" TextWrapping="Wrap" Margin="0,6,0,0" />
+            <TextBlock Text="{Binding UpstreamLine}" TextWrapping="Wrap" Margin="0,8,0,0" />
           </StackPanel>
         </DockPanel>
 
         <StackPanel Visibility="{Binding Section, Converter={StaticResource SectionVisible}, ConverterParameter=overview}">
-          <UniformGrid Columns="2" Margin="0,0,0,12">
+          <Grid Margin="0,0,0,12">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition />
+              <ColumnDefinition />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
             <Border Style="{StaticResource Card}" Margin="0,0,8,8">
               <StackPanel>
                 <TextBlock Text="系统代理" Foreground="{DynamicResource App.Muted}" />
                 <TextBlock Text="{Binding Proxy}" FontSize="18" Margin="0,6,0,0" TextWrapping="Wrap" />
               </StackPanel>
             </Border>
-            <Border Style="{StaticResource Card}" Margin="8,0,0,8">
+            <Border Grid.Column="1" Style="{StaticResource Card}" Margin="8,0,0,8">
               <StackPanel>
                 <TextBlock Text="客户端进程" Foreground="{DynamicResource App.Muted}" />
                 <TextBlock Text="{Binding Clients}" FontSize="18" Margin="0,6,0,0" TextWrapping="Wrap" />
               </StackPanel>
             </Border>
-            <Border Style="{StaticResource Card}" Margin="0,8,8,0">
+            <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,8,8,0">
               <StackPanel>
                 <TextBlock Text="回环监听" Foreground="{DynamicResource App.Muted}" />
                 <TextBlock Text="{Binding Listeners}" FontSize="16" Margin="0,6,0,0" TextWrapping="Wrap" />
               </StackPanel>
             </Border>
-            <Border Style="{StaticResource Card}" Margin="8,8,0,0">
+            <Border Grid.Row="1" Grid.Column="1" Style="{StaticResource Card}" Margin="8,8,0,0">
               <StackPanel>
                 <TextBlock Text="默认代理路径的 HTTPS" Foreground="{DynamicResource App.Muted}" />
                 <TextBlock Text="{Binding Probes}" FontSize="15" Margin="0,6,0,0" TextWrapping="Wrap" />
               </StackPanel>
             </Border>
-          </UniformGrid>
+          </Grid>
           <Border Style="{StaticResource Card}">
             <StackPanel>
               <TextBlock Text="这次能说明什么" FontWeight="SemiBold" />

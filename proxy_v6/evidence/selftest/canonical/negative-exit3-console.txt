@@ -21,4 +21,3 @@ Output: C:\CAB-Lab\publish\proxy_v6\evidence\selftest\negative-exit3
        child exit=1 expected=1
 [SELFTEST-HARNESS-ERROR] injected self-test harness exception for aggregate exit-code control
 SELFTEST RESULT: HARNESS_ERROR EXIT 3
-

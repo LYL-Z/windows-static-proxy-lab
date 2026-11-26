@@ -10,4 +10,3 @@ SELFTEST COUNTS: selected=0 checks=0 passed=0 failed=0
 [NO-TESTS] no META check executed; a green result is not permitted (exit 2).
 SELFTEST EVIDENCE: C:\CAB-Lab\publish\proxy_v6\evidence\selftest\negative-exit2\selftest.json
 SELFTEST RESULT: NO_TESTS_EXECUTED EXIT 2
-
