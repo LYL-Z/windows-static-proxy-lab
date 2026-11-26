@@ -1,0 +1,70 @@
+{
+    "schemaVersion":  1,
+    "tool":  "proxy_v6/tests/Harness.ps1",
+    "harnessVersion":  "6.0.0",
+    "runId":  "598c3d6f54504c43a1653033a358907f",
+    "host":  {
+                 "psVersion":  "5.1.26100.9818",
+                 "psEdition":  "Desktop",
+                 "os":  "Microsoft Windows NT 10.0.26300.0",
+                 "clr":  "4.0.30319.42000",
+                 "is64BitProcess":  true,
+                 "pid":  34452
+             },
+    "git":  {
+                "available":  true,
+                "head":  "36222c92c829a2ef08b71af2a3a3ff9a3c44b396",
+                "branch":  "v5/short-run-hardening",
+                "dirty":  true,
+                "error":  null
+            },
+    "repoRoot":  "D:\\claude防封\\publish",
+    "filter":  "*",
+    "startedAt":  "2026-11-18T05:06:36.685-08:00",
+    "finishedAt":  "2026-11-18T05:06:36.945-08:00",
+    "durationMs":  57,
+    "counts":  {
+                   "registered":  1,
+                   "executed":  1,
+                   "passed":  1,
+                   "failed":  0,
+                   "skipped":  0,
+                   "available":  1
+               },
+    "exitCode":  4,
+    "outcome":  "EVIDENCE_ERROR",
+    "harnessErrors":  [
+
+                      ],
+    "evidenceErrors":  [
+                           {
+                               "stage":  "evidence-dir",
+                               "message":  "cannot create evidence directory: path is a file, not a directory: C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-050628-121-6078b2a5\\META-06-case-evidence\\cases-blocked",
+                               "at":  "2026-11-18T05:06:36.705-08:00"
+                           },
+                           {
+                               "stage":  "case-evidence",
+                               "message":  "no evidence directory available for test FIX-EVIDENCE-01",
+                               "at":  "2026-11-18T05:06:36.742-08:00"
+                           }
+                       ],
+    "cases":  [
+                  {
+                      "id":  "FIX-EVIDENCE-01",
+                      "requirement":  "META-06",
+                      "precondition":  "isolated child process; final evidence path blocked by a file",
+                      "injectedFault":  "evidence write failure",
+                      "expected":  "test passes but the run must exit 4",
+                      "actual":  "all assertions passed",
+                      "status":  "pass",
+                      "passed":  true,
+                      "detail":  "assertions passed: 1",
+                      "durationMs":  8,
+                      "assertions":  1,
+                      "startedAt":  "2026-11-18T05:06:36.725-08:00",
+                      "finishedAt":  "2026-11-18T05:06:36.739-08:00",
+                      "evidenceFile":  "",
+                      "testOutput":  ""
+                  }
+              ]
+}

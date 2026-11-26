@@ -1,0 +1,61 @@
+{
+    "schemaVersion":  1,
+    "tool":  "proxy_v6/tests/Harness.ps1",
+    "harnessVersion":  "6.0.0",
+    "runId":  "14dec45d059940de9a9b9aaf1dee313c",
+    "host":  {
+                 "psVersion":  "5.1.26100.9818",
+                 "psEdition":  "Desktop",
+                 "os":  "Microsoft Windows NT 10.0.26300.0",
+                 "clr":  "4.0.30319.42000",
+                 "is64BitProcess":  true,
+                 "pid":  43724
+             },
+    "git":  {
+                "available":  true,
+                "head":  "36222c92c829a2ef08b71af2a3a3ff9a3c44b396",
+                "branch":  "v5/short-run-hardening",
+                "dirty":  true,
+                "error":  null
+            },
+    "repoRoot":  "D:\\claude防封\\publish",
+    "filter":  "*",
+    "startedAt":  "2026-11-18T05:06:34.927-08:00",
+    "finishedAt":  "2026-11-18T05:06:35.229-08:00",
+    "durationMs":  91,
+    "counts":  {
+                   "registered":  1,
+                   "executed":  0,
+                   "passed":  0,
+                   "failed":  0,
+                   "skipped":  1,
+                   "available":  1
+               },
+    "exitCode":  2,
+    "outcome":  "NO_TESTS_EXECUTED",
+    "harnessErrors":  [
+
+                      ],
+    "evidenceErrors":  [
+
+                       ],
+    "cases":  [
+                  {
+                      "id":  "FIX-SKIP-RUNTIME",
+                      "requirement":  "META-05",
+                      "precondition":  "runtime skip requested inside the body",
+                      "injectedFault":  "runtime skip",
+                      "expected":  "runtime skip is recorded separately and the run exits 2",
+                      "actual":  "skipped",
+                      "status":  "skip",
+                      "passed":  false,
+                      "detail":  "skipped at runtime: fixture runtime skip: simulated missing dependency",
+                      "durationMs":  12,
+                      "assertions":  0,
+                      "startedAt":  "2026-11-18T05:06:34.961-08:00",
+                      "finishedAt":  "2026-11-18T05:06:34.981-08:00",
+                      "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-050628-121-6078b2a5\\META-05-runtime\\cases\\0001-FIX-SKIP-RUNTIME.json",
+                      "testOutput":  ""
+                  }
+              ]
+}

@@ -1,0 +1,83 @@
+{
+    "schemaVersion":  1,
+    "tool":  "proxy_v6/tests/Harness.ps1",
+    "harnessVersion":  "6.0.0",
+    "runId":  "3182aa834afc49f89a8446c407c5501c",
+    "host":  {
+                 "psVersion":  "5.1.26100.9818",
+                 "psEdition":  "Desktop",
+                 "os":  "Microsoft Windows NT 10.0.26300.0",
+                 "clr":  "4.0.30319.42000",
+                 "is64BitProcess":  true,
+                 "pid":  52616
+             },
+    "git":  {
+                "available":  true,
+                "head":  "36222c92c829a2ef08b71af2a3a3ff9a3c44b396",
+                "branch":  "v5/short-run-hardening",
+                "dirty":  true,
+                "error":  null
+            },
+    "repoRoot":  "D:\\claude防封\\publish",
+    "filter":  "*",
+    "startedAt":  "2026-11-18T05:06:19.172-08:00",
+    "finishedAt":  "2026-11-18T05:06:19.473-08:00",
+    "durationMs":  99,
+    "counts":  {
+                   "registered":  2,
+                   "executed":  2,
+                   "passed":  2,
+                   "failed":  0,
+                   "skipped":  0,
+                   "available":  2
+               },
+    "exitCode":  3,
+    "outcome":  "HARNESS_ERROR",
+    "harnessErrors":  [
+                          {
+                              "stage":  "framework",
+                              "message":  "unhandled framework exception: injected harness fault at stage: before-summary",
+                              "detail":  "在 Invoke-HarnessFaultStage、D:\\claude防封\\publish\\proxy_v6\\tests\\Harness.ps1 中: 第 410 行\r\n在 Invoke-TestRun、D:\\claude防封\\publish\\proxy_v6\\tests\\Harness.ps1 中: 第 621 行\r\n在 \u003cScriptBlock\u003e、D:\\claude防封\\publish\\proxy_v6\\tests\\self\\fixtures\\harness-error.ps1 中: 第 21 行",
+                              "at":  "2026-11-18T05:06:19.271-08:00"
+                          }
+                      ],
+    "evidenceErrors":  [
+
+                       ],
+    "cases":  [
+                  {
+                      "id":  "FIX-META03-01",
+                      "requirement":  "META-03",
+                      "precondition":  "isolated child process",
+                      "injectedFault":  "none",
+                      "expected":  "test passes before the framework fault",
+                      "actual":  "all assertions passed",
+                      "status":  "pass",
+                      "passed":  true,
+                      "detail":  "assertions passed: 1",
+                      "durationMs":  8,
+                      "assertions":  1,
+                      "startedAt":  "2026-11-18T05:06:19.210-08:00",
+                      "finishedAt":  "2026-11-18T05:06:19.225-08:00",
+                      "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-050616-730-164fbd46\\META-03\\cases\\0001-FIX-META03-01.json",
+                      "testOutput":  ""
+                  },
+                  {
+                      "id":  "FIX-META03-02",
+                      "requirement":  "META-03",
+                      "precondition":  "isolated child process",
+                      "injectedFault":  "none",
+                      "expected":  "test passes before the framework fault",
+                      "actual":  "all assertions passed",
+                      "status":  "pass",
+                      "passed":  true,
+                      "detail":  "assertions passed: 1",
+                      "durationMs":  5,
+                      "assertions":  1,
+                      "startedAt":  "2026-11-18T05:06:19.255-08:00",
+                      "finishedAt":  "2026-11-18T05:06:19.260-08:00",
+                      "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-050616-730-164fbd46\\META-03\\cases\\0002-FIX-META03-02.json",
+                      "testOutput":  ""
+                  }
+              ]
+}

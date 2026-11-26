@@ -1,0 +1,27 @@
+
+== V6 TEST HARNESS SELF-TEST ==
+Repo: D:\claude防封\publish
+Filter: META-*; selected: 7 of 7 META checks
+Work root: C:\Users\Lenovo\AppData\Local\Temp\v6-tests\v6-selftest-20261118-050616-730-164fbd46
+Output: D:\claude防封\publish\proxy_v6\evidence\selftest\negative-exit1
+--------------------------------------------------------------
+[FAIL] META-01 all valid tests pass -> exit 0 and evidence written
+       child exit=0 expected=0
+       INJECTED self-test failure for aggregate exit-code control; all assertions met
+[PASS] META-02 any executed test fails -> exit 1
+       child exit=1 expected=1
+[PASS] META-03 framework exception -> exit 3, not pass/fail
+       child exit=3 expected=3
+[PASS] META-04 zero executed tests -> exit 2 even with a filter
+       child exit=2 expected=2
+[PASS] META-05 skips recorded separately; all-skip -> exit 2
+       child exit=0 expected=0 mixed / 2 all-skip / 2 runtime
+[PASS] META-06 final evidence write failure -> exit 4
+       child exit=4 expected=4
+[PASS] META-07 later pass never overwrites an earlier failure
+       child exit=1 expected=1
+--------------------------------------------------------------
+SELFTEST COUNTS: selected=7 checks=7 passed=6 failed=1
+SELFTEST EVIDENCE: D:\claude防封\publish\proxy_v6\evidence\selftest\negative-exit1\selftest.json
+SELFTEST RESULT: SELFTEST_FAIL EXIT 1
+

@@ -1,0 +1,17 @@
+{
+    "id":  "F07-12",
+    "requirement":  "F07",
+    "precondition":  "clean fixture",
+    "injectedFault":  "none",
+    "expected":  "journal cleared after success",
+    "actual":  "F07-12: journal cleared on success",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 2",
+    "durationMs":  762,
+    "assertions":  2,
+    "startedAt":  "2026-11-18T07:02:15.982-08:00",
+    "finishedAt":  "2026-11-18T07:02:16.744-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0033-F07-12.json",
+    "testOutput":  ""
+}

@@ -1,0 +1,17 @@
+{
+    "id":  "INF-SNAP-04",
+    "requirement":  "TX-08",
+    "precondition":  "one live target locked",
+    "injectedFault":  "restore failure on one file",
+    "expected":  "failure reported; other file restored",
+    "actual":  "partial restore reported failure and still restored the unlocked file",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  948,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T07:02:43.230-08:00",
+    "finishedAt":  "2026-11-18T07:02:44.177-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0067-INF-SNAP-04.json",
+    "testOutput":  ""
+}

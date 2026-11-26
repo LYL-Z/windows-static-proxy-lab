@@ -1,0 +1,40 @@
+{
+  "schema": "agent-c-gitleaks/v1",
+  "generatedAt": "2026-11-18T13:01:35.514Z",
+  "repo": "publish workspace (path omitted)",
+  "head": "36222c92c829a2ef08b71af2a3a3ff9a3c44b396",
+  "branch": "v5/short-run-hardening",
+  "commits": 5,
+  "tool": {
+    "name": "gitleaks",
+    "version": "8.30.1",
+    "config": "default",
+    "redact": true,
+    "rawReportsRetained": false
+  },
+  "scans": [
+    {
+      "mode": "git",
+      "label": "all refs; 5 commits; HEAD tree + history",
+      "findings": 0,
+      "ruleIds": [],
+      "command": "gitleaks git <repo> --log-opts=--all --report-format json --redact --exit-code 0"
+    },
+    {
+      "mode": "dir",
+      "label": "working tree including ignored local artifacts",
+      "findings": 0,
+      "ruleIds": [],
+      "command": "gitleaks dir <repo> --report-format json --redact --exit-code 0"
+    }
+  ],
+  "validation": {
+    "detected": true,
+    "findings": 1,
+    "ruleIds": [
+      "github-pat"
+    ],
+    "note": "synthetic high-entropy token in a temp directory; value not retained"
+  },
+  "interpretation": "0 findings in history and working tree; custom scans cover DPAPI-looking blobs, public IPv4, Windows user paths, and credential-shaped literals because gitleaks default rules do not cover them."
+}

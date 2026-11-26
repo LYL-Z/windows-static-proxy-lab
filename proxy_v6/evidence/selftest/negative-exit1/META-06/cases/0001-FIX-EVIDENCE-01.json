@@ -1,0 +1,17 @@
+{
+    "id":  "FIX-EVIDENCE-01",
+    "requirement":  "META-06",
+    "precondition":  "isolated child process; final evidence path blocked by a file",
+    "injectedFault":  "evidence write failure",
+    "expected":  "test passes but the run must exit 4",
+    "actual":  "all assertions passed",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  9,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T05:06:24.398-08:00",
+    "finishedAt":  "2026-11-18T05:06:24.415-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-050616-730-164fbd46\\META-06\\cases\\0001-FIX-EVIDENCE-01.json",
+    "testOutput":  ""
+}

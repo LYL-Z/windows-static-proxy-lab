@@ -4,7 +4,7 @@
 |---|---|
 | 明文密码存在于文档/日志/脚本 | **0**（全树复扫） |
 | 凭据存储 | settings.json 内 **DPAPI 密文**；仅生成配置时短暂明文 |
-| 命令行参数 | 不接受密码参数；迁移时可显式传入（会进入命令历史，已在文档警告） |
+| 命令行参数 | 运行期 apply 不接受密码；**-Init 使用 -CredentialFile <受保护文件>**；旧的 -StaticPass/-StaticPassFile 拼写被墓碑参数拒绝 |
 | 日志脱敏 | `Get-V4Redacted`：已知秘密 + `password=` + `Basic <b64>`（FT15 PASS） |
 | 备份 ACL | 快照目录 `Protect-V4Acl`（幂等、必须含 owner ACE） |
 | 旧凭据 | **仍有效，未轮换** → 唯一剩余高风险 |

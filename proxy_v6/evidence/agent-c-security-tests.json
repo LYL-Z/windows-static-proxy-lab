@@ -1,0 +1,157 @@
+{
+  "schema": "agent-c-security-tests/v1",
+  "generatedAt": "2026-11-18T13:03:45.319Z",
+  "baseline": {
+    "head": "36222c92c829a2ef08b71af2a3a3ff9a3c44b396",
+    "branch": "v5/short-run-hardening",
+    "source": "HEAD:proxy_v4/lib/V4.ps1 and HEAD:proxy_v4/state-v4.ps1 exported to an isolated %TEMP% sandbox",
+    "workingTreeDrift": {
+      "observed": "proxy_v4/apply-v4.ps1, lib/V4.ps1, rollback-v4.ps1 and state-v4.ps1 were modified by another process during the review; proxy_v6/ was untracked",
+      "reviewedTarget": "HEAD commit only"
+    }
+  },
+  "environment": {
+    "powershell": "5.1",
+    "elevation": "non-elevated",
+    "productionChanges": "none"
+  },
+  "realRepoAcl": {
+    "path": "publish/proxy_v4/config",
+    "protected": false,
+    "inherited": true,
+    "authenticatedUsers": "Modify",
+    "users": "ReadAndExecute",
+    "note": "Measured read-only with Get-Acl; this is the parent ACL that exists before Protect-V4Acl runs."
+  },
+  "acl": {
+    "basic": {
+      "result": true,
+      "protectedAfter": true,
+      "principalsAfter": [
+        "CURRENT_USER",
+        "SYSTEM",
+        "ADMINISTRATORS"
+      ],
+      "preExistingChildInheritedNewAces": true,
+      "secondCallResult": true,
+      "duplicateCurrentUserFullControlAces": 1,
+      "note": "Normal first hardening and idempotency work."
+    },
+    "earlyReturn": {
+      "setup": "protected DACL containing CURRENT_USER FullControl plus USERS ReadAndExecute",
+      "result": true,
+      "protectedBefore": true,
+      "broadGroupRetained": true,
+      "retainedPrincipals": [
+        "USERS",
+        "CURRENT_USER"
+      ],
+      "retainedRights": [
+        "ReadAndExecute, Synchronize",
+        "FullControl"
+      ],
+      "note": "Protect-V4Acl returns success without removing Everyone/Users/Authenticated Users or verifying FullControl."
+    },
+    "denyRule": {
+      "setup": "unprotected explicit deny (Delete) plus allow for CURRENT_USER",
+      "result": true,
+      "denyAcesAfter": 0,
+      "note": "RemoveAccessRule and DACL rewrite removed the explicit deny in this test."
+    },
+    "fileLevel": {
+      "result": true,
+      "protectedAfter": true,
+      "appRewriteResetsProtection": true,
+      "note": "After delete/recreate, the file re-inherited the unprotected parent ACL; runtime hardening is not durable."
+    },
+    "owner": {
+      "changed": false,
+      "note": "SetOwner is never called; a directory owned by another account is not detected."
+    },
+    "failureHandling": {
+      "callersIgnoreReturn": true,
+      "successLogEmittedOnFailure": true,
+      "note": "Save-V4Settings/apply/snapshot ignore the boolean return; no warning is logged."
+    }
+  },
+  "dpapi": {
+    "blobIsHex": true,
+    "blobLength": 524,
+    "prefix": "01000000",
+    "header": "d08c9ddf",
+    "roundTrip": true,
+    "corruptBlobThrows": "CryptographicException",
+    "corruptMessageContainsCanary": false,
+    "missingSettingsThrowsEvenWithSilentlyContinue": true,
+    "badBlobThrowsEvenWithSilentlyContinue": true,
+    "badBlobError": "ArgumentException",
+    "stateScriptExitCode": 1,
+    "stateScriptEmittedJson": false,
+    "note": "ConvertFrom-SecureString uses user-scope DPAPI with no additional entropy; cross-user/cross-machine blobs fail closed but the state path crashes rather than reporting DEGRADED."
+  },
+  "settingsAtRest": {
+    "plaintextPasswordPresent": false,
+    "usernamePresent": true,
+    "dpapiFieldLength": 524,
+    "dpapiPrefix": "01000000",
+    "fileProtected": false,
+    "parentProtected": true,
+    "fileAcesAfter": [
+      "CURRENT_USER",
+      "SYSTEM",
+      "ADMINISTRATORS"
+    ],
+    "note": "The file inherits a protected config directory after a successful Save; it is not individually protected, and the write happens before the directory ACL is applied."
+  },
+  "redaction": {
+    "knownRegisteredSecretMasked": true,
+    "registeredUsernameMasked": true,
+    "longBasicAuthMasked": true,
+    "quotedPasswordWithSpacesLeaksTail": true,
+    "shortBasicAuthLeaks": true,
+    "urlUserInfoLeaks": true,
+    "passKeyLeaks": true,
+    "secretKeyLeaks": true,
+    "bearerTokenLeaks": true,
+    "secretShorterThanFourLeaks": true,
+    "ipv4Unchanged": true,
+    "note": "Synthetic canaries only; no real credential was used."
+  },
+  "logging": {
+    "logDirectoryProtected": false,
+    "logFileProtected": false,
+    "logFileAces": [
+      "CURRENT_USER",
+      "SYSTEM",
+      "ADMINISTRATORS"
+    ],
+    "registeredSecretPresentInLog": false,
+    "note": "No explicit ACL hardening in Start-V4Log; in the real repo the evidence directory inherits Authenticated Users:Modify and Users:ReadAndExecute."
+  },
+  "staging": {
+    "tempFileNamePattern": ".v4stage-<guid>.yaml",
+    "plaintextPresentDuringValidation": true,
+    "tempFileProtected": false,
+    "leftoversAfterSuccess": 0,
+    "leftoversAfterValidatorFailure": 0,
+    "targetIntactOnFailure": true,
+    "note": "Set-V4Atomic exposes plaintext profile content in the target directory for the duration of validation; cleanup is best-effort."
+  },
+  "notExecuted": [
+    "apply-v4.ps1 / rollback-v4.ps1 / state-v4.ps1 against the real system",
+    "faultinject-v4.ps1 (FT12 targets the real hosts file and the harness writes the production lock path)",
+    "New-V4Snapshot / Restoration (would stop the live app and touch real profiles)",
+    "Cross-user DPAPI decryption attempt (no second account used)"
+  ],
+  "limitations": [
+    "Synthetic canaries are not real credentials.",
+    "ACL tests ran under %TEMP% whose base ACL is narrower than the publish repo ACL; the real repo ACL was measured separately.",
+    "The provided fault-injection suite was not run because of its real-system targets."
+  ],
+  "stateScript": {
+    "exitCode": 1,
+    "jsonEmitted": false,
+    "error": "settings.json not found",
+    "observedVia": "sandbox copy of HEAD state-v4.ps1"
+  }
+}

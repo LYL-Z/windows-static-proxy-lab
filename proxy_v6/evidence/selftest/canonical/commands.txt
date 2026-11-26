@@ -1,0 +1,42 @@
+V6 test-harness evidence commands (Agent B, 2026-11-18)
+
+1. Canonical self-test (all META checks)
+   powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File D:\claude防封\publish\proxy_v6\tests\self\SelfTest.ps1 -OutDir D:\claude防封\publish\proxy_v6\evidence\selftest\canonical
+   OBSERVED EXIT=0 (7/7 checks passed; selftest.json + console.txt in this directory)
+
+2. Self-test negative control: force a META check failure
+   powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File D:\claude防封\publish\proxy_v6\tests\self\SelfTest.ps1 -OutDir D:\claude防封\publish\proxy_v6\evidence\selftest\negative-exit1 -InjectCheckFailure META-01
+   OBSERVED EXIT=1 (SELFTEST_FAIL; negative-exit1-console.txt)
+
+3. Self-test negative control: select zero checks
+   powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File D:\claude防封\publish\proxy_v6\tests\self\SelfTest.ps1 -OutDir D:\claude防封\publish\proxy_v6\evidence\selftest\negative-exit2 -Filter META-99
+   OBSERVED EXIT=2 (NO_TESTS_EXECUTED; negative-exit2-console.txt)
+
+4. Self-test negative control: inject a runner exception
+   powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File D:\claude防封\publish\proxy_v6\tests\self\SelfTest.ps1 -OutDir D:\claude防封\publish\proxy_v6\evidence\selftest\negative-exit3 -InjectHarnessError
+   OBSERVED EXIT=3 (SELFTEST_HARNESS_ERROR; negative-exit3-console.txt)
+
+5. Self-test negative control: block the evidence directory
+   (create a regular file at <temp>\blocked, then pass -OutDir <temp>\blocked\out)
+   powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File D:\claude防封\publish\proxy_v6\tests\self\SelfTest.ps1 -OutDir <temp>\blocked\out
+   OBSERVED EXIT=4 (EVIDENCE_ERROR; negative-exit4-console.txt)
+
+6. Run-Tests with zero case tests (the cases directory currently has lead-owned F07-F10 files;
+   this run used an empty temp cases directory to prove the zero-executed contract)
+   powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File D:\claude防封\publish\proxy_v6\tests\Run-Tests.ps1 -CasesDir <temp>\empty-cases -OutFile <temp>\evidence.json -EvidenceDir <temp>\evidence-cases
+   OBSERVED EXIT=2 (RESULT: NO_TESTS_EXECUTED; run-tests-empty-console.txt)
+
+7. Integration load check (registration only; NO scenario body executed)
+   A temp ASCII probe dot-sourced Harness.ps1, lib\TestSupport.ps1 and every
+   cases\*.tests.ps1 file, then called Test-HarnessRegistry and printed ids.
+   OBSERVED: REGISTERED=29 HARNESS_ERRORS=0 DUPES=0; integration-load-console.txt
+
+8. Closure-body compatibility probe (registration + execution of one closure test)
+   temp fixture dot-sourced Harness.ps1, registered a .GetNewClosure() body,
+   then ran Invoke-TestRun in the child.
+   OBSERVED EXIT=0 (PROBE-CLOSURE-01 PASS; closure-probe-console.txt)
+
+Notes:
+- The Run-Tests.ps1 default invocation would execute the lead's 29 F07-F10
+  scenario tests. Agent B did not run them; only registration was checked.
+- No production command, registry, network, Clash, appdata or credential was touched.

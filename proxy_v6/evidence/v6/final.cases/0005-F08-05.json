@@ -1,0 +1,17 @@
+{
+    "id":  "F08-05",
+    "requirement":  "F08",
+    "precondition":  "target updated has an inline comment",
+    "injectedFault":  "inline comment",
+    "expected":  "target refreshed; comment preserved; foreign unchanged",
+    "actual":  "F08-05: target refreshed, comment case handled",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 2",
+    "durationMs":  689,
+    "assertions":  2,
+    "startedAt":  "2026-11-18T07:01:33.333-08:00",
+    "finishedAt":  "2026-11-18T07:01:34.022-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0005-F08-05.json",
+    "testOutput":  ""
+}

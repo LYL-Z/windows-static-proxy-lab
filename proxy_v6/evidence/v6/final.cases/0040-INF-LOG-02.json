@@ -1,0 +1,17 @@
+{
+    "id":  "INF-LOG-02",
+    "requirement":  "LOG-02",
+    "precondition":  "log file path is invalid",
+    "injectedFault":  "Add-Content target missing",
+    "expected":  "Write-V4Log never throws",
+    "actual":  "unwritable log file did not interrupt Write-V4Log; evidence ACL restricted",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  800,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T07:02:21.440-08:00",
+    "finishedAt":  "2026-11-18T07:02:22.240-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0040-INF-LOG-02.json",
+    "testOutput":  ""
+}

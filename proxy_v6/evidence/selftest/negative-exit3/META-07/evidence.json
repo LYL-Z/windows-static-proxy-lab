@@ -1,0 +1,78 @@
+{
+    "schemaVersion":  1,
+    "tool":  "proxy_v6/tests/Harness.ps1",
+    "harnessVersion":  "6.0.0",
+    "runId":  "5547d676dc16496ab6a0093ef6e4fef6",
+    "host":  {
+                 "psVersion":  "5.1.26100.9818",
+                 "psEdition":  "Desktop",
+                 "os":  "Microsoft Windows NT 10.0.26300.0",
+                 "clr":  "4.0.30319.42000",
+                 "is64BitProcess":  true,
+                 "pid":  53456
+             },
+    "git":  {
+                "available":  true,
+                "head":  "36222c92c829a2ef08b71af2a3a3ff9a3c44b396",
+                "branch":  "v5/short-run-hardening",
+                "dirty":  true,
+                "error":  null
+            },
+    "repoRoot":  "D:\\claude防封\\publish",
+    "filter":  "*",
+    "startedAt":  "2026-11-18T05:06:37.517-08:00",
+    "finishedAt":  "2026-11-18T05:06:37.804-08:00",
+    "durationMs":  91,
+    "counts":  {
+                   "registered":  2,
+                   "executed":  2,
+                   "passed":  1,
+                   "failed":  1,
+                   "skipped":  0,
+                   "available":  2
+               },
+    "exitCode":  1,
+    "outcome":  "FAIL",
+    "harnessErrors":  [
+
+                      ],
+    "evidenceErrors":  [
+
+                       ],
+    "cases":  [
+                  {
+                      "id":  "FIX-ORDER-01",
+                      "requirement":  "META-07",
+                      "precondition":  "isolated child process",
+                      "injectedFault":  "earlier failing assertion",
+                      "expected":  "earlier test fails",
+                      "actual":  "assertion failed: earlier failure must persist (actual: False)",
+                      "status":  "fail",
+                      "passed":  false,
+                      "detail":  "assertion failed: earlier failure must persist (actual: False)",
+                      "durationMs":  20,
+                      "assertions":  1,
+                      "startedAt":  "2026-11-18T05:06:37.550-08:00",
+                      "finishedAt":  "2026-11-18T05:06:37.577-08:00",
+                      "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-050628-121-6078b2a5\\META-07\\cases\\0001-FIX-ORDER-01.json",
+                      "testOutput":  ""
+                  },
+                  {
+                      "id":  "FIX-ORDER-02",
+                      "requirement":  "META-07",
+                      "precondition":  "isolated child process",
+                      "injectedFault":  "none",
+                      "expected":  "later test passes",
+                      "actual":  "all assertions passed",
+                      "status":  "pass",
+                      "passed":  true,
+                      "detail":  "assertions passed: 1",
+                      "durationMs":  2,
+                      "assertions":  1,
+                      "startedAt":  "2026-11-18T05:06:37.604-08:00",
+                      "finishedAt":  "2026-11-18T05:06:37.606-08:00",
+                      "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-050628-121-6078b2a5\\META-07\\cases\\0002-FIX-ORDER-02.json",
+                      "testOutput":  ""
+                  }
+              ]
+}

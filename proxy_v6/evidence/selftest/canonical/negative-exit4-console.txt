@@ -1,0 +1,27 @@
+[EVIDENCE-ERROR] cannot prepare self-test output directory: directory was not created: C:\Users\Lenovo\AppData\Local\Temp\v6-neg-453a0af5497f4dd1909152f94994c07d\blocked\out
+
+== V6 TEST HARNESS SELF-TEST ==
+Repo: D:\claude防封\publish
+Filter: META-*; selected: 7 of 7 META checks
+Work root: C:\Users\Lenovo\AppData\Local\Temp\v6-tests\v6-selftest-20261118-050638-551-1477730f
+--------------------------------------------------------------
+[PASS] META-01 all valid tests pass -> exit 0 and evidence written
+       child exit=0 expected=0
+[PASS] META-02 any executed test fails -> exit 1
+       child exit=1 expected=1
+[PASS] META-03 framework exception -> exit 3, not pass/fail
+       child exit=3 expected=3
+[PASS] META-04 zero executed tests -> exit 2 even with a filter
+       child exit=2 expected=2
+[PASS] META-05 skips recorded separately; all-skip -> exit 2
+       child exit=0 expected=0 mixed / 2 all-skip / 2 runtime
+[PASS] META-06 final evidence write failure -> exit 4
+       child exit=4 expected=4
+[PASS] META-07 later pass never overwrites an earlier failure
+       child exit=1 expected=1
+[EVIDENCE-ERROR] self-test output directory is unavailable
+--------------------------------------------------------------
+SELFTEST COUNTS: selected=7 checks=7 passed=7 failed=0
+SELFTEST EVIDENCE: NOT WRITTEN
+SELFTEST RESULT: EVIDENCE_ERROR EXIT 4
+

@@ -1,6 +1,9 @@
 backup/
+**/backup/
 config/settings.json
+**/config/settings.json
 config/.lock
+**/config/.lock
 *.bak
 *.log
 ConsoleHost_history*

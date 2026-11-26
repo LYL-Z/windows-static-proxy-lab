@@ -1,0 +1,17 @@
+{
+    "id":  "F08-02",
+    "requirement":  "F08",
+    "precondition":  "target has no updated; next profile has updated",
+    "injectedFault":  "target block without updated",
+    "expected":  "next profile updated unchanged; target gains updated",
+    "actual":  "F08-02: foreign 222222 kept, target got updated",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 2",
+    "durationMs":  693,
+    "assertions":  2,
+    "startedAt":  "2026-11-18T07:01:31.203-08:00",
+    "finishedAt":  "2026-11-18T07:01:31.896-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0002-F08-02.json",
+    "testOutput":  ""
+}

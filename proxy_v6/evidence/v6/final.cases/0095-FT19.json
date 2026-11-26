@@ -1,0 +1,17 @@
+{
+    "id":  "FT19",
+    "requirement":  "F11",
+    "precondition":  "two parallel mocked children",
+    "injectedFault":  "parallel test execution",
+    "expected":  "real HKCU unchanged",
+    "actual":  "two parallel mocked tests did not touch real HKCU",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  1502,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T07:03:36.932-08:00",
+    "finishedAt":  "2026-11-18T07:03:38.434-08:00",
+    "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0095-FT19.json",
+    "testOutput":  ""
+}
