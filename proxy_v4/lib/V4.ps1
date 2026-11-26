@@ -256,10 +256,76 @@ function Get-V4Journal {
     if (-not (Test-Path -LiteralPath $p)) { return $null }
     try {
         $j = Get-Content -LiteralPath $p -Raw -Encoding UTF8 | ConvertFrom-Json
-        if (-not $j -or -not $j.snapshot) { return [pscustomobject]@{ corrupt = $true; data = $null } }
-        return [pscustomobject]@{ corrupt = $false; data = $j }
+        if ($j -and $j.reason -eq 'apply-preparation') {
+            $validSchema = $j.schema -is [int] -or $j.schema -is [long]
+            $validPort = $j.port -is [int] -or $j.port -is [long]
+            $file = Get-Item -LiteralPath $p -Force -ErrorAction Stop
+            $valid = $validSchema -and $j.schema -eq 1 -and $validPort -and $j.port -ge 1 -and $j.port -le 65535 -and
+                $j.wasRunning -is [bool] -and $j.wasAligned -is [bool] -and
+                -not ($j.wasAligned -and -not $j.wasRunning) -and -not $j.snapshot -and
+                -not ($file.Attributes -band [IO.FileAttributes]::ReparsePoint) -and
+                (Test-V4AclHardened -Path $p -Allowed (Get-V4AllowedSidSet))
+            return [pscustomobject]@{ corrupt = (-not $valid); preparation = $true; data = $j }
+        }
+        if ($j -and $j.snapshot) { return [pscustomobject]@{ corrupt = $false; preparation = $false; data = $j } }
     }
-    catch { return [pscustomobject]@{ corrupt = $true; data = $null } }
+    catch { }
+    return [pscustomobject]@{ corrupt = $true; preparation = $false; data = $null }
+}
+
+function Write-V4PreparationJournal {
+    param([int]$Port, [bool]$WasRunning, $BeforeProxy)
+    $entry = [ordered]@{
+        schema = 1
+        reason = 'apply-preparation'
+        port = $Port
+        wasRunning = $WasRunning
+        wasAligned = ($WasRunning -and $BeforeProxy.enabled -eq $true -and $BeforeProxy.server -eq ('127.0.0.1:' + $Port))
+    }
+    Assert-V4SnapshotPath (Get-V4JournalPath)
+    if (-not (Test-V4AclHardened -Path $script:ConfigDir -Allowed (Get-V4AllowedSidSet))) {
+        throw (New-V4Fault 34 'preparation journal requires a private config directory')
+    }
+    $stage = Join-Path $script:ConfigDir ('.v4-prepare-' + [guid]::NewGuid().ToString('N') + '.tmp')
+    $created = $false
+    try {
+        $stream = [IO.File]::Open($stage, 'CreateNew', 'Write', 'None')
+        $created = $true
+        try {
+            $bytes = [Text.Encoding]::UTF8.GetBytes(($entry | ConvertTo-Json -Compress))
+            $stream.Write($bytes, 0, $bytes.Length)
+            $stream.Flush($true)
+        }
+        finally { $stream.Dispose() }
+        if (-not (Protect-V4Acl -Path $stage)) { throw 'cannot secure preparation journal' }
+        [IO.File]::Move($stage, (Get-V4JournalPath))
+    }
+    finally { if ($created -and [IO.File]::Exists($stage)) { [IO.File]::Delete($stage) } }
+}
+
+function Test-V4PreparationProxyIntent {
+    param([int]$Port)
+    $current = Get-V4SystemProxy
+    return ($current.enabled -eq $true -and $current.server -eq ('127.0.0.1:' + $Port) -and
+        (Get-V4UiSystemProxy) -eq $true -and (Get-V4AutomaticProxyStatus) -eq 'NOT_OBSERVED')
+}
+
+function Resume-V4PreparationClient {
+    param($Preparation)
+    $port = [int]$Preparation.port
+    if (-not $Preparation.wasRunning -or -not $Preparation.wasAligned -or -not (Test-V4PreparationProxyIntent -Port $port)) {
+        return 41
+    }
+    $paths = Get-V4Paths
+    if (-not $paths.Core -or -not $paths.Exe) { return 40 }
+    if (-not (Test-V4ClashListener -Port $port -ExpectedCore $paths.Core -RequireImagePath)) {
+        if (Test-V4Port -Port $port) { return 40 }
+        if (-not (Test-V4PreparationProxyIntent -Port $port)) { return 41 }
+        if (-not (Start-V4Clash -TimeoutSec 40 -Port $port)) { return 40 }
+    }
+    if (-not (Test-V4PreparationProxyIntent -Port $port)) { return 41 }
+    if (-not (Test-V4ClashListener -Port $port -ExpectedCore $paths.Core -RequireImagePath)) { return 40 }
+    return 0
 }
 
 function Write-V4Journal {
@@ -359,6 +425,13 @@ function Invoke-V4ApplyTransaction {
         else { $code = 1; $msg = $_.Exception.Message }
         if (-not $msg) { $msg = $_.Exception.Message }
         if ($Context.Redact) { try { $msg = & $Context.Redact $msg } catch { } }
+        if ($ops.RecordsPreparation -and -not $journalWritten) {
+            # No live configuration write was attempted. Preserve evidence and
+            # let an operator review current proxy intent before any restart.
+            $pending = Get-V4Journal
+            if ($pending) { $code = 34 }
+            return [pscustomobject]@{ ok = $false; exitCode = $code; error = $msg; snapshot = $snap; applied = $false; restored = $false }
+        }
         if ($snap -or $applied -or ($null -ne $wasRunning)) {
             $restoreProxy = $null
             $verifyProxy = $null
@@ -1150,11 +1223,13 @@ function New-V4Snapshot {
     if (-not (Protect-V4Acl -Path $script:BackupDir)) { throw 'cannot harden backup root ACL' }
     $beforeProxy = Get-V4SystemProxy
     $wasRunning = ((Get-V4AppPids).Count -gt 0)
+    Write-V4PreparationJournal -Port $Port -WasRunning $wasRunning -BeforeProxy $beforeProxy
     if ($wasRunning) { Stop-V4Clash -Port $Port | Out-Null }
     $stamp = (Get-Date -Format 'yyyyMMdd-HHmmss-fff') + '-' + [guid]::NewGuid().ToString('N').Substring(0, 6)
     $dir = Join-Path $script:BackupDir $stamp
     # An interrupted capture holds ciphertext only and has no committed manifest.
     $r = New-V4SnapshotFiles -AppData $p.AppData -ProfilesDir $p.ProfilesDir -Dir $dir -SystemProxy $beforeProxy -ClashRunningBefore $wasRunning -Reason $Reason
+    Test-V4SnapshotManifest -SnapshotDir $r.dir | Out-Null
     return $r.dir
 }
 

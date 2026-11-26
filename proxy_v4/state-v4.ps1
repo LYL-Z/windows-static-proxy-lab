@@ -71,9 +71,11 @@ function Get-StateResult {
         $result.reasons += 'managed profile or runtime marker could not be verified'
     }
     if (-not $markersOk -and $result.state -eq 'CHAIN_VERIFIED') { $result.state = 'DEGRADED' }
+    $transaction = Get-V4Journal
     $result.recoveryAction = switch ($true) {
         { [bool](Get-V4RepairReceipt) } { 'REVIEW_INTERRUPTED_REPAIR'; break }
-        { [bool](Get-V4Journal) } { 'REVIEW_PENDING_TRANSACTION'; break }
+        { $transaction -and $transaction.preparation } { 'REVIEW_INTERRUPTED_PREPARATION'; break }
+        { [bool]$transaction } { 'REVIEW_PENDING_TRANSACTION'; break }
         { $st.mode -eq 'UNKNOWN' } { 'REVIEW_SETTINGS_OR_PROBE'; break }
         { -not $st.clashRunning -or -not $st.mixedPort } { 'CHECK_CLASH_STARTUP'; break }
         { -not $result.firstHopOk } { 'CHECK_FIRST_HOP'; break }
@@ -90,6 +92,11 @@ function Get-StateResult {
     }
     if ($result.recoveryAction -eq 'REVIEW_PENDING_TRANSACTION') {
         $result.faults += 'PENDING_TRANSACTION'
+        if ($result.state -eq 'CHAIN_VERIFIED') { $result.state = 'DEGRADED' }
+    }
+    if ($result.recoveryAction -eq 'REVIEW_INTERRUPTED_PREPARATION') {
+        $result.faults += 'PENDING_PREPARATION'
+        $result.reasons += 'Snapshot preparation may have stopped the client. Review current proxy intent before authorizing client resume.'
         if ($result.state -eq 'CHAIN_VERIFIED') { $result.state = 'DEGRADED' }
     }
     if ($result.recoveryAction -eq 'REVIEW_INTERRUPTED_REPAIR') {

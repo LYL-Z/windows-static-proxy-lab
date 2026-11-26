@@ -64,6 +64,15 @@ powershell.exe -NoProfile -File .\publish\proxy_v4\state-v4.ps1 -ConfigDirectory
 
 处理完中断记录后，重新运行只读状态命令，并在实际应用中向中性端点复测。旧版脚本及其他软件不读取该记录；正式换版前需保证所有写入入口使用同一候选版本。
 
+### 完整 Apply 在快照准备时中断
+
+`REVIEW_INTERRUPTED_PREPARATION` 表示 Apply 可能已经停掉客户端，配置写入阶段尚未开始。此时常规 Apply 和 Rollback 退出 34。查看当前代理选择后，按实际意图授权其中一个命令。
+
+- `rollback-v4.ps1 -ResolvePreparation ResumeClient` 检查恢复前客户端原本在运行，Windows 当前仍启用同一个 Clash 回环端口，且保存的客户端代理开关与自动代理设置相容。脚本只恢复客户端并核对进程、监听和实际代理选择。若用户已关闭或换了代理，返回 41 并保留准备记录。
+- `rollback-v4.ps1 -ResolvePreparation KeepCurrent` 接受当前状态并核销准备记录。此入口仅处理准备记录，保留当前运行状态和代理选择。
+
+两个入口都跳过快照文件恢复及代理设置写入。若同时有人手动调整系统代理，应先暂停解决操作。复核失败时保留记录，出口及实际应用路径仍需另行验证。
+
 ## V6 安全警告
 
 - `-Init` 已不接受命令行密码；显式迁移改用 `-CredentialFile <受保护文件>`。旧的 `-StaticPass`/`-StaticPassFile` 会被拒绝。优先从当前 Clash profile 迁移。
