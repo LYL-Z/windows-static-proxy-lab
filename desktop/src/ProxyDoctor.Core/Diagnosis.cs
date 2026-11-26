@@ -110,6 +110,8 @@ public static class RequestRouter
     {
         var value = (text ?? "").Trim();
         return value.Contains("保持原配置", StringComparison.Ordinal)
+            || value.Contains("保留现有配置", StringComparison.Ordinal)
+            || value.Contains("保持现有配置", StringComparison.Ordinal)
             || value.Contains("不擅自修改", StringComparison.Ordinal)
             || value.Contains("不要修改", StringComparison.Ordinal);
     }
@@ -133,7 +135,7 @@ public static class RequestRouter
             return true;
         if (value.Contains("网络故障", StringComparison.Ordinal) && value.Contains("恢复方案", StringComparison.Ordinal))
             return true;
-        if (value.Contains("检查我的网络", StringComparison.Ordinal))
+        if (value.Contains("检查我的网络", StringComparison.Ordinal) || value.Contains("检查网络", StringComparison.Ordinal))
             return true;
         if (value.Contains("StarSky", StringComparison.OrdinalIgnoreCase) && value.Contains("停止运行", StringComparison.Ordinal))
             return true;

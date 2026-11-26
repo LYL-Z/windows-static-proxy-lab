@@ -113,6 +113,7 @@ public class ClassifierTests
     [InlineData("检查我的电脑网络配置是否正常。")]
     [InlineData("检查网络故障并提供恢复方案。")]
     [InlineData("全面检查我的网络")]
+    [InlineData("检查网络")]
     [InlineData("StarSky 停止运行了")]
     [InlineData("Clash 没有流量")]
     [InlineData("检查异常并提供恢复方案")]
@@ -140,6 +141,8 @@ public class ClassifierTests
         Assert.Equal("no-modify", RequestRouter.IntentToken(RequestIntent.NoModify));
         Assert.Equal(RequestIntent.NoModify, RequestRouter.Route("全面检查我的网络，保持原配置，不擅自修改"));
         Assert.False(RequestRouter.IsDiagnoseRequest("全面检查我的网络，保持原配置，不擅自修改"));
+        Assert.Equal(RequestIntent.NoModify, RequestRouter.Route("检查网络，但保留现有配置"));
+        Assert.Equal(RequestIntent.NoModify, RequestRouter.Route("只读检查我的网络，保持现有配置"));
     }
 
     [Theory]

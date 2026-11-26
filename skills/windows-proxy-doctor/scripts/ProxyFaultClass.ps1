@@ -147,9 +147,12 @@ function Get-ProxyDoctorFaultClass($Observation) {
 function Resolve-ProxyDoctorUserRequest([string]$Text) {
     $value = if ($null -eq $Text) { '' } else { $Text.Trim() }
     $keepOriginal = -join @([char]0x4FDD, [char]0x6301, [char]0x539F, [char]0x914D, [char]0x7F6E)
+    $keepCurrent = -join @([char]0x4FDD, [char]0x7559, [char]0x73B0, [char]0x6709, [char]0x914D, [char]0x7F6E)
+    $preserveCurrent = -join @([char]0x4FDD, [char]0x6301, [char]0x73B0, [char]0x6709, [char]0x914D, [char]0x7F6E)
     $doNotModify = -join @([char]0x4E0D, [char]0x64C5, [char]0x81EA, [char]0x4FEE, [char]0x6539)
     $doNotChange = -join @([char]0x4E0D, [char]0x8981, [char]0x4FEE, [char]0x6539)
-    if ($value.Contains($keepOriginal) -or $value.Contains($doNotModify) -or $value.Contains($doNotChange)) {
+    if ($value.Contains($keepOriginal) -or $value.Contains($keepCurrent) -or $value.Contains($preserveCurrent) -or
+        $value.Contains($doNotModify) -or $value.Contains($doNotChange)) {
         return [pscustomobject][ordered]@{
             goal = 'NoModify'
             intent = 'no-modify'
@@ -188,7 +191,8 @@ function Resolve-ProxyDoctorUserRequest([string]$Text) {
     if ($value.Contains($networkFault) -and $value.Contains($recoveryPlan)) { $fault = $true }
     if ($value -match '(?i)starsky.+clash.+(?:no traffic|without traffic)') { $fault = $true }
     $checkMyNetwork = -join @([char]0x68C0, [char]0x67E5, [char]0x6211, [char]0x7684, [char]0x7F51, [char]0x7EDC)
-    if ($value.Contains($checkMyNetwork) -or $value -match '(?i)\bcheck (?:my|the) network\b') { $fault = $true }
+    $checkNetwork = -join @([char]0x68C0, [char]0x67E5, [char]0x7F51, [char]0x7EDC)
+    if ($value.Contains($checkMyNetwork) -or $value.Contains($checkNetwork) -or $value -match '(?i)\bcheck (?:my|the) network\b') { $fault = $true }
     $stopped = -join @([char]0x505C, [char]0x6B62, [char]0x8FD0, [char]0x884C)
     if ($mentionsStarSky -and $value.Contains($stopped)) { $fault = $true }
     if ($mentionsClash -and $value.Contains($noTraffic)) { $fault = $true }

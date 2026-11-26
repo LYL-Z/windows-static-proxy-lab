@@ -158,6 +158,12 @@ try {
         $doNotChange = Text 0x4E0D,0x8981,0x4FEE,0x6539
         $heldWithCheck = Resolve-ProxyDoctorUserRequest ($network + ', ' + $doNotChange)
         Assert-True ($heldWithCheck.goal -eq 'NoModify' -and $null -eq $heldWithCheck.entry) 'short do-not-modify wording lost its precedence'
+        $checkNetwork = Text 0x68C0,0x67E5,0x7F51,0x7EDC
+        $keepCurrent = Text 0x4FDD,0x7559,0x73B0,0x6709,0x914D,0x7F6E
+        $preserveCurrent = Text 0x4FDD,0x6301,0x73B0,0x6709,0x914D,0x7F6E
+        Assert-True ((Resolve-ProxyDoctorUserRequest $checkNetwork).intent -eq 'diagnose') 'plain network check was not routed'
+        Assert-True ((Resolve-ProxyDoctorUserRequest ($checkNetwork + ', ' + $keepCurrent)).intent -eq 'no-modify') 'keep current configuration wording lost its precedence'
+        Assert-True ((Resolve-ProxyDoctorUserRequest ($checkNetwork + ', ' + $preserveCurrent)).intent -eq 'no-modify') 'preserve current configuration wording lost its precedence'
     }
     Check 'docs-point-at-classifier' {
         $skill = Get-Content -LiteralPath (Join-Path $root 'SKILL.md') -Raw -Encoding UTF8
