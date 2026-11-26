@@ -86,7 +86,6 @@ public static class RecoveryTrust
             result.WritesMatch,
             result.JournalClear,
             result.LiveUnchanged,
-            !string.IsNullOrEmpty(result.Writes),
             result.Writes);
 
     public static bool IsComplete(JsonElement result)
@@ -107,7 +106,7 @@ public static class RecoveryTrust
         if (result.EnumerateObject().Any(item => item.Name != "Writes" &&
             item.Name.Equals("Writes", StringComparison.OrdinalIgnoreCase))) return false;
         var rawPresent = result.TryGetProperty("Writes", out var writesElement);
-        if (rawPresent && writesElement.ValueKind != JsonValueKind.String) return false;
+        if (!rawPresent || writesElement.ValueKind != JsonValueKind.String) return false;
         return Verdict(
             started,
             cancelled,
@@ -119,12 +118,8 @@ public static class RecoveryTrust
             writesMatch,
             journal,
             live,
-            rawPresent,
-            rawPresent ? writesElement.GetString() : null);
+            writesElement.GetString());
     }
-
-    private static bool IsAllowedTransactionExit(int exitCode) =>
-        exitCode is 0 or 32 or 33 or 34 or 40 or 41;
 
     private static bool Verdict(
         bool started,
@@ -137,15 +132,13 @@ public static class RecoveryTrust
         bool writesMatch,
         bool journal,
         bool live,
-        bool rawWritesPresent,
         string? writes)
     {
         if (!started || cancelled || timedOut) return false;
         if (process != 0) return false;
-        if (transaction != expected || !IsAllowedTransactionExit(expected)) return false;
+        if (transaction != ExpectedTransactionExit || expected != ExpectedTransactionExit) return false;
         if (!profile || !writesMatch || !journal || !live) return false;
-        if (rawWritesPresent && !WritesMatchScenario(writes)) return false;
-        return true;
+        return WritesMatchScenario(writes);
     }
 
     private static bool TryReadBool(JsonElement result, string name, out bool value)

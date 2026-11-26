@@ -226,7 +226,7 @@
     },
     {
       "name": "success-without-raw-writes",
-      "completeSuccess": true,
+      "completeSuccess": false,
       "result": {
         "ScriptStarted": true,
         "Cancelled": false,
@@ -258,8 +258,8 @@
       }
     },
     {
-      "name": "allowed-expected-0",
-      "completeSuccess": true,
+      "name": "untrusted-self-declared-exit-0",
+      "completeSuccess": false,
       "result": {
         "ScriptStarted": true,
         "Cancelled": false,
@@ -275,8 +275,8 @@
       }
     },
     {
-      "name": "allowed-expected-33",
-      "completeSuccess": true,
+      "name": "untrusted-self-declared-exit-33",
+      "completeSuccess": false,
       "result": {
         "ScriptStarted": true,
         "Cancelled": false,
@@ -292,8 +292,8 @@
       }
     },
     {
-      "name": "allowed-expected-34",
-      "completeSuccess": true,
+      "name": "untrusted-self-declared-exit-34",
+      "completeSuccess": false,
       "result": {
         "ScriptStarted": true,
         "Cancelled": false,
@@ -309,8 +309,8 @@
       }
     },
     {
-      "name": "allowed-expected-40",
-      "completeSuccess": true,
+      "name": "untrusted-self-declared-exit-40",
+      "completeSuccess": false,
       "result": {
         "ScriptStarted": true,
         "Cancelled": false,
@@ -326,8 +326,8 @@
       }
     },
     {
-      "name": "allowed-expected-41",
-      "completeSuccess": true,
+      "name": "untrusted-self-declared-exit-41",
+      "completeSuccess": false,
       "result": {
         "ScriptStarted": true,
         "Cancelled": false,
@@ -374,6 +374,38 @@
         "JournalClear": true,
         "LiveUnchanged": true,
         "Writes": "enabled=0 server=old:8080"
+      }
+    },
+    {
+      "name": "raw-write-evidence-required",
+      "completeSuccess": false,
+      "result": {
+        "ScriptStarted": true,
+        "Cancelled": false,
+        "TimedOut": false,
+        "ProcessExit": 0,
+        "TransactionExit": 32,
+        "ExpectedTransactionExit": 32,
+        "ProfileRestored": true,
+        "WritesMatch": true,
+        "JournalClear": true,
+        "LiveUnchanged": true
+      }
+    },
+    {
+      "name": "self-declared-failure-without-raw-writes",
+      "completeSuccess": false,
+      "result": {
+        "ScriptStarted": true,
+        "Cancelled": false,
+        "TimedOut": false,
+        "ProcessExit": 0,
+        "TransactionExit": 40,
+        "ExpectedTransactionExit": 40,
+        "ProfileRestored": true,
+        "WritesMatch": true,
+        "JournalClear": true,
+        "LiveUnchanged": true
       }
     }
   ]

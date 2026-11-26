@@ -65,17 +65,13 @@ function Test-ProxyDoctorRecoveryResult {
             if ($cancelled) { $reasons.Add('cancelled') }
             if ($timedOut) { $reasons.Add('timed out') }
             if ($process -ne 0) { $reasons.Add('wrapper exit') }
-            if (($expected -notin @(0, 32, 33, 34, 40, 41)) -or ($transaction -ne $expected)) { $reasons.Add('transaction exit') }
+            if ($expected -ne 32 -or $transaction -ne 32) { $reasons.Add('transaction exit') }
             if (-not $profile) { $reasons.Add('profile hash') }
             if (-not $writes) { $reasons.Add('writes') }
-            $writesProperty = $Result.PSObject.Properties['Writes']
-            if ($writesProperty -and -not [string]::Equals($writesProperty.Name, 'Writes', [StringComparison]::Ordinal)) {
-                $reasons.Add('bad name Writes')
-            } elseif ($writesProperty) {
-                $rawWrites = $writesProperty.Value
-                if ($rawWrites -isnot [string] -or -not (Test-ProxyDoctorRecoveryWrites $rawWrites)) {
-                    $reasons.Add('raw writes')
-                }
+            $writesProperty = Get-RecoveryProperty $Result 'Writes'
+            if (-not $writesProperty -or $writesProperty.Value -isnot [string] -or
+                -not (Test-ProxyDoctorRecoveryWrites $writesProperty.Value)) {
+                $reasons.Add('raw writes')
             }
             if (-not $journal) { $reasons.Add('journal') }
             if (-not $live) { $reasons.Add('live proxy') }

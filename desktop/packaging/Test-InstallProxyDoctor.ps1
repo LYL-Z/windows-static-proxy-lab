@@ -220,6 +220,8 @@ try {
 
     $dest = Join-Path $allowed 'app'
     New-Item -ItemType Directory -Path $dest -Force | Out-Null
+    $userEmpty = Join-Path $dest 'my unrelated empty directory'
+    New-Item -ItemType Directory -Path $userEmpty | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $dest 'keep.txt'), 'keep')
     Invoke-Install $dest $source $allowed
     $manifest = Read-Manifest $dest
@@ -241,6 +243,7 @@ try {
     if (Test-Path -LiteralPath (Join-Path $dest 'sub')) { throw 'empty directory was left behind' }
     if ([System.IO.File]::ReadAllText((Join-Path $dest 'keep.txt')) -ne 'keep') { throw 'uninstall changed a pre-existing file' }
     if (-not (Test-Path -LiteralPath $dest)) { throw 'uninstall removed a directory that still had a file' }
+    if (-not (Test-Path -LiteralPath $userEmpty -PathType Container)) { throw 'uninstall removed an unrelated empty directory' }
 
     $clean = Join-Path $allowed 'clean'
     Invoke-Install $clean $source $allowed

@@ -104,15 +104,23 @@ function Get-JsonString([string]$Value) {
     return '"' + $escaped + '"'
 }
 
-function Write-HashManifest([string]$Path, $Entries) {
+function Write-HashManifest([string]$Path, $Entries, $Directories, [bool]$RootCreated) {
     $parts = New-Object System.Collections.Generic.List[string]
     foreach ($entry in $Entries) {
         $part = '{"path":' + (Get-JsonString ([string]$entry.path)) + ',"sha256":' + (Get-JsonString ([string]$entry.sha256)) + '}'
         [void]$parts.Add($part)
     }
-    $json = '{"algorithm":"SHA256","files":[' + ($parts -join ',') + ']}'
+    $dirParts = @($Directories | ForEach-Object { Get-JsonString $_ })
+    $json = '{"algorithm":"SHA256","files":[' + ($parts -join ',') + '],"directories":[' +
+        ($dirParts -join ',') + '],"rootCreated":' + $RootCreated.ToString().ToLowerInvariant() + '}'
     $utf8 = New-Object System.Text.UTF8Encoding $false
-    [System.IO.File]::WriteAllText($Path, $json, $utf8)
+    $stage = $Path + '.' + [Guid]::NewGuid().ToString('N') + '.tmp'
+    try {
+        [System.IO.File]::WriteAllText($stage, $json, $utf8)
+        [System.IO.File]::Move($stage, $Path)
+    } finally {
+        if ([System.IO.File]::Exists($stage)) { [System.IO.File]::Delete($stage) }
+    }
 }
 
 function Read-HashManifest([string]$Path) {
@@ -147,6 +155,7 @@ function Install-Package([string]$DestinationPath, [string]$SourcePath) {
         }
         $target = [System.IO.Path]::GetFullPath((Join-Path $DestinationPath $relative))
         if (-not (Test-StrictChild $DestinationPath $target)) { throw 'copy target escapes the destination' }
+        Assert-NotStartupDestination $target
         $plan.Add([pscustomobject]@{ Source = $file.FullName; Relative = $relative; Target = $target }) | Out-Null
     }
 
@@ -157,13 +166,21 @@ function Install-Package([string]$DestinationPath, [string]$SourcePath) {
         Assert-PathChainHasNoReparsePoint $item.Target
         if (Test-Path -LiteralPath $item.Target) { throw 'package would overwrite an existing file; use a separate version folder' }
     }
+    $rootCreated = -not (Test-Path -LiteralPath $DestinationPath)
     New-Item -ItemType Directory -Path $DestinationPath -Force | Out-Null
     Assert-NotReparse $DestinationPath
 
     $entries = New-Object System.Collections.Generic.List[object]
+    $created = New-Object System.Collections.Generic.List[string]
+    $destinationPrefix = $DestinationPath + '\'
     foreach ($item in @($plan | Sort-Object Relative)) {
         $parent = Split-Path -Parent $item.Target
         if (-not (Test-Path -LiteralPath $parent)) {
+            $dir = $parent
+            while ((Test-StrictChild $DestinationPath $dir) -and -not (Test-Path -LiteralPath $dir)) {
+                $created.Add($dir.Substring($destinationPrefix.Length))
+                $dir = Split-Path -Parent $dir
+            }
             New-Item -ItemType Directory -Path $parent -Force | Out-Null
         }
         Assert-PathChainHasNoReparsePoint $item.Target
@@ -171,30 +188,15 @@ function Install-Package([string]$DestinationPath, [string]$SourcePath) {
         $hash = (Get-FileHash -LiteralPath $item.Target -Algorithm SHA256).Hash.ToUpperInvariant()
         $entries.Add([ordered]@{ path = $item.Relative; sha256 = $hash }) | Out-Null
     }
-    Write-HashManifest $manifestPath $entries
+    Write-HashManifest $manifestPath $entries $created $rootCreated
 }
 
-function Remove-EmptyDirectories([string]$Root) {
-    $dirs = New-Object System.Collections.Generic.List[string]
-    $pending = New-Object System.Collections.Generic.Queue[string]
-    $pending.Enqueue((Get-NormalizedPath $Root))
-    while ($pending.Count -gt 0) {
-        $dir = $pending.Dequeue()
-        Assert-NotReparse $dir
-        foreach ($child in @(Get-ChildItem -LiteralPath $dir -Force -Directory)) {
-            Assert-NotReparse $child.FullName
-            $dirs.Add($child.FullName) | Out-Null
-            $pending.Enqueue($child.FullName)
-        }
-    }
-    foreach ($dir in @($dirs.ToArray() | Sort-Object -Descending)) {
-        if (-not (Get-ChildItem -LiteralPath $dir -Force)) {
+function Remove-EmptyDirectories($Directories) {
+    foreach ($dir in @($Directories | Sort-Object Length -Descending)) {
+        Assert-PathChainHasNoReparsePoint $dir
+        if ((Test-Path -LiteralPath $dir -PathType Container) -and -not (Get-ChildItem -LiteralPath $dir -Force)) {
             [System.IO.Directory]::Delete($dir)
         }
-    }
-    if ((Test-Path -LiteralPath $Root) -and -not (Get-ChildItem -LiteralPath $Root -Force)) {
-        Assert-NotReparse $Root
-        [System.IO.Directory]::Delete((Get-NormalizedPath $Root))
     }
 }
 
@@ -211,6 +213,16 @@ function Uninstall-Package([string]$DestinationPath) {
     if ($rawFiles.Count -eq 1 -and $null -eq $rawFiles[0]) { $rawFiles = @() }
 
     $planned = New-Object System.Collections.Generic.List[object]
+    $plannedDirs = New-Object System.Collections.Generic.List[string]
+    foreach ($relative in $manifest.directories) {
+        Assert-SafeRelativePath $relative 'manifest directory escapes the destination'
+        $directory = [System.IO.Path]::GetFullPath((Join-Path $DestinationPath $relative))
+        if (-not (Test-StrictChild $DestinationPath $directory)) { throw 'manifest directory escapes the destination' }
+        Assert-NotStartupDestination $directory
+        Assert-PathChainHasNoReparsePoint $directory
+        $plannedDirs.Add($directory)
+    }
+    if ($manifest.rootCreated -is [bool] -and $manifest.rootCreated) { $plannedDirs.Add($DestinationPath) }
     foreach ($entry in $rawFiles) {
         if ($null -eq $entry) { throw 'manifest entry is invalid' }
         $relative = [string]$entry.path
@@ -219,6 +231,7 @@ function Uninstall-Package([string]$DestinationPath) {
         Assert-SafeRelativePath $relative 'manifest path escapes the destination'
         $target = [System.IO.Path]::GetFullPath((Join-Path $DestinationPath $relative))
         if (-not (Test-StrictChild $DestinationPath $target)) { throw 'manifest path escapes the destination' }
+        Assert-NotStartupDestination $target
         Assert-PathChainHasNoReparsePoint $target
         if (Test-Path -LiteralPath $target -PathType Container) { throw 'manifest path is a directory' }
         if (Test-Path -LiteralPath $target -PathType Leaf) {
@@ -235,7 +248,7 @@ function Uninstall-Package([string]$DestinationPath) {
         Remove-Item -LiteralPath $item.Target -Force
     }
     Remove-Item -LiteralPath $manifestPath -Force
-    Remove-EmptyDirectories $DestinationPath
+    Remove-EmptyDirectories $plannedDirs
 }
 
 $destination = Get-NormalizedPath $Destination
