@@ -11,7 +11,7 @@
 .EXAMPLE
   powershell -ExecutionPolicy Bypass -File rollback-v2.ps1 -List
   powershell -ExecutionPolicy Bypass -File rollback-v2.ps1
-  powershell -ExecutionPolicy Bypass -File rollback-v2.ps1 -SnapshotDir "D:\claude防封\proxy_v2\backup\20261118-021500"
+  powershell -ExecutionPolicy Bypass -File rollback-v2.ps1 -SnapshotDir "C:\CAB-Lab\proxy_v2\backup\20261118-021500"
 #>
 [CmdletBinding()]
 param(

@@ -2,7 +2,7 @@
 
 V3 不替代 V2 的日常操作，而是在其上加了三样东西：**状态机**、**故障注入自证**、**长稳（含首试成功率）**。
 
-工具位置：`D:\claude防封\proxy_v3\`（操作类脚本仍在 `proxy_v2\`，V3 直接复用，不改动）
+工具位置：`C:\CAB-Lab\proxy_v3\`（操作类脚本仍在 `proxy_v2\`，V3 直接复用，不改动）
 
 ---
 
@@ -10,10 +10,10 @@ V3 不替代 V2 的日常操作，而是在其上加了三样东西：**状态�
 
 ```powershell
 # 看状态（只读，2 秒）
-powershell -ExecutionPolicy Bypass -File D:\claude防封\proxy_v3\state.ps1
+powershell -ExecutionPolicy Bypass -File C:\CAB-Lab\proxy_v3\state.ps1
 
 # 如果不是 HEALTHY，重新应用
-powershell -ExecutionPolicy Bypass -File D:\claude防封\proxy_v2\apply-v2.ps1 -Mode NEXIP -AcknowledgeCredentialAccess
+powershell -ExecutionPolicy Bypass -File C:\CAB-Lab\proxy_v2\apply-v2.ps1 -Mode NEXIP -AcknowledgeCredentialAccess
 ```
 
 `state.ps1` 输出的五态含义：
@@ -34,20 +34,20 @@ powershell -ExecutionPolicy Bypass -File D:\claude防封\proxy_v2\apply-v2.ps1 -
 
 ```powershell
 # NexIP 静态代理（默认目标；需 StarSky 已加速）
-powershell -ExecutionPolicy Bypass -File D:\claude防封\proxy_v2\apply-v2.ps1 -Mode NEXIP -AcknowledgeCredentialAccess
+powershell -ExecutionPolicy Bypass -File C:\CAB-Lab\proxy_v2\apply-v2.ps1 -Mode NEXIP -AcknowledgeCredentialAccess
 
 # StarSky 普通代理
-powershell -ExecutionPolicy Bypass -File D:\claude防封\proxy_v2\apply-v2.ps1 -Mode STARSKY
+powershell -ExecutionPolicy Bypass -File C:\CAB-Lab\proxy_v2\apply-v2.ps1 -Mode STARSKY
 
 # 回到原始网络（之后需手动在 StarSky 点"停止加速"）
-powershell -ExecutionPolicy Bypass -File D:\claude防封\proxy_v2\apply-v2.ps1 -Mode RAW
+powershell -ExecutionPolicy Bypass -File C:\CAB-Lab\proxy_v2\apply-v2.ps1 -Mode RAW
 ```
 
 回滚：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File D:\claude防封\proxy_v2\rollback-v2.ps1 -List
-powershell -ExecutionPolicy Bypass -File D:\claude防封\proxy_v2\rollback-v2.ps1
+powershell -ExecutionPolicy Bypass -File C:\CAB-Lab\proxy_v2\rollback-v2.ps1 -List
+powershell -ExecutionPolicy Bypass -File C:\CAB-Lab\proxy_v2\rollback-v2.ps1
 ```
 
 ---
@@ -55,7 +55,7 @@ powershell -ExecutionPolicy Bypass -File D:\claude防封\proxy_v2\rollback-v2.ps
 ## 3. 自检：故障注入
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File D:\claude防封\proxy_v3\invoke-faultinjection.ps1 -OutFile D:\claude防封\proxy_v3\evidence\fault-injection.json
+powershell -ExecutionPolicy Bypass -File C:\CAB-Lab\proxy_v3\invoke-faultinjection.ps1 -OutFile C:\CAB-Lab\proxy_v3\evidence\fault-injection.json
 ```
 
 它会**真的**制造 5 种故障并断言系统反应，全程只读或可自动还原：
@@ -74,10 +74,10 @@ powershell -ExecutionPolicy Bypass -File D:\claude防封\proxy_v3\invoke-faultin
 
 ```powershell
 # 24 小时（推荐先跑这个）
-python D:\claude防封\proxy_v3\tools\monitor-longrun.py --hours 24 --interval 60 --retry 2 --out D:\claude防封\proxy_v3\evidence\soak-24h.jsonl
+python C:\CAB-Lab\proxy_v3\tools\monitor-longrun.py --hours 24 --interval 60 --retry 2 --out C:\CAB-Lab\proxy_v3\evidence\soak-24h.jsonl
 
 # 72 小时扩展
-python D:\claude防封\proxy_v3\tools\monitor-longrun.py --hours 72 --interval 120 --retry 2 --out D:\claude防封\proxy_v3\evidence\soak-72h.jsonl
+python C:\CAB-Lab\proxy_v3\tools\monitor-longrun.py --hours 72 --interval 120 --retry 2 --out C:\CAB-Lab\proxy_v3\evidence\soak-72h.jsonl
 ```
 
 **它和你以前看到的监测工具的区别**：
@@ -91,7 +91,7 @@ python D:\claude防封\proxy_v3\tools\monitor-longrun.py --hours 72 --interval 1
 查看现有结果：
 
 ```powershell
-python D:\claude防封\proxy_v3\tools\monitor-longrun.py --hours 0 --out D:\claude防封\proxy_v3\evidence\soak-24h.jsonl
+python C:\CAB-Lab\proxy_v3\tools\monitor-longrun.py --hours 0 --out C:\CAB-Lab\proxy_v3\evidence\soak-24h.jsonl
 ```
 （`--hours 0` = 只做聚合，不新发请求）
 
@@ -101,12 +101,12 @@ python D:\claude防封\proxy_v3\tools\monitor-longrun.py --hours 0 --out D:\clau
 
 ```powershell
 # 出口对照：TCP 走静态 IP，UDP 走 StarSky —— 这是当前架构的边界
-python D:\claude防封\proxy_v3\tools\stun_probe.py
-python D:\claude防封\proxy_v3\tools\udp_relay_test.py
-python D:\claude防封\proxy_v3\tools\proto_probe.py
+python C:\CAB-Lab\proxy_v3\tools\stun_probe.py
+python C:\CAB-Lab\proxy_v3\tools\udp_relay_test.py
+python C:\CAB-Lab\proxy_v3\tools\proto_probe.py
 
 # 分阶段延迟
-python D:\claude防封\proxy_v2\benchmark.py --proxy 127.0.0.1:7897 --samples 20
+python C:\CAB-Lab\proxy_v2\benchmark.py --proxy 127.0.0.1:7897 --samples 20
 ```
 
 ---

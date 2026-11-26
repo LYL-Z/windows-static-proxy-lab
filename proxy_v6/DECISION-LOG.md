@@ -1,7 +1,7 @@
 # DECISION-LOG — V6.0
 
 ## D-001 工作仓库与分支（2026-11-18T05:00:00-08:00）
-- 决定：在 `D:\claude防封\publish` 的 `v5/short-run-hardening` 分支原地接管，不新建孤儿仓库、不重写历史、不合并 main。
+- 决定：在 `C:\CAB-Lab\publish` 的 `v5/short-run-hardening` 分支原地接管，不新建孤儿仓库、不重写历史、不合并 main。
 - 理由：任务书要求在现有 Draft PR 基础上持续提交；本地/远端 HEAD 已核对为 36222c9。
 
 ## D-002 缺陷关闭规则

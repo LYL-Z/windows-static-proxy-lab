@@ -94,7 +94,7 @@ F11 latch 只覆盖 `proxy_v4/lib/V4.ps1` 的系统代理函数。以下 tracked
 |---|---|
 | 公网 IPv4 | **19 unique / 533 occurrences / 37 files**（较 abe0eaa +1/+3/+1；新增来自事故/状态记录） |
 | Windows 用户目录路径 | **49 occurrences / 43 files / 1 unique username** |
-| 项目绝对路径（`D:\claude防封`） | **96 occurrences / 31 files** |
+| 项目绝对路径（`C:\CAB-Lab`） | **96 occurrences / 31 files** |
 | 盘符路径行 | **543 lines / 242 files** |
 | 邮件形态 | **6 机构 + 2 test/example + 0 私人** |
 | 本地 ignored 文件 | 未在 HEAD；未作为发布面计数 |

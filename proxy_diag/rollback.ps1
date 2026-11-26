@@ -6,8 +6,8 @@
 # =====================================================================
 $ErrorActionPreference = 'Stop'
 
-$bak  = 'D:\claude防封\proxy_diag\backup\20261118-011610'
-$base = 'C:\Users\Lenovo\AppData\Roaming\io.github.clash-verge-rev.clash-verge-rev'
+$bak  = 'C:\CAB-Lab\proxy_diag\backup\20261118-011610'
+$base = 'C:\CAB-Lab\AppData\Roaming\io.github.clash-verge-rev.clash-verge-rev'
 $exe  = 'C:\Program Files\Clash Verge\clash-verge.exe'
 
 if (-not (Test-Path $bak)) { throw "backup dir not found: $bak" }

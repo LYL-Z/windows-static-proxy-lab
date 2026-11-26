@@ -8,7 +8,7 @@ Mihomo 的 `socks5` 节点**只能**以明文保存用户名密码。这是内�
 
 ## 2. P0 审计结果（已处置）
 
-扫描范围：`D:\claude防封\` 下全部 `.md/.txt/.json/.jsonl/.log/.ps1/.py`，外加 PowerShell 历史、配置目录、备份目录。
+扫描范围：`C:\CAB-Lab\` 下全部 `.md/.txt/.json/.jsonl/.log/.ps1/.py`，外加 PowerShell 历史、配置目录、备份目录。
 （比对方式：把已知密码读入内存做精确子串匹配，**只输出文件路径与计数，不输出明文**。）
 
 ### 2.1 发现

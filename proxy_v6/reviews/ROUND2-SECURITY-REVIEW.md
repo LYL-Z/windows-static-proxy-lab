@@ -90,7 +90,7 @@
 ### R2C-06（中，OPEN，发布决策）
 HEAD 树（abe0eaa）自定义扫描：
 - Windows 用户目录路径：49 处、43 文件、1 个用户名；基线 2 处/2 文件；新增 47 处/41 文件，集中在 `proxy_v6/evidence/selftest/` 与 `proxy_v6/evidence/v6/full.json`。
-- 项目绝对路径（`D:\claude防封`）：95 处/30 文件；基线 54/19。
+- 项目绝对路径（`C:\CAB-Lab`）：95 处/30 文件；基线 54/19。
 - 盘符路径行：653 行/367 文件（多数为证据 JSON）。
 - 公网 IPv4：18 个唯一/530 次/36 文件，与基线相同；`SECURITY-NOTES.md` 只概括承认“静态端点 IP”，`proxy_v5/PUBLICATION-AUDIT.md` 明示了一个 IP。
 - 邮箱：6 处机构地址、0 私人地址；`Run-InfraCase.ps1:584` 的 `user:pass@example.com` 是测试 URL，被正则误计为邮箱。

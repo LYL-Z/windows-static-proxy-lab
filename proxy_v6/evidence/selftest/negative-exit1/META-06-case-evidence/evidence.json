@@ -18,7 +18,7 @@
                 "dirty":  true,
                 "error":  null
             },
-    "repoRoot":  "D:\\claude防封\\publish",
+    "repoRoot":  "C:\\CAB-Lab\\publish",
     "filter":  "*",
     "startedAt":  "2026-11-18T05:06:25.230-08:00",
     "finishedAt":  "2026-11-18T05:06:25.487-08:00",
@@ -39,7 +39,7 @@
     "evidenceErrors":  [
                            {
                                "stage":  "evidence-dir",
-                               "message":  "cannot create evidence directory: path is a file, not a directory: C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-050616-730-164fbd46\\META-06-case-evidence\\cases-blocked",
+                               "message":  "cannot create evidence directory: path is a file, not a directory: C:\\CAB-Lab\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-050616-730-164fbd46\\META-06-case-evidence\\cases-blocked",
                                "at":  "2026-11-18T05:06:25.249-08:00"
                            },
                            {

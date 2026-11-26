@@ -18,7 +18,7 @@
                 "dirty":  true,
                 "error":  null
             },
-    "repoRoot":  "D:\\claude防封\\publish",
+    "repoRoot":  "C:\\CAB-Lab\\publish",
     "filter":  "*",
     "startedAt":  "2026-11-18T05:06:34.052-08:00",
     "finishedAt":  "2026-11-18T05:06:34.332-08:00",
@@ -54,7 +54,7 @@
                       "assertions":  0,
                       "startedAt":  "2026-11-18T05:06:34.086-08:00",
                       "finishedAt":  "2026-11-18T05:06:34.097-08:00",
-                      "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-050628-121-6078b2a5\\META-05-all\\cases\\0001-FIX-SKIP-ONLY.json",
+                      "evidenceFile":  "C:\\CAB-Lab\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-050628-121-6078b2a5\\META-05-all\\cases\\0001-FIX-SKIP-ONLY.json",
                       "testOutput":  ""
                   }
               ]

@@ -14,7 +14,7 @@ Three remaining files still matched the account identifiers; those occurrences w
 
 ## Residual considerations
 
-- Scripts reference absolute paths (`D:\claude防封\...`) and a Windows 11 host; they are published as-run.
+- Scripts reference absolute paths (`C:\CAB-Lab\...`) and a Windows 11 host; they are published as-run.
 - The static endpoint IP and first-hop exit IP appear in reports and evidence. They are network facts,
   not secrets — but they do describe one specific rented endpoint.
 - Commit identity uses a GitHub noreply address, not a personal mail.

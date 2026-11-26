@@ -8,7 +8,7 @@
 |---|---|---|---|---|
 | `RAW` | 关闭 | 无 | 本地 ISP（中国联通四川） | 无人 |
 | `STARSKY` | `127.0.0.1:11119` | StarSky 自身 | StarSky 节点（`142.111.173.93`） | StarSky |
-| `NEXIP` | `127.0.0.1:7897` | StarSky `11119` | NexIP 静态 IP（`72.245.197.103`） | Clash Verge |
+| `NEXIP` | `127.0.0.1:7897` | StarSky `11119` | NexIP 静态 IP（`192.0.2.254`） | Clash Verge |
 
 ## 2. NEXIP 模式的数据流
 
@@ -21,15 +21,15 @@ Clash Verge Rev  (mihomo v1.19.33)
    │  PROXY = fallback[ US-WA-SOCKS5 , DIRECT ]
    ▼
 节点 US-WA-SOCKS5  ── dialer-proxy ──►  STAR-FIRSTHOP (127.0.0.1:11119)
-                                            │  HTTP CONNECT 72.245.197.103:9506
+                                            │  HTTP CONNECT 192.0.2.254:9506
                                             ▼
                                    StarSky 隧道（美国西雅图）
                                             │
                                             ▼
-                          NexIP 72.245.197.103:9506  (SOCKS5 + 用户名密码)
+                          NexIP 192.0.2.254:9506  (SOCKS5 + 用户名密码)
                                             │
                                             ▼
-                                       互联网（出口 = 72.245.197.103）
+                                       互联网（出口 = 192.0.2.254）
 ```
 
 关键点：
@@ -82,7 +82,7 @@ Clash Verge Rev  (mihomo v1.19.33)
 ## 6. 文件布局
 
 ```
-D:\claude防封\proxy_v2\
+C:\CAB-Lab\proxy_v2\
 ├─ lib\Common.ps1
 ├─ apply-v2.ps1  rollback-v2.ps1  status.ps1  validate-v2.ps1
 ├─ benchmark.py  monitor-v2.py

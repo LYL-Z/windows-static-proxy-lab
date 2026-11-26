@@ -3,7 +3,7 @@
 ## 0. 先看这里：你现在的状态
 
 ```powershell
-cd D:\claude防封\proxy_v2
+cd C:\CAB-Lab\proxy_v2
 powershell -ExecutionPolicy Bypass -File .\status.ps1
 ```
 
@@ -29,7 +29,7 @@ powershell -ExecutionPolicy Bypass -File .\apply-v2.ps1 -Mode NEXIP -Acknowledge
 
 该命令会：发现路径 → 验证第一跳真的能代理 → 快照 → 生成配置 → `mihomo -t` 校验 → 原子替换 → 重启 → **验证真实出口 IP** → 才接管系统代理。
 
-预期出口：`72.245.197.103`。
+预期出口：`192.0.2.254`。
 
 想先只看不写：
 
@@ -63,7 +63,7 @@ powershell -ExecutionPolicy Bypass -File .\rollback-v2.ps1 -List
 powershell -ExecutionPolicy Bypass -File .\rollback-v2.ps1
 
 # 回滚到指定快照
-powershell -ExecutionPolicy Bypass -File .\rollback-v2.ps1 -SnapshotDir "D:\claude防封\proxy_v2\backup\20261118-021020"
+powershell -ExecutionPolicy Bypass -File .\rollback-v2.ps1 -SnapshotDir "C:\CAB-Lab\proxy_v2\backup\20261118-021020"
 ```
 
 回滚会：停进程 → 还原文件 → **逐文件 SHA256 校验** → 还原系统代理 → 仅当快照记录"当时 Clash 在运行"才重启 Clash（避免它一启动又把系统代理改回去）。

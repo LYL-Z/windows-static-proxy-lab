@@ -10,5 +10,5 @@ Filter: *
 --------------------------------------------------------------
 Counts: registered=1 executed=0 passed=0 failed=0 skipped=1 available=1
 [NO-TESTS] no test executed; a green result is not permitted (exit 2).
-Evidence: C:\Users\Lenovo\AppData\Local\Temp\v6-tests\v6-selftest-20261118-050628-121-6078b2a5\META-05-runtime\evidence.json
+Evidence: C:\CAB-Lab\AppData\Local\Temp\v6-tests\v6-selftest-20261118-050628-121-6078b2a5\META-05-runtime\evidence.json
 RESULT: NO_TESTS_EXECUTED EXIT 2

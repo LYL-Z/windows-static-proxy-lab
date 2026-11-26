@@ -18,7 +18,7 @@
                 "dirty":  true,
                 "error":  null
             },
-    "repoRoot":  "D:\\claude防封\\publish",
+    "repoRoot":  "C:\\CAB-Lab\\publish",
     "filter":  "*",
     "startedAt":  "2026-11-18T05:06:29.670-08:00",
     "finishedAt":  "2026-11-18T05:06:29.979-08:00",
@@ -54,7 +54,7 @@
                       "assertions":  1,
                       "startedAt":  "2026-11-18T05:06:29.706-08:00",
                       "finishedAt":  "2026-11-18T05:06:29.737-08:00",
-                      "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-050628-121-6078b2a5\\META-02\\cases\\0001-FIX-FAIL-01.json",
+                      "evidenceFile":  "C:\\CAB-Lab\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-050628-121-6078b2a5\\META-02\\cases\\0001-FIX-FAIL-01.json",
                       "testOutput":  ""
                   },
                   {
@@ -66,12 +66,12 @@
                       "actual":  "unexpected exception",
                       "status":  "fail",
                       "passed":  false,
-                      "detail":  "unexpected exception: intentional unexpected exception | stack: 在 \u003cScriptBlock\u003e、D:\\claude防封\\publish\\proxy_v6\\tests\\self\\fixtures\\fail.ps1 中: 第 18 行 | 在 Invoke-HarnessCase、D:\\claude防封\\publish\\proxy_v6\\tests\\Harness.ps1 中: 第 434 行 | 在 Invoke-TestRun、D:\\claude防封\\publish\\proxy_v6\\tests\\Harness.ps1 中: 第 618 行 | 在 \u003cScriptBlock\u003e、D:\\claude防封\\publish\\proxy_v6\\tests\\self\\fixtures\\fail.ps1 中: 第 21 行 | at: 所在位置 D:\\claude防封\\publish\\proxy_v6\\tests\\self\\fixtures\\fail.ps1:18 字符: 3 | +   throw \u0027intentional unexpected exception\u0027 | +   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+                      "detail":  "unexpected exception: intentional unexpected exception | stack: 在 \u003cScriptBlock\u003e、C:\\CAB-Lab\\publish\\proxy_v6\\tests\\self\\fixtures\\fail.ps1 中: 第 18 行 | 在 Invoke-HarnessCase、C:\\CAB-Lab\\publish\\proxy_v6\\tests\\Harness.ps1 中: 第 434 行 | 在 Invoke-TestRun、C:\\CAB-Lab\\publish\\proxy_v6\\tests\\Harness.ps1 中: 第 618 行 | 在 \u003cScriptBlock\u003e、C:\\CAB-Lab\\publish\\proxy_v6\\tests\\self\\fixtures\\fail.ps1 中: 第 21 行 | at: 所在位置 C:\\CAB-Lab\\publish\\proxy_v6\\tests\\self\\fixtures\\fail.ps1:18 字符: 3 | +   throw \u0027intentional unexpected exception\u0027 | +   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
                       "durationMs":  8,
                       "assertions":  0,
                       "startedAt":  "2026-11-18T05:06:29.764-08:00",
                       "finishedAt":  "2026-11-18T05:06:29.772-08:00",
-                      "evidenceFile":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-050628-121-6078b2a5\\META-02\\cases\\0002-FIX-FAIL-02.json",
+                      "evidenceFile":  "C:\\CAB-Lab\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-050628-121-6078b2a5\\META-02\\cases\\0002-FIX-FAIL-02.json",
                       "testOutput":  ""
                   }
               ]

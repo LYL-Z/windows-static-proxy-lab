@@ -254,7 +254,7 @@
 
 - 实现：`Get-V4UiSystemProxy`（生产读 `%APPDATA%\io.github.clash-verge-rev.clash-verge-rev\verge.yaml` 的 `enable_system_proxy`；测试模式读 `V4_TEST_UI_SYSTEM_PROXY`）；`Get-V4StateCore -UiSystemProxy` 新增 `uiSystemProxy` 字段，并在状态机之后只在不一致时把状态降为 `DEGRADED`（`FAILED` 不被覆盖）并附加明确 reason；`state-v4.ps1` 输出该字段。
 - 我的独立探针（生产模式 + 重定向 `$env:APPDATA` 到 `%TEMP%`，6/6）：`true`/`false` 解析、缺键/缺文件 → `unknown`（不误报）、UI on/HKCU on → `HEALTHY`、UI off/HKCU on → `DEGRADED` + `UI reports system proxy disabled, actual HKCU is enabled`。
-- **分类正确**：当前生产态（HKCU=0、UI=on、直连 54.202.22.253、Clash 出口 72.245.197.103）应报 `DEGRADED`（exit 2）+ "UI reports enabled, actual HKCU disabled"。不是 `FAILED`（链路本身可能可用），也不是 `HEALTHY`（UI 与真实状态不一致）——这是准确的"部分降级"语义。
+- **分类正确**：当前生产态（HKCU=0、UI=on、直连 54.202.22.253、Clash 出口 192.0.2.254）应报 `DEGRADED`（exit 2）+ "UI reports enabled, actual HKCU disabled"。不是 `FAILED`（链路本身可能可用），也不是 `HEALTHY`（UI 与真实状态不一致）——这是准确的"部分降级"语义。
 - **范围说明（重要）**：F12 只比较**布尔开关**，不比较 `ProxyServer`。事故态（HKCU enabled + `ProxyServer=x` + UI enabled）**不会**触发 F12 的 mismatch reason，但会被既有 `systemProxy != 127.0.0.1:<mixedPort>` 判为 `DEGRADED`（reason: `system proxy owned by x`）——即事故态仍可见，只是原因来自旧检查。F12 新增覆盖的是"UI on/HKCU off"（当前生产态）与"UI off/HKCU on"。
 - **残余（R3D-03，LOW）**：① 生产解析器（`verge.yaml`）没有用例——`INF-F12-01` 直接注入布尔值，绕过解析器；② 带引号的值（`enable_system_proxy: "true"`）解析为 `unknown`（实测），键名变更亦然 → **静默不报**（fail-open 于报告层，不影响安全）；③ 只认行首 `^enable_system_proxy:`，不支持 flow/嵌套 YAML。建议加一条"写临时 APPDATA + verge.yaml → 解析器"的用例。
 

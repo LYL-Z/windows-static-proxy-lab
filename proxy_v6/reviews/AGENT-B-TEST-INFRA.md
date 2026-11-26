@@ -124,14 +124,14 @@
 命令（原始）：
 
 ```text
-powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "D:\claude防封\publish\proxy_v6\tests\self\SelfTest.ps1" -OutDir "D:\claude防封\publish\proxy_v6\evidence\selftest\canonical"
+powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "C:\CAB-Lab\publish\proxy_v6\tests\self\SelfTest.ps1" -OutDir "C:\CAB-Lab\publish\proxy_v6\evidence\selftest\canonical"
 ```
 
 stdout（原文见 `canonical/console.txt`）：
 
 ```text
 == V6 TEST HARNESS SELF-TEST ==
-Repo: D:\claude防封\publish
+Repo: C:\CAB-Lab\publish
 Filter: META-*; selected: 7 of 7 META checks
 --------------------------------------------------------------
 [PASS] META-01 all valid tests pass -> exit 0 and evidence written
@@ -150,7 +150,7 @@ Filter: META-*; selected: 7 of 7 META checks
        child exit=1 expected=1
 --------------------------------------------------------------
 SELFTEST COUNTS: selected=7 checks=7 passed=7 failed=0
-SELFTEST EVIDENCE: D:\claude防封\publish\proxy_v6\evidence\selftest\canonical\selftest.json
+SELFTEST EVIDENCE: C:\CAB-Lab\publish\proxy_v6\evidence\selftest\canonical\selftest.json
 SELFTEST RESULT: SELFTEST_PASS EXIT 0
 ```
 
@@ -173,7 +173,7 @@ SELFTEST RESULT: SELFTEST_PASS EXIT 0
 用空临时 cases 目录运行 `Run-Tests.ps1`（显式 `-CasesDir <temp>\empty-cases`，避免执行 lead 的 F07-F10）：
 
 ```powershell
-powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File D:\claude防封\publish\proxy_v6\tests\Run-Tests.ps1 -CasesDir <temp>\empty-cases -OutFile <temp>\evidence.json -EvidenceDir <temp>\evidence-cases
+powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\CAB-Lab\publish\proxy_v6\tests\Run-Tests.ps1 -CasesDir <temp>\empty-cases -OutFile <temp>\evidence.json -EvidenceDir <temp>\evidence-cases
 ```
 
 
@@ -215,16 +215,16 @@ IDS=F08-01,...,F09-SUITE,F10-01,...,F07-01,...（完整列表见 integration-loa
 
 ```powershell
 # 自验（不会加载 cases/ 下的 F07-F10）
-powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File D:\claude防封\publish\proxy_v6\tests\self\SelfTest.ps1
+powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\CAB-Lab\publish\proxy_v6\tests\self\SelfTest.ps1
 
 # 运行场景（注意：当前会执行 lead 的 29 个 F07-F10 用例，需在获授权的隔离环境运行）
-powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File D:\claude防封\publish\proxy_v6\tests\Run-Tests.ps1
+powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\CAB-Lab\publish\proxy_v6\tests\Run-Tests.ps1
 
 # 只跑某一组
-powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File D:\claude防封\publish\proxy_v6\tests\Run-Tests.ps1 -Filter 'F08-*'
+powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\CAB-Lab\publish\proxy_v6\tests\Run-Tests.ps1 -Filter 'F08-*'
 
 # 指定证据输出
-powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File D:\claude防封\publish\proxy_v6\tests\Run-Tests.ps1 -OutFile D:\claude防封\publish\proxy_v6\evidence\v6\f08.json
+powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\CAB-Lab\publish\proxy_v6\tests\Run-Tests.ps1 -OutFile C:\CAB-Lab\publish\proxy_v6\evidence\v6\f08.json
 ```
 
 场景文件接入约定（详见 `cases/README.md`）：只注册、不调用 `Invoke-TestRun`、不 `exit`；用 `New-TestTempRoot`/`Remove-TestTempRoot` 且在 `finally` 清理；生产 V4 代码不要在运行器进程内 dot-source，需在隔离子进程中经 `V4_TEST_MODE/V4_TEST_ROOT` 运行。lead 的 29 个用例已符合注册约定；是否通过由 lead 的运行结果决定。

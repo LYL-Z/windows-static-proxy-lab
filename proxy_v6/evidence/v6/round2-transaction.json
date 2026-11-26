@@ -3,7 +3,7 @@
   "tool": "proxy_v6/reviews/ROUND2-TRANSACTION-REVIEW.md",
   "reviewer": "round2-transaction",
   "target": {
-    "repo": "D:\\claude防封\\publish",
+    "repo": "C:\\CAB-Lab\\publish",
     "branch": "v5/short-run-hardening",
     "commit": "abe0eaa4b29f9d40b8157420d96fa09013d165da",
     "baseline": "36222c92c829a2ef08b71af2a3a3ff9a3c44b396"

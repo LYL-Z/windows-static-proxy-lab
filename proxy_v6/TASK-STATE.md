@@ -8,7 +8,7 @@
 | 项 | 值 |
 |---|---|
 | 仓库 | https://github.com/LYL-Z/windows-static-proxy-lab |
-| 本地路径 | D:\claude防封\publish |
+| 本地路径 | C:\CAB-Lab\publish |
 | 分支 | v5/short-run-hardening |
 | 初始冻结基线 | 36222c92c829a2ef08b71af2a3a3ff9a3c44b396 |
 | V6 修复 | abe0eaa -> c562c18 -> d5f2134 -> 0268e17 -> 79198fd |

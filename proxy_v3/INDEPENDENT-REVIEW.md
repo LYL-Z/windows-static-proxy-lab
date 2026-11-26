@@ -70,9 +70,9 @@ FI5 first-hop unreachable        PASS
 并重新执行了一次完整 `apply-v2 -Mode NEXIP`：
 
 ```
-configs replaced atomically → Clash listening → chain verified: 72.245.197.103
-system proxy -> 127.0.0.1:7897; egress = 72.245.197.103
-DONE. exit=72.245.197.103
+configs replaced atomically → Clash listening → chain verified: 192.0.2.254
+system proxy -> 127.0.0.1:7897; egress = 192.0.2.254
+DONE. exit=192.0.2.254
 ```
 
 ---

@@ -18,7 +18,7 @@ V2 阶段做过一次 **300 次 / 13.6 分钟**的连续性验收：
 |---|---|
 | 样本 | 300 |
 | 成功 | **300 / 300（100%）** |
-| 出口 IP | `72.245.197.103` × 300 |
+| 出口 IP | `192.0.2.254` × 300 |
 | 延迟 | min 2324 / p50 2678 / p90 2950 / p95 3201 / p99 4274 / max 4577 ms |
 
 **关于这组数据的正确解读**：300 次请求集中在 13.6 分钟内，样本高度相关（同一网络环境、同一时段、同一服务端状态），**不能**当作 24 小时随机抽样，也**不**代表夜间/跨运营商/跨路由变化的稳定性。因此它在 V3 里只作为"短窗口基线"，不重复提交为新验收。
@@ -46,10 +46,10 @@ python tools\monitor-longrun.py --hours 0.06 --interval 20 --retry 2 --out evide
 
 ```powershell
 # 24 小时（建议先跑）
-python D:\claude防封\proxy_v3\tools\monitor-longrun.py --hours 24 --interval 60 --retry 2 --out D:\claude防封\proxy_v3\evidence\soak-24h.jsonl
+python C:\CAB-Lab\proxy_v3\tools\monitor-longrun.py --hours 24 --interval 60 --retry 2 --out C:\CAB-Lab\proxy_v3\evidence\soak-24h.jsonl
 
 # 72 小时扩展
-python D:\claude防封\proxy_v3\tools\monitor-longrun.py --hours 72 --interval 120 --retry 2 --out D:\claude防封\proxy_v3\evidence\soak-72h.jsonl
+python C:\CAB-Lab\proxy_v3\tools\monitor-longrun.py --hours 72 --interval 120 --retry 2 --out C:\CAB-Lab\proxy_v3\evidence\soak-72h.jsonl
 ```
 
 要求与实现要点：

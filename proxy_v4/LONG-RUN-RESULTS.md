@@ -11,5 +11,5 @@
 工具：`proxy_v3\tools\monitor-longrun.py`（区分首试/重试、失败不删、未满时长报 PENDING）。
 
 ```powershell
-python D:\claude防封\proxy_v3\tools\monitor-longrun.py --hours 24 --interval 60 --retry 2 --out D:\claude防封\proxy_v4\evidence\soak-24h.jsonl
+python C:\CAB-Lab\proxy_v3\tools\monitor-longrun.py --hours 24 --interval 60 --retry 2 --out C:\CAB-Lab\proxy_v4\evidence\soak-24h.jsonl
 ```

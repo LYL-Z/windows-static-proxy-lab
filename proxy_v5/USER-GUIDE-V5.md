@@ -1,14 +1,14 @@
 # USER-GUIDE-V5
 
 ## 现状
-- 系统仍运行 V4 配置（独立 profile `v4-managed`），出口 `72.245.197.103`。
+- 系统仍运行 V4 配置（独立 profile `v4-managed`），出口 `192.0.2.254`。
 - 上游 #7012 未修：**重启后链式代理大概率失效**，需重新 `apply-v4.ps1`。
 
 ## 每次开机后
 ```powershell
-powershell -ExecutionPolicy Bypass -File D:\claude防封\proxy_v4\state-v4.ps1
+powershell -ExecutionPolicy Bypass -File C:\CAB-Lab\proxy_v4\state-v4.ps1
 # 若非 HEALTHY，且 StarSky 已"加速中"：
-powershell -ExecutionPolicy Bypass -File D:\claude防封\proxy_v4\apply-v4.ps1
+powershell -ExecutionPolicy Bypass -File C:\CAB-Lab\proxy_v4\apply-v4.ps1
 ```
 
 ## 换节点后的正确认知

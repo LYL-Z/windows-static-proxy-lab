@@ -28,7 +28,7 @@ Clash Verge 的 `verge.yaml` 仍保存：
 
 ## 3. 实际流量路径
 - 直连（绕过系统代理）出口：**54.202.22.253**（StarSky 路径）。
-- 经 127.0.0.1:7897 出口：**72.245.197.103**（NexIP/V4 静态链）。
+- 经 127.0.0.1:7897 出口：**192.0.2.254**（NexIP/V4 静态链）。
 - 说明 Clash 链路本身可用；浏览器因 ProxyEnable=0 没走 Clash，所以 Clash 近 10 分钟几乎无流量、IP 信息显示 StarSky 出口。UI 的“节点延迟 332ms”只证明测速请求有响应，不证明浏览器在用该节点。
 
 ## 4. 与 F11 的关系
@@ -39,7 +39,7 @@ Clash Verge 的 `verge.yaml` 仍保存：
 - 状态输出新增 `uiSystemProxy`；
 - UI 与 HKCU 不一致时报告额外 reason；
 - 在有 settings 且其他路径正常时降为 DEGRADED；
-- 生产目录 `D:\claude防封\proxy_v4\config\settings.json` **存在**（933B，DACL 尚未 protected）；**publish 仓库的 `proxy_v4\config` 没有 settings.json**。因此 V6 state 从 publish 运行会 FAILED（settings missing）；若部署到生产并指向生产配置，预期 DEGRADED + UI reason。当前生产仍是 baseline，没有 `uiSystemProxy` 输出。
+- 生产目录 `C:\CAB-Lab\proxy_v4\config\settings.json` **存在**（933B，DACL 尚未 protected）；**publish 仓库的 `proxy_v4\config` 没有 settings.json**。因此 V6 state 从 publish 运行会 FAILED（settings missing）；若部署到生产并指向生产配置，预期 DEGRADED + UI reason。当前生产仍是 baseline，没有 `uiSystemProxy` 输出。
 - 不再用 UI 或节点测速单条件判 HEALTHY。
 测试：`INF-F12-01`（有 settings 时 DEGRADED）、`INF-F12-02`（settings 缺失时 FAILED + UI reason，适用于 publish 路径）、`INF-F12-03`（verge.yaml true/false/missing）。F12 的“检测”不等于“恢复使用”或“用户验收”。
 

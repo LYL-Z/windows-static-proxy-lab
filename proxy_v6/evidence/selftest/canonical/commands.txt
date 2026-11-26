@@ -1,29 +1,29 @@
 V6 test-harness evidence commands (Agent B, 2026-11-18)
 
 1. Canonical self-test (all META checks)
-   powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File D:\claude防封\publish\proxy_v6\tests\self\SelfTest.ps1 -OutDir D:\claude防封\publish\proxy_v6\evidence\selftest\canonical
+   powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\CAB-Lab\publish\proxy_v6\tests\self\SelfTest.ps1 -OutDir C:\CAB-Lab\publish\proxy_v6\evidence\selftest\canonical
    OBSERVED EXIT=0 (7/7 checks passed; selftest.json + console.txt in this directory)
 
 2. Self-test negative control: force a META check failure
-   powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File D:\claude防封\publish\proxy_v6\tests\self\SelfTest.ps1 -OutDir D:\claude防封\publish\proxy_v6\evidence\selftest\negative-exit1 -InjectCheckFailure META-01
+   powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\CAB-Lab\publish\proxy_v6\tests\self\SelfTest.ps1 -OutDir C:\CAB-Lab\publish\proxy_v6\evidence\selftest\negative-exit1 -InjectCheckFailure META-01
    OBSERVED EXIT=1 (SELFTEST_FAIL; negative-exit1-console.txt)
 
 3. Self-test negative control: select zero checks
-   powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File D:\claude防封\publish\proxy_v6\tests\self\SelfTest.ps1 -OutDir D:\claude防封\publish\proxy_v6\evidence\selftest\negative-exit2 -Filter META-99
+   powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\CAB-Lab\publish\proxy_v6\tests\self\SelfTest.ps1 -OutDir C:\CAB-Lab\publish\proxy_v6\evidence\selftest\negative-exit2 -Filter META-99
    OBSERVED EXIT=2 (NO_TESTS_EXECUTED; negative-exit2-console.txt)
 
 4. Self-test negative control: inject a runner exception
-   powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File D:\claude防封\publish\proxy_v6\tests\self\SelfTest.ps1 -OutDir D:\claude防封\publish\proxy_v6\evidence\selftest\negative-exit3 -InjectHarnessError
+   powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\CAB-Lab\publish\proxy_v6\tests\self\SelfTest.ps1 -OutDir C:\CAB-Lab\publish\proxy_v6\evidence\selftest\negative-exit3 -InjectHarnessError
    OBSERVED EXIT=3 (SELFTEST_HARNESS_ERROR; negative-exit3-console.txt)
 
 5. Self-test negative control: block the evidence directory
    (create a regular file at <temp>\blocked, then pass -OutDir <temp>\blocked\out)
-   powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File D:\claude防封\publish\proxy_v6\tests\self\SelfTest.ps1 -OutDir <temp>\blocked\out
+   powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\CAB-Lab\publish\proxy_v6\tests\self\SelfTest.ps1 -OutDir <temp>\blocked\out
    OBSERVED EXIT=4 (EVIDENCE_ERROR; negative-exit4-console.txt)
 
 6. Run-Tests with zero case tests (the cases directory currently has lead-owned F07-F10 files;
    this run used an empty temp cases directory to prove the zero-executed contract)
-   powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File D:\claude防封\publish\proxy_v6\tests\Run-Tests.ps1 -CasesDir <temp>\empty-cases -OutFile <temp>\evidence.json -EvidenceDir <temp>\evidence-cases
+   powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File C:\CAB-Lab\publish\proxy_v6\tests\Run-Tests.ps1 -CasesDir <temp>\empty-cases -OutFile <temp>\evidence.json -EvidenceDir <temp>\evidence-cases
    OBSERVED EXIT=2 (RESULT: NO_TESTS_EXECUTED; run-tests-empty-console.txt)
 
 7. Integration load check (registration only; NO scenario body executed)

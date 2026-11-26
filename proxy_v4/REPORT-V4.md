@@ -1,7 +1,7 @@
 # REPORT-V4 — 安全加固、配置完整性、生命周期可靠性
 
 时间：2026-11-18 03:45–04:05 (America/Los_Angeles)
-目录：D:\claude防封\proxy_v4\（V1/V2/V3 全部保留）
+目录：C:\CAB-Lab\proxy_v4\（V1/V2/V3 全部保留）
 
 ## 0. 总评：**PARTIAL — 未达到正式发布 Gate**
 
@@ -25,8 +25,8 @@
 
 ```
 apply-v4 -DryRun   -> staged configs pass mihomo -t
-apply-v4           -> snapshot -> 注册独立 profile -> 原子替换 -> 启动 -> chain verified: 72.245.197.103
-state-v4           -> STATE HEALTHY / NEXIP / firstHopOk True / exit 72.245.197.103
+apply-v4           -> snapshot -> 注册独立 profile -> 原子替换 -> 启动 -> chain verified: 192.0.2.254
+state-v4           -> STATE HEALTHY / NEXIP / firstHopOk True / exit 192.0.2.254
                       systemProxy 127.0.0.1:7897 (owner record: clash)
                       profile marker True / runtime marker(chain signature) True
 faultinject-v4     -> 13/13 场景符合预期

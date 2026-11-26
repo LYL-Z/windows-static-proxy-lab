@@ -4,7 +4,7 @@
     "startedAt":  "2026-11-18T06:33:33.893-08:00",
     "finishedAt":  "2026-11-18T06:33:44.692-08:00",
     "durationMs":  10797,
-    "repoRoot":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-selftest-wt",
+    "repoRoot":  "C:\\CAB-Lab\\AppData\\Local\\Temp\\v6-selftest-wt",
     "git":  {
                 "head":  "79198fd1046f08e17ca9ca819a464ca7a7a19921",
                 "branch":  "HEAD",
@@ -38,9 +38,9 @@
                        "expectedExit":  "0",
                        "childExitCode":  0,
                        "childTimedOut":  false,
-                       "stdout":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-01\\stdout.txt",
-                       "stderr":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-01\\stderr.txt",
-                       "evidence":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-01\\evidence.json",
+                       "stdout":  "C:\\CAB-Lab\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-01\\stdout.txt",
+                       "stderr":  "C:\\CAB-Lab\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-01\\stderr.txt",
+                       "evidence":  "C:\\CAB-Lab\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-01\\evidence.json",
                        "at":  "2026-11-18T06:33:36.270-08:00"
                    },
                    {
@@ -52,9 +52,9 @@
                        "expectedExit":  "1",
                        "childExitCode":  1,
                        "childTimedOut":  false,
-                       "stdout":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-02\\stdout.txt",
-                       "stderr":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-02\\stderr.txt",
-                       "evidence":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-02\\evidence.json",
+                       "stdout":  "C:\\CAB-Lab\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-02\\stdout.txt",
+                       "stderr":  "C:\\CAB-Lab\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-02\\stderr.txt",
+                       "evidence":  "C:\\CAB-Lab\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-02\\evidence.json",
                        "at":  "2026-11-18T06:33:37.143-08:00"
                    },
                    {
@@ -66,9 +66,9 @@
                        "expectedExit":  "3",
                        "childExitCode":  3,
                        "childTimedOut":  false,
-                       "stdout":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-03\\stdout.txt",
-                       "stderr":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-03\\stderr.txt",
-                       "evidence":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-03\\evidence.json",
+                       "stdout":  "C:\\CAB-Lab\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-03\\stdout.txt",
+                       "stderr":  "C:\\CAB-Lab\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-03\\stderr.txt",
+                       "evidence":  "C:\\CAB-Lab\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-03\\evidence.json",
                        "at":  "2026-11-18T06:33:38.009-08:00"
                    },
                    {
@@ -80,9 +80,9 @@
                        "expectedExit":  "2",
                        "childExitCode":  2,
                        "childTimedOut":  false,
-                       "stdout":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-04-empty\\stdout.txt",
-                       "stderr":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-04-empty\\stderr.txt",
-                       "evidence":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-04-empty\\evidence.json",
+                       "stdout":  "C:\\CAB-Lab\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-04-empty\\stdout.txt",
+                       "stderr":  "C:\\CAB-Lab\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-04-empty\\stderr.txt",
+                       "evidence":  "C:\\CAB-Lab\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-04-empty\\evidence.json",
                        "at":  "2026-11-18T06:33:39.579-08:00"
                    },
                    {
@@ -94,9 +94,9 @@
                        "expectedExit":  "0 mixed / 2 all-skip / 2 runtime",
                        "childExitCode":  0,
                        "childTimedOut":  false,
-                       "stdout":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-05-mixed\\stdout.txt",
-                       "stderr":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-05-mixed\\stderr.txt",
-                       "evidence":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-05-mixed\\evidence.json",
+                       "stdout":  "C:\\CAB-Lab\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-05-mixed\\stdout.txt",
+                       "stderr":  "C:\\CAB-Lab\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-05-mixed\\stderr.txt",
+                       "evidence":  "C:\\CAB-Lab\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-05-mixed\\evidence.json",
                        "at":  "2026-11-18T06:33:42.110-08:00"
                    },
                    {
@@ -108,8 +108,8 @@
                        "expectedExit":  "4",
                        "childExitCode":  4,
                        "childTimedOut":  false,
-                       "stdout":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-06\\stdout.txt",
-                       "stderr":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-06\\stderr.txt",
+                       "stdout":  "C:\\CAB-Lab\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-06\\stdout.txt",
+                       "stderr":  "C:\\CAB-Lab\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-06\\stderr.txt",
                        "evidence":  null,
                        "at":  "2026-11-18T06:33:43.818-08:00"
                    },
@@ -122,9 +122,9 @@
                        "expectedExit":  "1",
                        "childExitCode":  1,
                        "childTimedOut":  false,
-                       "stdout":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-07\\stdout.txt",
-                       "stderr":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-07\\stderr.txt",
-                       "evidence":  "D:\\claude防封\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-07\\evidence.json",
+                       "stdout":  "C:\\CAB-Lab\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-07\\stdout.txt",
+                       "stderr":  "C:\\CAB-Lab\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-07\\stderr.txt",
+                       "evidence":  "C:\\CAB-Lab\\publish\\proxy_v6\\evidence\\selftest\\canonical\\META-07\\evidence.json",
                        "at":  "2026-11-18T06:33:44.675-08:00"
                    }
                ]

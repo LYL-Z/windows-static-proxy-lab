@@ -4,20 +4,20 @@
 
 ```powershell
 # 状态（只读）
-powershell -ExecutionPolicy Bypass -File D:\claude防封\proxy_v4\state-v4.ps1
+powershell -ExecutionPolicy Bypass -File C:\CAB-Lab\proxy_v4\state-v4.ps1
 
 # 应用（StarSky 需在"加速中"）
-powershell -ExecutionPolicy Bypass -File D:\claude防封\proxy_v4\apply-v4.ps1
+powershell -ExecutionPolicy Bypass -File C:\CAB-Lab\proxy_v4\apply-v4.ps1
 
 # 回滚
-powershell -ExecutionPolicy Bypass -File D:\claude防封\proxy_v4\rollback-v4.ps1 -List
-powershell -ExecutionPolicy Bypass -File D:\claude防封\proxy_v4\rollback-v4.ps1
+powershell -ExecutionPolicy Bypass -File C:\CAB-Lab\proxy_v4\rollback-v4.ps1 -List
+powershell -ExecutionPolicy Bypass -File C:\CAB-Lab\proxy_v4\rollback-v4.ps1
 ```
 
 ## 首次/重装
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File D:\claude防封\proxy_v4\apply-v4.ps1 -Init
+powershell -ExecutionPolicy Bypass -File C:\CAB-Lab\proxy_v4\apply-v4.ps1 -Init
 ```
 （从当前 Clash 配置一次性迁移到 `config\settings.json`，密码以 DPAPI 加密保存）
 

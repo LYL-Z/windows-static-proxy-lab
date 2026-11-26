@@ -2,7 +2,7 @@
 
 - 时间：2026-11-18 03:00 → 03:45 (America/Los_Angeles)
 - 方式：实际操作系统、独立代理复审、真实测试、公开资料核验
-- 交付目录：`D:\claude防封\proxy_v3\`（V1 `proxy_diag\`、V2 `proxy_v2\` 全部保留，未覆盖）
+- 交付目录：`C:\CAB-Lab\proxy_v3\`（V1 `proxy_diag\`、V2 `proxy_v2\` 全部保留，未覆盖）
 - 前提：未伪造身份/位置/设备指纹；未绕过任何平台限制；未购买/续费/退款；未提交工单
 
 ---
@@ -64,7 +64,7 @@ V3 的价值不在于"又连上了"，而在于三件事：
 H1 regression : EAP=Stop 下探测死端口返回 [] 而非抛异常   PASS
 H2 regression : 失败替换后仍为 ORIGINAL；成功为 NEW2；残留 .bak=0  PASS
 FI1..FI5      : 5/5 PASS
-apply-v2      : configs replaced → chain verified 72.245.197.103 → 系统代理 7897   PASS
+apply-v2      : configs replaced → chain verified 192.0.2.254 → 系统代理 7897   PASS
 ACL           : 快照目录 ACL 成功（不再报 needs ownership）
 ```
 
@@ -74,7 +74,7 @@ ACL           : 快照目录 ACL 成功（不再报 needs ownership）
 
 | 协议 | 路径 | 出口 |
 |---|---|---|
-| TCP/HTTPS | Clash → StarSky → NexIP | **72.245.197.103** |
+| TCP/HTTPS | Clash → StarSky → NexIP | **192.0.2.254** |
 | UDP/STUN（直连） | utun119 → StarSky | **142.111.173.93** |
 | UDP/STUN（**经 Clash UDP 中继**） | Clash 回落 → utun119 → StarSky | **142.111.173.93** |
 
@@ -129,7 +129,7 @@ ACL           : 快照目录 ACL 成功（不再报 needs ownership）
 
 ## 8. 最后一句实话
 
-这套系统现在**能在 TCP 上稳定地以 `72.245.197.103` 访问 HTTPS**，并且**第一次有了可独立复现的故障测试与诚实的失败报告**。
+这套系统现在**能在 TCP 上稳定地以 `192.0.2.254` 访问 HTTPS**，并且**第一次有了可独立复现的故障测试与诚实的失败报告**。
 
 但它**不**等于"住宅 IP 已确认"、**不**等于"独享"、**不**等于"长期稳定已验收"，更**不**等于"Claude 使用资格成立"。
 

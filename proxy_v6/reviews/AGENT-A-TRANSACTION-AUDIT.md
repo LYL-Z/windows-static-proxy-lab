@@ -2,13 +2,13 @@
 
 审计人：Agent A（transaction & concurrency auditor）
 审计时间：2026-11-18 04:51–05:12（America/Los_Angeles）
-报告位置：D:\claude防封\publish\proxy_v6\reviews\AGENT-A-TRANSACTION-AUDIT.md
+报告位置：C:\CAB-Lab\publish\proxy_v6\reviews\AGENT-A-TRANSACTION-AUDIT.md
 
 ## 0. 审计对象、基线冻结与证据声明
 
 | 项 | 值 |
 |---|---|
-| 代码仓库 | D:\claude防封\publish（分支 v5/short-run-hardening） |
+| 代码仓库 | C:\CAB-Lab\publish（分支 v5/short-run-hardening） |
 | 冻结基线 | commit 36222c92c829a2ef08b71af2a3a3ff9a3c44b396（HEAD 与 origin 一致） |
 | 基线 blob | apply-v4.ps1 711b13b9；lib/V4.ps1 74c436bf；rollback-v4.ps1 96b690ee；state-v4.ps1 328dfc8f；tests/faultinject-v4.ps1 87267b05 |
 | 主报告行号 | 全部对 commit 36222c9 的 git blob，使用 git archive 导出的临时副本阅读与执行 |

@@ -18,7 +18,7 @@
                 "dirty":  false,
                 "error":  null
             },
-    "repoRoot":  "C:\\Users\\Lenovo\\AppData\\Local\\Temp\\v6-selftest-wt",
+    "repoRoot":  "C:\\CAB-Lab\\AppData\\Local\\Temp\\v6-selftest-wt",
     "filter":  "NO-SUCH-TEST-*",
     "startedAt":  "2026-11-18T06:33:39.216-08:00",
     "finishedAt":  "2026-11-18T06:33:39.449-08:00",
