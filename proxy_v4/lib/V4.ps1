@@ -981,17 +981,22 @@ function Get-V4Sha256Bytes {
     finally { $sha.Dispose() }
 }
 
-function Set-V4SealedSnapshotFile {
-    param([string]$Path, [string]$PlainSha)
-    $plain = [IO.File]::ReadAllBytes($Path)
+function Write-V4SealedSnapshotEntry {
+    param([string]$Source, [string]$Target, [string]$Name, [string]$ExpectedHash)
+    Assert-V4SnapshotPath $Source
+    Assert-V4SnapshotPath $Target
+    $plain = [IO.File]::ReadAllBytes($Source)
     try {
-        if ((Get-V4Sha256Bytes $plain) -ne $PlainSha) { throw ('snapshot plaintext changed before seal: ' + $Path) }
+        $plainHash = Get-V4Sha256Bytes $plain
+        if ($ExpectedHash -and $plainHash -ne $ExpectedHash) { throw ('snapshot plaintext changed before seal: ' + $Name) }
         $cipher = Protect-V4SnapshotBytes $plain
-        Set-V4Atomic -TargetPath $Path -Bytes $cipher | Out-Null
+        Set-V4Atomic -TargetPath $Target -Bytes $cipher | Out-Null
+        if (-not (Protect-V4Acl -Path $Target)) { throw 'cannot harden sealed snapshot file' }
+        $cipherHash = Get-V4Sha256Bytes $cipher
+        if ((Get-FileHash -LiteralPath $Target -Algorithm SHA256).Hash -ne $cipherHash) { throw 'new snapshot ciphertext mismatch' }
+        return [pscustomobject]@{ name = $Name; sha256 = $plainHash; cipherSha256 = $cipherHash; sealed = $true; bytes = $cipher.Length }
     }
     finally { [Array]::Clear($plain, 0, $plain.Length) }
-    if (-not (Protect-V4Acl -Path $Path)) { throw 'cannot harden sealed snapshot file' }
-    return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash
 }
 
 function Test-V4SnapshotEntrySealed {
@@ -1004,15 +1009,29 @@ function Test-V4SnapshotRelativeName {
     param([string]$Name)
     if ([string]::IsNullOrWhiteSpace($Name)) { return $false }
     $name = ([string]$Name).Replace('/', '\')
-    if ($name.StartsWith('\\') -or $name.StartsWith('\') -or $name.Contains(':')) { return $false }
-    $parts = $name.Split([char[]]@('\','/'), [System.StringSplitOptions]::RemoveEmptyEntries)
+    if ($name -match '[:*?"<>|]') { return $false }
+    $parts = $name.Split([char]'\')
     if ($parts.Length -eq 0) { return $false }
     foreach ($part in $parts) {
-        if ($part -eq '.' -or $part -eq '..') { return $false }
+        if (-not $part -or $part.EndsWith('.') -or $part.EndsWith(' ')) { return $false }
     }
     $okRoot = ($parts.Length -eq 1 -and ($script:V4RootConfigFiles -contains $name))
     $okProfile = ($parts.Length -eq 2 -and $parts[0] -eq 'profiles' -and $parts[1].EndsWith('.yaml'))
     return [bool]($okRoot -or $okProfile)
+}
+
+function Assert-V4SnapshotPath {
+    param([string]$Path)
+    # Check the actual filesystem chain as well as the manifest's lexical names.
+    $cursor = [IO.Path]::GetFullPath($Path)
+    while ($cursor) {
+        try { $item = Get-Item -LiteralPath $cursor -Force -ErrorAction Stop }
+        catch [Management.Automation.ItemNotFoundException] { $item = $null }
+        if ($item -and ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+            throw 'snapshot paths must not contain reparse points'
+        }
+        $cursor = [IO.Path]::GetDirectoryName($cursor)
+    }
 }
 
 function Get-V4SnapshotSchema {
@@ -1041,6 +1060,7 @@ function Test-V4DirectoryInside {
 function Read-V4SnapshotPlain {
     param([string]$SnapshotDir, $Entry)
     $src = Join-Path $SnapshotDir ([string]$Entry.name)
+    Assert-V4SnapshotPath $src
     $stored = [IO.File]::ReadAllBytes($src)
     $content = $null
     $ownsStored = $true
@@ -1082,23 +1102,19 @@ function New-V4SnapshotFiles {
         [string]$Reason = 'apply'
     )
     if (-not $AppData) { throw 'clash appdata not found' }
+    Assert-V4SnapshotPath $Dir
+    if (Test-Path -LiteralPath $Dir) { throw 'new snapshot directory already exists' }
     Ensure-V4Dir $Dir
+    # Inherit the verified private ACL before creating any snapshot contents.
+    if (-not (Protect-V4Acl -Path $Dir)) { throw 'cannot harden snapshot directory ACL' }
     $profSnap = Join-Path $Dir 'profiles'
     Ensure-V4Dir $profSnap
-    # C-01: harden the directory BEFORE plaintext credential-bearing files are copied in.
-    if (-not (Protect-V4Acl -Path $Dir)) { throw 'cannot harden snapshot directory ACL before copy' }
     $files = @()
     $absent = @()
     foreach ($f in $script:V4RootConfigFiles) {
         $src = Join-Path $AppData $f
         if (Test-Path -LiteralPath $src) {
-            $dst = Join-Path $Dir $f
-            $srcHash = (Get-FileHash -LiteralPath $src -Algorithm SHA256).Hash
-            Copy-Item -LiteralPath $src -Destination $dst -Force
-            $dstHash = (Get-FileHash -LiteralPath $dst -Algorithm SHA256).Hash
-            if ($srcHash -ne $dstHash) { throw ('snapshot copy mismatch: ' + $f) }
-            $cipherSha = Set-V4SealedSnapshotFile -Path $dst -PlainSha $dstHash
-            $files += [pscustomobject]@{ name = $f; sha256 = $dstHash; cipherSha256 = $cipherSha; sealed = $true; bytes = (Get-Item -LiteralPath $dst).Length }
+            $files += Write-V4SealedSnapshotEntry -Source $src -Target (Join-Path $Dir $f) -Name $f
         }
         else { $absent += $f }
     }
@@ -1107,13 +1123,7 @@ function New-V4SnapshotFiles {
         foreach ($fi in @(Get-ChildItem -LiteralPath $ProfilesDir -File -Filter '*.yaml' -ErrorAction SilentlyContinue)) {
             if ($fi.Name -eq $script:V4ManagedProfile) { $managedSeen = $true }
             $rel = Join-Path 'profiles' $fi.Name
-            $dst = Join-Path $profSnap $fi.Name
-            $srcHash = (Get-FileHash -LiteralPath $fi.FullName -Algorithm SHA256).Hash
-            Copy-Item -LiteralPath $fi.FullName -Destination $dst -Force
-            $dstHash = (Get-FileHash -LiteralPath $dst -Algorithm SHA256).Hash
-            if ($srcHash -ne $dstHash) { throw ('snapshot copy mismatch: ' + $rel) }
-            $cipherSha = Set-V4SealedSnapshotFile -Path $dst -PlainSha $dstHash
-            $files += [pscustomobject]@{ name = $rel; sha256 = $dstHash; cipherSha256 = $cipherSha; sealed = $true; bytes = (Get-Item -LiteralPath $dst).Length }
+            $files += Write-V4SealedSnapshotEntry -Source $fi.FullName -Target (Join-Path $profSnap $fi.Name) -Name $rel
         }
     }
     if (-not $managedSeen) { $absent += $script:V4ManagedProfileRel }
@@ -1127,7 +1137,7 @@ function New-V4SnapshotFiles {
         absent = $absent
     }
     $mp = Join-Path $Dir 'manifest.json'
-    Write-V4File -Path $mp -Content ($manifest | ConvertTo-Json -Depth 7)
+    Set-V4Atomic -TargetPath $mp -Content ($manifest | ConvertTo-Json -Depth 7) | Out-Null
     return [pscustomobject]@{ dir = $Dir; manifest = $manifest; files = $files; absent = $absent }
 }
 
@@ -1135,6 +1145,7 @@ function New-V4Snapshot {
     param([string]$Reason = 'apply', [int]$Port = 7897)
     $p = Get-V4Paths
     if (-not $p.AppData) { throw 'clash appdata not found' }
+    Assert-V4SnapshotPath $script:BackupDir
     Ensure-V4Dir $script:BackupDir
     if (-not (Protect-V4Acl -Path $script:BackupDir)) { throw 'cannot harden backup root ACL' }
     $beforeProxy = Get-V4SystemProxy
@@ -1142,20 +1153,16 @@ function New-V4Snapshot {
     if ($wasRunning) { Stop-V4Clash -Port $Port | Out-Null }
     $stamp = (Get-Date -Format 'yyyyMMdd-HHmmss-fff') + '-' + [guid]::NewGuid().ToString('N').Substring(0, 6)
     $dir = Join-Path $script:BackupDir $stamp
-    try {
-        $r = New-V4SnapshotFiles -AppData $p.AppData -ProfilesDir $p.ProfilesDir -Dir $dir -SystemProxy $beforeProxy -ClashRunningBefore $wasRunning -Reason $Reason
-        return $r.dir
-    }
-    catch {
-        Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue
-        throw
-    }
+    # An interrupted capture holds ciphertext only and has no committed manifest.
+    $r = New-V4SnapshotFiles -AppData $p.AppData -ProfilesDir $p.ProfilesDir -Dir $dir -SystemProxy $beforeProxy -ClashRunningBefore $wasRunning -Reason $Reason
+    return $r.dir
 }
 
 function Test-V4SnapshotManifest {
     param([string]$SnapshotDir)
     if (-not $SnapshotDir) { throw 'snapshot directory is empty' }
     $mp = Join-Path $SnapshotDir 'manifest.json'
+    Assert-V4SnapshotPath $mp
     if (-not (Test-Path -LiteralPath $mp)) { throw ('snapshot manifest missing: ' + $SnapshotDir) }
     try { $m = Get-Content -LiteralPath $mp -Raw -Encoding UTF8 | ConvertFrom-Json }
     catch { throw 'snapshot manifest is not valid JSON' }
@@ -1171,6 +1178,7 @@ function Test-V4SnapshotManifest {
         $sealed = Test-V4SnapshotEntrySealed $e
         if ($schema -ge 3 -and -not $sealed) { throw ('snapshot manifest is missing cipherSha256: ' + $name) }
         $src = Join-Path $SnapshotDir $name
+        Assert-V4SnapshotPath $src
         if (-not (Test-Path -LiteralPath $src)) { throw ('snapshot incomplete: missing ' + $name) }
         if ($sealed) {
             $cipherProp = $null
@@ -1218,6 +1226,12 @@ function Get-V4SnapshotTarget {
 function Restore-V4Files {
     param([string]$SnapshotDir, [string]$AppData, [string]$ProfilesDir)
     $v = Test-V4SnapshotManifest -SnapshotDir $SnapshotDir
+    $targets = @{}
+    foreach ($name in (@($v.entries.name) + @($v.absent))) {
+        $target = Get-V4SnapshotTarget -Name $name -AppData $AppData -ProfilesDir $ProfilesDir
+        Assert-V4SnapshotPath $target
+        $targets[$name] = $target
+    }
     # Decrypt and verify every entry before the first target write. A corrupt
     # ciphertext must not leave a later file in the same snapshot updated.
     $prepared = New-Object System.Collections.Generic.List[object]
@@ -1235,7 +1249,7 @@ function Restore-V4Files {
     $failures = New-Object System.Collections.Generic.List[object]
     for ($i = 0; $i -lt $prepared.Count; $i++) {
         $item = $prepared[$i]
-        $target = Get-V4SnapshotTarget -Name $item.name -AppData $AppData -ProfilesDir $ProfilesDir
+        $target = $targets[$item.name]
         try {
             $expected = [string]$item.sha256
             $validator = ({ param($f) if ((Get-FileHash -LiteralPath $f -Algorithm SHA256).Hash.ToLowerInvariant() -ne $expected.ToLowerInvariant()) { throw 'restored hash mismatch' } }).GetNewClosure()
@@ -1249,7 +1263,7 @@ function Restore-V4Files {
         }
     }
     foreach ($name in $v.absent) {
-        $target = Get-V4SnapshotTarget -Name $name -AppData $AppData -ProfilesDir $ProfilesDir
+        $target = $targets[$name]
         try {
             if (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Force -ErrorAction Stop }
             $restored += ('absent:' + $name)
@@ -1297,89 +1311,42 @@ function ConvertTo-V4SealedSnapshot {
         [Parameter(Mandatory = $true)][string]$TestRoot,
         [switch]$Confirm
     )
-    # Test-only migration. Real backup directories live outside TEMP and are refused.
     if (-not $Confirm) { throw 'snapshot seal migration requires -Confirm' }
-    if ([string]::IsNullOrWhiteSpace($env:TEMP)) { throw 'TEMP is not set' }
-    if (-not (Test-V4DirectoryInside $TestRoot $env:TEMP)) { throw 'refusing to seal a snapshot when TestRoot is outside TEMP' }
-    if (-not (Test-V4DirectoryInside $SnapshotDir $env:TEMP)) { throw 'refusing to seal a snapshot outside TEMP' }
+    if (-not $script:TestMode) { throw 'snapshot seal migration requires test mode' }
+    $temp = [IO.Path]::GetTempPath()
+    if (-not (Test-V4DirectoryInside $TestRoot $temp)) { throw 'refusing to seal a snapshot when TestRoot is outside TEMP' }
+    if (-not (Test-V4DirectoryInside $SnapshotDir $temp)) { throw 'refusing to seal a snapshot outside TEMP' }
     if (-not (Test-V4DirectoryInside $SnapshotDir $TestRoot)) { throw 'refusing to seal a snapshot outside TestRoot' }
-    $manifestPath = Join-Path $SnapshotDir 'manifest.json'
-    if (-not (Test-Path -LiteralPath $manifestPath)) { throw ('snapshot manifest missing: ' + $SnapshotDir) }
-    $oldManifest = [IO.File]::ReadAllBytes($manifestPath)
-    $staged = New-Object System.Collections.Generic.List[object]
-    try {
-        $v = Test-V4SnapshotManifest -SnapshotDir $SnapshotDir
-        if ((Get-V4SnapshotSchema $v.manifest) -ne 2) { throw 'snapshot seal migration only accepts schema 2' }
-        foreach ($e in $v.entries) {
-            if ($e.sealed) { throw ('schema 2 entry is already sealed: ' + $e.name) }
-            $src = Join-Path $SnapshotDir $e.name
-            $plain = [IO.File]::ReadAllBytes($src)
-            if ((Get-V4Sha256Bytes $plain).ToLowerInvariant() -ne ([string]$e.sha256).ToLowerInvariant()) {
-                [Array]::Clear($plain, 0, $plain.Length)
-                throw ('snapshot plaintext changed before seal: ' + $e.name)
-            }
-            $cipher = Protect-V4SnapshotBytes $plain
-            [void]$staged.Add([pscustomobject]@{
-                name = [string]$e.name
-                src = $src
-                plain = $plain
-                cipher = $cipher
-                sha256 = [string]$e.sha256
-                cipherSha256 = (Get-V4Sha256Bytes $cipher)
-            })
-        }
-        for ($i = 0; $i -lt $staged.Count; $i++) {
-            $s = $staged[$i]
-            Set-V4Atomic -TargetPath $s.src -Bytes $s.cipher | Out-Null
-            if (-not (Protect-V4Acl -Path $s.src)) { throw ('cannot harden sealed snapshot file: ' + $s.name) }
-            $written = (Get-FileHash -LiteralPath $s.src -Algorithm SHA256).Hash
-            if ($written.ToLowerInvariant() -ne $s.cipherSha256.ToLowerInvariant()) { throw ('sealed snapshot ciphertext mismatch: ' + $s.name) }
-        }
-        $m = $v.manifest
-        $created = (Get-Date).ToString('s')
-        if ($m.PSObject.Properties.Name -contains 'createdAt' -and $m.createdAt) {
-            if ($m.createdAt -is [datetime]) { $created = ([datetime]$m.createdAt).ToString('s') }
-            else { $created = [string]$m.createdAt }
-        }
-        $reason = 'migrate'
-        if ($m.PSObject.Properties.Name -contains 'reason' -and $m.reason) { $reason = [string]$m.reason }
-        $fileEntries = @()
-        for ($i = 0; $i -lt $staged.Count; $i++) {
-            $s = $staged[$i]
-            $fileEntries += [ordered]@{ name = $s.name; sha256 = $s.sha256; cipherSha256 = $s.cipherSha256; sealed = $true; bytes = $s.cipher.Length }
-        }
-        $manifest = [ordered]@{
-            schema = 3
-            createdAt = $created
-            reason = $reason
-            files = @($fileEntries)
-            absent = @($v.absent)
-        }
-        if ($m.PSObject.Properties.Name -contains 'systemProxy') { $manifest.systemProxy = $m.systemProxy }
-        if ($m.PSObject.Properties.Name -contains 'clashRunningBefore') { $manifest.clashRunningBefore = [bool]$m.clashRunningBefore }
-        Write-V4File -Path $manifestPath -Content ($manifest | ConvertTo-Json -Depth 7)
-        Test-V4SnapshotManifest -SnapshotDir $SnapshotDir | Out-Null
-        return [pscustomobject]@{ dir = ([IO.Path]::GetFullPath($SnapshotDir)); schema = 3 }
+    if ([IO.Path]::GetFullPath($TestRoot).TrimEnd('\') -ne [IO.Path]::GetFullPath($script:Root).TrimEnd('\')) {
+        throw 'TestRoot must match the active V4 test root'
     }
-    catch {
-        $migrationError = [string]$_.Exception.Message
-        for ($i = 0; $i -lt $staged.Count; $i++) {
-            $s = $staged[$i]
-            try { if ($s.plain) { Set-V4Atomic -TargetPath $s.src -Bytes $s.plain | Out-Null } } catch { }
-        }
-        try { if ($oldManifest) { [IO.File]::WriteAllBytes($manifestPath, $oldManifest) } } catch { }
-        throw $migrationError
+    Assert-V4SnapshotPath $SnapshotDir
+    $source = Test-V4SnapshotManifest -SnapshotDir $SnapshotDir
+    if ((Get-V4SnapshotSchema $source.manifest) -ne 2 -or @($source.entries | Where-Object sealed).Count -gt 0) {
+        throw 'snapshot seal migration requires a plain schema 2 snapshot'
     }
-    finally {
-        for ($i = 0; $i -lt $staged.Count; $i++) {
-            $s = $staged[$i]
-            if ($s.plain) { [Array]::Clear($s.plain, 0, $s.plain.Length) }
-            if ($s.cipher) { [Array]::Clear($s.cipher, 0, $s.cipher.Length) }
-        }
-        if ($oldManifest) { [Array]::Clear($oldManifest, 0, $oldManifest.Length) }
-    }
-}
 
+    # Keep the legacy input intact even when sealing is interrupted midway.
+    $tag = [guid]::NewGuid().ToString('N')
+    $stage = Join-Path $TestRoot ('.seal-stage-' + $tag)
+    $destination = Join-Path $TestRoot ('sealed-' + $tag)
+    Assert-V4SnapshotPath $stage
+    Assert-V4SnapshotPath $destination
+    # An incomplete stage holds ciphertext under the private test root.
+    Ensure-V4Dir $stage
+    if (-not (Protect-V4Acl -Path $stage)) { throw 'cannot harden staged snapshot directory ACL' }
+    $entries = foreach ($entry in $source.entries) {
+        Write-V4SealedSnapshotEntry -Source (Join-Path $SnapshotDir $entry.name) -Target (Join-Path $stage $entry.name) -Name $entry.name -ExpectedHash $entry.sha256
+    }
+    $manifest = $source.manifest
+    $manifest | Add-Member -NotePropertyName schema -NotePropertyValue 3 -Force
+    $manifest.files = @($entries)
+    $manifest | Add-Member -NotePropertyName absent -NotePropertyValue @($source.absent) -Force
+    Set-V4Atomic -TargetPath (Join-Path $stage 'manifest.json') -Content ($manifest | ConvertTo-Json -Depth 7) | Out-Null
+    Test-V4SnapshotManifest -SnapshotDir $stage | Out-Null
+    [IO.Directory]::Move($stage, $destination)
+    return [pscustomobject]@{ dir = $destination; schema = 3 }
+}
 function Restore-V4Snapshot {
     param([string]$SnapshotDir, [int]$Port = 7897, [switch]$NoProcessControl)
     $p = Get-V4Paths

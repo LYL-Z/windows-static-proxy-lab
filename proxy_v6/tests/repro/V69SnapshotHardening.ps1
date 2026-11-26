@@ -241,21 +241,50 @@ try {
 
     $legacySeal = Join-Path $root 'legacy-seal'
     Copy-Snapshot $legacy $legacySeal
+    $sealInputStamp = Get-Stamp $legacySeal
+    $isolationBefore = $script:TestMode
+    try {
+        $script:TestMode = $false
+        Assert-MigrationRefused 'migration requires V4 test mode' { ConvertTo-V4SealedSnapshot -SnapshotDir $legacySeal -TestRoot $root -Confirm } 'test mode'
+    } finally { $script:TestMode = $isolationBefore }
+
+    $alias = Join-Path $root 'legacy-alias'
+    New-Item -ItemType Junction -Path $alias -Target $legacySeal | Out-Null
+    try {
+        Assert-MigrationRefused 'migration refuses a redirected snapshot directory' { ConvertTo-V4SealedSnapshot -SnapshotDir $alias -TestRoot $root -Confirm } 'reparse point'
+        Invoke-Refused 'restore refuses a redirected snapshot directory' { Restore-V4Files -SnapshotDir $alias -AppData $app -ProfilesDir $profilesDir }
+    } finally { [IO.Directory]::Delete($alias) }
+
+    $originalWriter = (Get-Command Write-V4SealedSnapshotEntry).ScriptBlock
+    try {
+        function Write-V4SealedSnapshotEntry {
+            param($Source, $Target, $Name, $ExpectedHash)
+            if ($Name -eq 'profiles.yaml') { throw 'injected second-file seal failure' }
+            & $originalWriter @PSBoundParameters
+        }
+        Assert-MigrationRefused 'migration stops on second-file seal failure' { ConvertTo-V4SealedSnapshot -SnapshotDir $legacySeal -TestRoot $root -Confirm } 'second-file seal failure'
+        Check 'failed migration preserves every legacy input byte' ((Get-Stamp $legacySeal) -eq $sealInputStamp) ''
+        Check 'failed migration publishes no snapshot' (-not @(Get-ChildItem -LiteralPath $root -Directory -Filter 'sealed-*').Count) ''
+    } finally {
+        Set-Item -Path Function:Write-V4SealedSnapshotEntry -Value $originalWriter
+    }
+
     $migrated = $null
     $migrateDetail = ''
     try { $migrated = ConvertTo-V4SealedSnapshot -SnapshotDir $legacySeal -TestRoot $root -Confirm }
     catch { $migrateDetail = [string]$_.Exception.Message }
     $sealedManifest = $null
-    if (-not $migrateDetail) { $sealedManifest = Read-Manifest $legacySeal }
+    if ($migrated) { $sealedManifest = Read-Manifest $migrated.dir }
     $sealOk = ($migrated -and $migrated.schema -eq 3 -and $sealedManifest -and [int]$sealedManifest.schema -eq 3)
     Check 'confirmed TEMP migration seals schema 2' $sealOk $migrateDetail
+    Check 'successful migration preserves every legacy input byte' ((Get-Stamp $legacySeal) -eq $sealInputStamp) ''
     $cipherRaw = ''
     $manifestRaw = ''
-    if (Test-Path -LiteralPath (Join-Path $legacySeal 'clash-verge.yaml')) {
-        $cipherRaw = [Text.Encoding]::UTF8.GetString((Read-Bytes (Join-Path $legacySeal 'clash-verge.yaml')))
-        $manifestRaw = [IO.File]::ReadAllText((Join-Path $legacySeal 'manifest.json'))
+    if ($migrated) {
+        $cipherRaw = [Text.Encoding]::UTF8.GetString((Read-Bytes (Join-Path $migrated.dir 'clash-verge.yaml')))
+        $manifestRaw = [IO.File]::ReadAllText((Join-Path $migrated.dir 'manifest.json'))
     }
-    Check 'migrated ciphertext hides the synthetic marker' ((-not $cipherRaw.Contains('legacy-clash-synthetic')) -and (-not $manifestRaw.Contains('legacy-clash-synthetic'))) ''
+    Check 'migrated ciphertext hides the synthetic marker' ($migrated -and (-not $cipherRaw.Contains('legacy-clash-synthetic')) -and (-not $manifestRaw.Contains('legacy-clash-synthetic'))) ''
     $everyCipher = $true
     if ($sealedManifest) {
         foreach ($entry in @($sealedManifest.files)) {
@@ -267,14 +296,14 @@ try {
     Write-Bytes (Join-Path $legacyApp 'profiles.yaml') $sentinelProfiles
     $afterSeal = $null
     $afterDetail = ''
-    try { $afterSeal = Restore-V4Files -SnapshotDir $legacySeal -AppData $legacyApp -ProfilesDir $legacyProfilesDir }
+    try { $afterSeal = Restore-V4Files -SnapshotDir $migrated.dir -AppData $legacyApp -ProfilesDir $legacyProfilesDir }
     catch { $afterDetail = [string]$_.Exception.Message }
     $afterExact = $false
     if ($afterSeal -and $afterSeal.ok -eq $true) {
         $afterExact = (Test-BytesEqual $legacyClash (Read-Bytes (Join-Path $legacyApp 'clash-verge.yaml'))) -and (Test-BytesEqual $legacyProfiles (Read-Bytes (Join-Path $legacyApp 'profiles.yaml')))
     }
     Check 'migrated schema 3 snapshot restores exact bytes' (($null -ne $afterSeal) -and ($afterSeal.ok -eq $true) -and $afterExact) $afterDetail
-    Assert-MigrationRefused 'migration refuses an already sealed snapshot' { ConvertTo-V4SealedSnapshot -SnapshotDir $legacySeal -TestRoot $root -Confirm } 'schema 2'
+    Assert-MigrationRefused 'migration refuses an already sealed snapshot' { ConvertTo-V4SealedSnapshot -SnapshotDir $migrated.dir -TestRoot $root -Confirm } 'schema 2'
 
     Set-Sentinels
     $held = Read-Bytes $clashTarget
@@ -306,8 +335,10 @@ catch {
 }
 finally {
     if ($lock) { $lock.Dispose() }
-    Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
-    if (Test-Path -LiteralPath $outside) { Remove-Item -LiteralPath $outside -Recurse -Force -ErrorAction SilentlyContinue }
+    Assert-V4SnapshotPath $root
+    if ((Test-V4DirectoryInside $root ([IO.Path]::GetTempPath())) -and (Split-Path -Leaf $root) -match '^v69harden-[0-9a-f]{32}$') {
+        Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction Stop
+    }
 }
 
 if ($failed.Count) { Write-Host ('FAILED ' + $failed.Count); exit 1 }
