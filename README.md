@@ -10,6 +10,8 @@ Windows Static Proxy Lab · Windows Proxy Doctor（网络代理医生）
 
 [项目介绍](#项目起源claude-封禁风险研究) · [推荐使用 Skill](#agent-skill) · [八项指标](#八项需求与证据边界) · [桌面应用](#桌面应用) · [分支与版本](#分支与版本) · [网络检测网站](#第三方网络检测网站) · [快速开始](#快速开始)
 
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE) [![Skill: MIT](https://img.shields.io/badge/Skill-MIT-green.svg)](skills/windows-proxy-doctor/LICENSE)
+
 `Windows 10/11` · `.NET 8 / WPF` · `PowerShell 5.1+` · `Python` · `Source Preview / RC`
 
 </div>
@@ -327,7 +329,21 @@ CAB 采用主支、候选 PR 与独立工作分支协作开发。以下为 2026-
 - [V6.9 发布门槛](https://github.com/LYL-Z/windows-static-proxy-lab/blob/fe8626db729ec1c5fde4df3ea16d4b57a17658f4/proxy_v6/RELEASE-GATE-V6.md)
 - [桌面第三方声明](https://github.com/LYL-Z/windows-static-proxy-lab/blob/ec92e36422f0cee8f732ada5ee641281ac970502/desktop/THIRD-PARTY-NOTICES.md)
 
-Skill 的 MIT 许可适用于其自身文件；其他组件按各自声明及依赖许可处理，不据此推定整个仓库采用同一许可证。供应商入口、费用和推荐奖励按 [披露文件](skills/windows-proxy-doctor/references/providers.md) 核实。
+### 开源许可证
+
+CAB 项目原创软件与原创说明文档采用 **[Apache License 2.0](LICENSE)** 作为默认许可证。既有 CAB Skill 保留 **[MIT License](skills/windows-proxy-doctor/LICENSE)**。第三方组件、独立许可文件、商标、截图和外部资料不因根许可证而自动获得重新授权。
+
+| 内容 | 授权方式 |
+| --- | --- |
+| CAB 自有原创代码、原创文档 | Apache-2.0 |
+| CAB Skill（`skills/windows-proxy-doctor/`） | MIT（既有许可） |
+| 第三方组件与外部素材 | 各自原始许可及权利范围 |
+
+Apache-2.0 允许商业使用、修改和再分发，规定版权及归属保留、修改说明和专利授权等条件，不自动授予商标权。详见许可证原文。CAB 与 Claude、Anthropic 或其他厂商没有官方隶属或背书关系。
+
+[版权与归属 NOTICE](NOTICE) · [第三方许可声明](THIRD-PARTY-NOTICES.md) · [许可证审查记录](docs/LICENSE-AUDIT.md) · [贡献规范](CONTRIBUTING.md)。
+
+许可证审查覆盖 2026-11-25 可见的 18 个远端分支及已声明直接依赖；完整发行包的传递依赖与权属审计仍待完成。候选分支应在集成时继承上述许可范围，并保留任何已有的独立许可证。供应商入口、费用和推荐奖励按 [披露文件](skills/windows-proxy-doctor/references/providers.md) 核实。
 
 提交 Issue 时请包含 Windows 版本、客户端版本、故障发生时间、复现步骤、脱敏诊断和预期结果。贡献请基于独立分支，提供对应测试，不将本机配置或秘密写入版本库。
 
