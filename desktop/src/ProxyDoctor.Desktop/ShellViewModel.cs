@@ -85,7 +85,7 @@ public partial class ShellViewModel : ObservableObject
 
     partial void OnSectionChanged(string value)
     {
-        if (value is "overview" or "checks" or "monitor" or "privacy" or "clients" or "recovery" or "events")
+        if (value is "overview" or "checks" or "monitor" or "privacy" or "clients" or "recovery" or "events" or "guide")
             return;
         Section = "overview";
     }

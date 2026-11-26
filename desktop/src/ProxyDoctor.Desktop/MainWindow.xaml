@@ -105,6 +105,7 @@
             <Button Content="客户端" Command="{Binding ShowCommand}" CommandParameter="clients" Style="{StaticResource NavButton}" />
             <Button Content="恢复" Command="{Binding ShowCommand}" CommandParameter="recovery" Style="{StaticResource NavButton}" />
             <Button Content="事件" Command="{Binding ShowCommand}" CommandParameter="events" Style="{StaticResource NavButton}" />
+            <Button Content="开始使用" Command="{Binding ShowCommand}" CommandParameter="guide" Style="{StaticResource NavButton}" />
           </StackPanel>
         </ScrollViewer>
       </DockPanel>
@@ -157,6 +158,13 @@
               </StackPanel>
             </Border>
           </Grid>
+          <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+            <StackPanel>
+              <TextBlock Text="连接拓扑" FontWeight="SemiBold" />
+              <TextBlock Text="应用 → Windows 代理选择 → 本地核心 → 上游" TextWrapping="Wrap" Margin="0,8,0,0" />
+              <TextBlock Text="{Binding ClientLine}" Foreground="{DynamicResource App.Muted}" TextWrapping="Wrap" Margin="0,8,0,0" />
+            </StackPanel>
+          </Border>
           <Border Style="{StaticResource Card}">
             <StackPanel>
               <TextBlock Text="这次能说明什么" FontWeight="SemiBold" />
@@ -166,6 +174,28 @@
           </Border>
           <Button Content="预览方案" Command="{Binding PreviewRecoveryCommand}" HorizontalAlignment="Left" Margin="0,12,0,0"
                   IsEnabled="{Binding Busy, Converter={StaticResource NotBusy}}" />
+        </StackPanel>
+
+        <StackPanel Visibility="{Binding Section, Converter={StaticResource SectionVisible}, ConverterParameter=guide}">
+          <TextBlock Text="开始使用 CAB" FontSize="20" FontWeight="SemiBold" />
+          <Border Style="{StaticResource Card}" Margin="0,12,0,0">
+            <StackPanel>
+              <TextBlock Text="检查这台电脑" FontWeight="SemiBold" />
+              <TextBlock Text="保留现有网络配置。先确认系统代理、客户端进程与回环监听，再查看 HTTPS 采样和协议证据。" TextWrapping="Wrap" Margin="0,8,0,10" />
+              <WrapPanel>
+                <Button Content="运行诊断" Command="{Binding DiagnoseCommand}" IsEnabled="{Binding Busy, Converter={StaticResource NotBusy}}" Margin="0,0,8,8" />
+                <Button Content="查看检查项" Command="{Binding ShowCommand}" CommandParameter="checks" Margin="0,0,8,8" />
+                <Button Content="查看客户端" Command="{Binding ShowCommand}" CommandParameter="clients" Margin="0,0,8,8" />
+              </WrapPanel>
+            </StackPanel>
+          </Border>
+          <Border Style="{StaticResource Card}" Margin="0,12,0,0">
+            <StackPanel>
+              <TextBlock Text="出现故障时" FontWeight="SemiBold" />
+              <TextBlock Text="先确认哪些路径有证据。恢复页可以预览方案并验证一次隔离回滚。首次配置、软件渠道、费用说明及人工步骤可由 CAB Skill 引导。" TextWrapping="Wrap" Margin="0,8,0,10" />
+              <Button Content="查看恢复方案" Command="{Binding PreviewRecoveryCommand}" HorizontalAlignment="Left" IsEnabled="{Binding Busy, Converter={StaticResource NotBusy}}" />
+            </StackPanel>
+          </Border>
         </StackPanel>
 
         <StackPanel Visibility="{Binding Section, Converter={StaticResource SectionVisible}, ConverterParameter=checks}">
