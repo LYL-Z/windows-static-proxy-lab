@@ -1,0 +1,137 @@
+# CAB Windows CI for the shared Desktop/CLI core, the skill scripts, and a
+# private-key scan. This file does not call proxy_v6/tests/Run-Tests.ps1.
+# That 114-case engine harness stays manual: it is long and environment-heavy.
+# The synthetic snapshot seal lives in cab-v69-seal.yml and is workflow_dispatch only.
+# No production credentials and no repository secrets are read.
+
+name: CAB Windows
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  core-tests:
+    name: Desktop/CLI Core tests
+    runs-on: windows-latest
+    timeout-minutes: 20
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+      DOTNET_NOLOGO: 1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Test ProxyDoctor.Core.Tests
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & dotnet test desktop/tests/ProxyDoctor.Core.Tests/ProxyDoctor.Core.Tests.csproj --configuration Release --verbosity minimal
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+  skill-tests:
+    name: Skill tests
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Run skill tests with Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $shell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+          if (-not (Test-Path -LiteralPath $shell)) {
+            throw 'Windows PowerShell 5.1 was not found in System32.'
+          }
+          $major = & $shell -NoProfile -Command '$PSVersionTable.PSVersion.Major'
+          if ($LASTEXITCODE -ne 0 -or $major -ne '5') { throw 'Windows PowerShell 5.1 did not start.' }
+          $scripts = @(
+            'skills/windows-proxy-doctor/tests/Run-Tests.ps1',
+            'skills/windows-proxy-doctor/tests/Run-FaultClassTests.ps1',
+            'skills/windows-proxy-doctor/tests/Run-OnboardingTests.ps1'
+          )
+          foreach ($relative in $scripts) {
+            Write-Host ("RUN " + $relative)
+            & $shell -NoProfile -ExecutionPolicy Bypass -File $relative
+            if ($LASTEXITCODE -ne 0) { throw ("{0} exited {1}" -f $relative, $LASTEXITCODE) }
+          }
+
+      - name: Repeat skill tests with pwsh when it is installed
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $explicit = 'C:\Program Files\PowerShell\7\pwsh.exe'
+          if (Test-Path -LiteralPath $explicit) {
+            $pwshPath = $explicit
+          } else {
+            $command = Get-Command pwsh -ErrorAction SilentlyContinue
+            if (-not $command) {
+              Write-Host 'pwsh is not installed. Second skill run skipped.'
+              exit 0
+            }
+            $pwshPath = $command.Source
+          }
+          $pwshVersion = & $pwshPath -NoProfile -Command '$PSVersionTable.PSVersion.ToString()'
+          Write-Host $pwshVersion
+          if ($LASTEXITCODE -ne 0) { throw ("pwsh could not report its version (exit {0})." -f $LASTEXITCODE) }
+          $scripts = @(
+            'skills/windows-proxy-doctor/tests/Run-Tests.ps1',
+            'skills/windows-proxy-doctor/tests/Run-FaultClassTests.ps1',
+            'skills/windows-proxy-doctor/tests/Run-OnboardingTests.ps1'
+          )
+          foreach ($relative in $scripts) {
+            Write-Host ("RUN pwsh " + $relative)
+            & $pwshPath -NoProfile -ExecutionPolicy Bypass -File $relative
+            if ($LASTEXITCODE -ne 0) { throw ("pwsh {0} exited {1}" -f $relative, $LASTEXITCODE) }
+          }
+
+  secret-scan:
+    name: Private key scan
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Fail on PRIVATE KEY blocks
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $pattern = ('-' * 5) + 'BEGIN[ A-Z0-9]*PRIVATE KEY' + ('-' * 5)
+          $raw = @(& git --no-pager grep -I -l -E -e $pattern -- .)
+          $code = $LASTEXITCODE
+          if ($code -eq 0) {
+            Write-Host 'PRIVATE KEY block detected. Paths only; file contents are not printed.'
+            foreach ($item in $raw) {
+              $text = [string]$item
+              if ($text -match '-----') {
+                Write-Host '(line omitted)'
+                continue
+              }
+              Write-Host $text
+            }
+            exit 1
+          }
+          if ($code -eq 1) {
+            Write-Host 'No PRIVATE KEY blocks found.'
+            exit 0
+          }
+          Write-Host ("git grep could not finish (exit {0})." -f $code)
+          exit $code
