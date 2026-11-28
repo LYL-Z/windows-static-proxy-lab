@@ -157,3 +157,41 @@
 - cab/d-protect 引用的 fail-close 重跑数据、`check_offline.py --self-test` 退出码均为文档陈述，本次未复跑。
 - cab/e-clients / cab/f-monitor 的 xUnit 未编译执行；只核对了用例断言与源码可达分支、手算了 sequence 期望值。
 - cab/i-package 的失败回滚未实际执行；只核对了路径校验、哈希校验、前置 manifest 校验与测试断言的一致性。
+
+---
+
+## 六、接管结果（2026-11-28 收口）
+
+本节由收口实际执行记录，不是审计推断。基线 `134ebf0`（`integration/cab-next`，已含 `7303ccd` 的 cab/b-actions）。全部 8 个 `cab/*` 分支都用 `git merge --no-ff` 合入；**没有删除分支、没有 rebase、没有强推、没有 push**。合并后按本节"落地提交"栏做小改，改动都进新的普通提交，不改写合并历史。
+
+| 分支 | 结论 | 落地提交 | 合入后做了什么 |
+| --- | --- | --- | --- |
+| cab/i-package | MERGED（修复后） | `e20a077` 合并 + `4af0d5c` 修复 + `4d90dff` CI | 删掉生产安装器上的 `-FaultAfterCopiedFiles` 参数；失败注入改为测试从外部用 `FileShare.None` 锁住一个源文件，安装器本身回到零测试开关。`Test-InstallProxyDoctor.ps1` 新增独立的 `packaging-tests` job。本地跑通（`ROLLBACK: removed incomplete version`）。 |
+| cab/c-protocol | MERGED | `c2d7f09` 合并 + `4211640` | 产品文案与 4 个 xUnit 原样保留；`CAB-PROTOCOL.md` 与 `docs/CAB-CI.md` 明确 836 行 `protocol_probe.py` 与两个 PS1 探针是可选证据、不进 CI、不作门禁。 |
+| cab/e-clients | MERGED（修复后） | `5492415` 合并 + `f36e297` | `ManualSteps` 接到「客户端」页：`ShellViewModel.RenderClientLine` 按 Clash 核心状态取 `ManualSteps`，上游取监测 `upstream` 通道（无新鲜采样按未知）；新增 `ClientSteps` 与卡片。`CLIENT-LIMITS.md` 的手动清单改为指针，句子只留 `CLIENT-STEPS.md` 一处。 |
+| cab/f-monitor | MERGED（修复后） | `255f91d` 合并 + `6b03434` | `MonitorEngine` 独占 `monitor-events.jsonl`（新增 `EventFileName` / `DefaultEventPath`），并在 `SaveEvents`/`LoadEvents` 里拒绝 `EventLog.FileName`；`EventLog.FileName` 公开为 `events.jsonl`。壳层在 `StopMonitor` 存、`StartMonitor` 恢复、「监测」页渲染窗口。新增 1 个 xUnit 锁住文件名分离。 |
+| cab/g-desktop | MERGED | `d60c1fe` 合并 + `913b356` | XAML/converter 原样保留；`shots/overview.png` 归位为 `desktop/overview.png`，README 的截图引用改成本仓库相对路径（原来钉在旧提交的绝对 raw URL，指向没有页头的旧界面）。 |
+| cab/h-skill | MERGED（去重） | `2649780` 合并 + `f6bc02a` | `operator-boundary.md` 只留两条新增规则（不承诺解封、StarSky 重启≠加速），read-only 与 no-modify 改为指向 `safety.md` 与 `Resolve-ProxyDoctorUserRequest`；`safety.md` 加一行指针。四条断言串仍全部存在，`Run-FaultClassTests.ps1` 22/22 本地通过。 |
+| cab/a-engine | MERGED（部分保留） | `158c762` 合并 + `d839174` | 保留 `CAB-CorruptPreparationJournal.ps1`（本地 10/10 PASS，已进 `engine-tests`）。两份 59 行说明合成一份：`CAB-COUNT-NOTE.md` 删除，独有句子并入 `CAB-F35.md`。 |
+| cab/d-protect | MERGED（部分保留） | `7564a94` 合并 + `03d92c0` | 不新增第 4 份边界文档：`docs/CAB-PROTECT.md` 删除，重跑数据、作业对象覆盖、未覆盖范围与三件事区分并入 `docs/V69-ACCEPTANCE.md` 的「进程失败关闭的本地重跑」。 |
+
+无 REJECTED / BLOCKED / SUPERSEDED。
+
+### 收口的本地实测（同一台机器，Windows PowerShell 5.1，非管理员）
+
+| 项 | 命令 | 结果 |
+| --- | --- | --- |
+| Core xUnit | `dotnet test desktop/tests/ProxyDoctor.Core.Tests -c Release` | 94 passed / 0 failed（含 c-protocol 4 个与 f-monitor 新增用例） |
+| Desktop 编译 | `dotnet build desktop/src/ProxyDoctor.Desktop -c Release` | 0 warning / 0 error |
+| CLI 编译 | `dotnet build desktop/src/ProxyDoctor.Cli -c Release` | 0 warning / 0 error |
+| 引擎套件 | `proxy_v6/tests/Run-Tests.ps1` | registered=114 executed=114 passed=114 failed=0 skipped=0，退出码 0，213.7 秒 |
+| 损坏 preparation 探针 | `proxy_v6/tests/repro/CAB-CorruptPreparationJournal.ps1` | 10 条断言 PASS，退出码 0 |
+| 安装器回滚 | `desktop/packaging/Test-InstallProxyDoctor.ps1` | PASS，退出码 0，29.9 秒 |
+| Skill 三套 | `Run-Tests.ps1` / `Run-FaultClassTests.ps1` / `Run-OnboardingTests.ps1` | 15/15、22/22、24/24，退出码 0 |
+
+### F77 / F53 的关闭方式
+
+`.github/workflows/cab-windows.yml` 新增 `engine-tests`（`windows-latest`，40 分钟）：先确认 `Run-Tests.ps1`、`Harness.ps1`、`lib/TestSupport.ps1` 存在，再用 Windows PowerShell 5.1 实际执行 114 项套件，证据写 `$env:RUNNER_TEMP\v6-evidence\evidence.json`，失败时打印计数、非 PASS 用例与 harness/evidence 错误并以套件退出码失败；同 job 再跑 `CAB-CorruptPreparationJournal.ps1`。`core-tests`、`skill-tests`、`secret-scan` 未改坏；`pwsh` 缺失仍然 fail（`4aa4333` 的逻辑保留）。
+
+**未在 runner 上验证**：本轮没有 push，也没有触发 GitHub Actions，因此上述 job 的真实 runner 行为（checkout、runner 自带 5.1、40 分钟是否够用）都还是本地证据，不是 CI 通过结论。
+
