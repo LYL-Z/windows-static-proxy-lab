@@ -21,6 +21,14 @@
     <ProjectReference Include="..\ProxyDoctor.Core\ProxyDoctor.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="..\..\scripts\Invoke-IsolatedRecovery.ps1" Link="scripts\Invoke-IsolatedRecovery.ps1" CopyToOutputDirectory="PreserveNewest" />
+    <!--
+      F69/F70: the complete portable engine whitelist. Three individual reviewed
+      files, never a folder copy. Do not add settings.json, owner.json, backup\,
+      logs\, evidence\ or any credential here.
+    -->
+    <Content Include="..\..\scripts\Invoke-IsolatedRecovery.ps1" Link="engine\scripts\Invoke-IsolatedRecovery.ps1" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\..\proxy_v4\rollback-v4.ps1" Link="engine\proxy_v4\rollback-v4.ps1" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\..\proxy_v4\lib\V4.ps1" Link="engine\proxy_v4\lib\V4.ps1" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
+  <Import Project="..\..\packaging\engine-manifest.targets" />
 </Project>

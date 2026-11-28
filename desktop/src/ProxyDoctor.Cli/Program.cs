@@ -9,6 +9,23 @@ if (sentenceAt >= 0)
     return 0;
 }
 
+if (args.Contains("--engine-check"))
+{
+    Console.Error.WriteLine("Usage: --engine-check validates the packaged engine folder only; it starts no script.");
+    var engine = EnginePackage.Resolve();
+    Console.WriteLine(JsonSerializer.Serialize(new
+    {
+        ok = engine.Ok,
+        detail = engine.Detail,
+        engineRoot = engine.EngineRoot,
+        scriptPath = engine.ScriptPath,
+        requiredEngineVersion = EnginePackage.RequiredEngineVersion,
+        allowRepositorySearch = EnginePackage.AllowRepositorySearch,
+        files = engine.Files.Select(item => new { item.Path, item.Sha256 })
+    }, new JsonSerializerOptions { WriteIndented = true }));
+    return engine.Ok ? 0 : 2;
+}
+
 if (args.Contains("--isolated-recovery"))
 {
     Console.Error.WriteLine("Usage: --isolated-recovery exits 0 only when CompleteSuccess is true; otherwise 2.");

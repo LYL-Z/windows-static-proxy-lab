@@ -276,8 +276,17 @@ public class ClassifierTests
     [Fact]
     public void Trusted_engine_and_script_match_the_reviewed_hashes()
     {
+        // F69/F70: recovery must resolve from the packaged engine\ folder beside the
+        // binary, not from a repository checkout above it.
+        var package = EnginePackage.Resolve();
+        Assert.True(package.Ok, package.Detail);
         Assert.NotNull(IsolatedRecovery.FindScript());
         Assert.NotNull(IsolatedRecovery.FindEngineRoot());
+        Assert.EndsWith(EnginePackage.DirectoryName, package.EngineRoot);
+        Assert.Equal(
+            Path.Combine(package.EngineRoot!, EnginePackage.ScriptRelative),
+            package.ScriptPath);
+        Assert.Equal(3, package.Files.Count);
     }
 
     [Fact]

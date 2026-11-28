@@ -1,0 +1,52 @@
+<Project>
+  <!--
+    F69/F70: the reviewed recovery engine ships beside the executable under engine\.
+
+    Whitelist (identical to EnginePackage.Whitelist in ProxyDoctor.Core\EnginePackage.cs):
+      engine\proxy_v4\rollback-v4.ps1
+      engine\proxy_v4\lib\V4.ps1
+      engine\scripts\Invoke-IsolatedRecovery.ps1
+
+    Nothing else is packaged. In particular settings.json, owner.json, backup\,
+    logs\, evidence\ and any credential or private configuration are never copied:
+    the Content whitelist in each csproj names individual files and never a folder.
+
+    This file only *generates* engine-manifest.json (file name + SHA-256 + version)
+    from the files that were just copied, so the manifest can never describe a
+    different build than the one shipped. Runtime verification lives in
+    ProxyDoctor.Core\EnginePackage.cs.
+  -->
+  <PropertyGroup>
+    <!-- Must stay in sync with EnginePackage.RequiredEngineVersion. -->
+    <EnginePackageVersion>v4.0</EnginePackageVersion>
+    <EngineManifestFileName>engine-manifest.json</EngineManifestFileName>
+  </PropertyGroup>
+
+  <Target Name="WriteEngineManifest" AfterTargets="Build">
+    <GetFileHash Files="$(OutDir)engine\proxy_v4\rollback-v4.ps1" Algorithm="SHA256">
+      <Output TaskParameter="Items" ItemName="_EngineRollbackHashed" />
+    </GetFileHash>
+    <GetFileHash Files="$(OutDir)engine\proxy_v4\lib\V4.ps1" Algorithm="SHA256">
+      <Output TaskParameter="Items" ItemName="_EngineLibraryHashed" />
+    </GetFileHash>
+    <GetFileHash Files="$(OutDir)engine\scripts\Invoke-IsolatedRecovery.ps1" Algorithm="SHA256">
+      <Output TaskParameter="Items" ItemName="_EngineScriptHashed" />
+    </GetFileHash>
+
+    <PropertyGroup>
+      <_EngineManifestJson>{"schemaVersion":1,"engineVersion":"$(EnginePackageVersion)","files":[{"path":"proxy_v4/rollback-v4.ps1","sha256":"@(_EngineRollbackHashed->'%(FileHash)')"},{"path":"proxy_v4/lib/V4.ps1","sha256":"@(_EngineLibraryHashed->'%(FileHash)')"},{"path":"scripts/Invoke-IsolatedRecovery.ps1","sha256":"@(_EngineScriptHashed->'%(FileHash)')"}]}</_EngineManifestJson>
+    </PropertyGroup>
+
+    <WriteLinesToFile File="$(OutDir)engine\$(EngineManifestFileName)" Lines="$(_EngineManifestJson)" Overwrite="true" Encoding="UTF-8" />
+  </Target>
+
+  <!--
+    engine-manifest.json is generated after Build, so it is not among the Content
+    items publish already handled. Carry it into the publish folder explicitly.
+  -->
+  <Target Name="CopyEngineManifestToPublish" AfterTargets="Publish" DependsOnTargets="WriteEngineManifest">
+    <Copy SourceFiles="$(OutDir)engine\$(EngineManifestFileName)"
+          DestinationFolder="$(PublishDir)engine"
+          Condition="Exists('$(OutDir)engine\$(EngineManifestFileName)')" />
+  </Target>
+</Project>

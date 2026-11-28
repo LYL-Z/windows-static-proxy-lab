@@ -10,4 +10,14 @@
   <ItemGroup>
     <ProjectReference Include="..\ProxyDoctor.Core\ProxyDoctor.Core.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <!--
+      F69/F70: the CLI ships the same portable engine whitelist as the Desktop app,
+      so recovery can be diagnosed and exercised from an unpacked release folder.
+    -->
+    <Content Include="..\..\scripts\Invoke-IsolatedRecovery.ps1" Link="engine\scripts\Invoke-IsolatedRecovery.ps1" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\..\proxy_v4\rollback-v4.ps1" Link="engine\proxy_v4\rollback-v4.ps1" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\..\proxy_v4\lib\V4.ps1" Link="engine\proxy_v4\lib\V4.ps1" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <Import Project="..\..\packaging\engine-manifest.targets" />
 </Project>
