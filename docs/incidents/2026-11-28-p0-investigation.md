@@ -1,4 +1,4 @@
-# 2026-11-28 两次生产网络事故 — P0 专项调查与可靠性修复
+﻿# 2026-11-28 两次生产网络事故 — P0 专项调查与可靠性修复
 
 > 分支：`cab/p0-state-truth`（从 `integration/cab-next` @ `f2454c0` 切出）
 > 工作树：独立目录，未触碰任何人的生产脚本或正在运行的网络配置。
@@ -123,3 +123,33 @@
 - INC 之外的真实浏览器栈验证（Chrome/Edge 的实际上传）——需要人工在浏览器里操作。
 - NexIP 侧根因（拒来源 / 账号 / 线路），需厂商服务端日志。
 - 生产脚本替换本身：**等待授权**。
+---
+
+## 10. 静态链路已恢复（实测，2026-11-28 03:5x）
+
+| 检查 | 结果 |
+|---|---|
+| 系统代理 | `127.0.0.1:7897`（已切回购买的静态 IP 链路） |
+| 7897 境外出口 | **`72.245.197.103`**（Arisk / AS3257） |
+| 7897 稳定性采样 | google 3/3、baidu 3/3、chatgpt 3/3 = **9/9** |
+| 四站点复测 | baidu/google/chatgpt/github 全 200 |
+| NexIP 应用层 | 经第一跳 `CONNECT 9506` → `200 Connection established`；SOCKS5 方法协商返回 **`05 02`**（要求用户名/密码） |
+
+**关键结论**：`05 02` 证明 NexIP 服务端**正常在线并要求认证**，并非拒绝来源、也不是账号被封。
+故障窗口内出现的 `Empty reply` 属于上游会话不可用，现已自行恢复。
+
+**我此前的一处错误验收**：用 `curl` 不加 `-x` 测"系统代理"，而 curl **不读 Windows 系统代理**，
+那个 `107.149.115.70` 是直连（经 StarSky TUN）出口，不能作为系统代理链路的证据。
+正确证据是 `-x http://127.0.0.1:7897` 的 9/9 + 出口 IP，以及 WinINET 侧代理值本身。
+
+## 11. 新增可立即运行的诊断入口
+
+`proxy_v4/tools/cab-doctor.ps1` —— 单文件、只读、不依赖共享库，可直接运行：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File proxy_v4\tools\cab-doctor.ps1
+```
+
+输出：系统代理 / 环境变量（脱敏）/ 直连基线 / 每个代理的监听与成功率 / 失败类型 / 判定 / 恢复命令。
+判定值：`HEALTHY` `PARTIAL` `SYSTEM_PROXY_MISMATCH` `PROXY_BROKEN_DIRECT_OK` `DIRECT_ONLY` `BROKEN`；退出码 0/2/3。
+实测：`HEALTHY`，7897 与 11119 各 2/2，p50 分别为 4584ms / 7206ms（**偏慢，已如实记录**）。
