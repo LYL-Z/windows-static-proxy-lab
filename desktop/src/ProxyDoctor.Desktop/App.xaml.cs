@@ -9,6 +9,12 @@ public partial class App : System.Windows.Application
 
     public static string? CapturePath { get; private set; }
     public static string? Section { get; private set; }
+
+    /// <summary>
+    /// F72: <c>--recover</c> no longer authorizes anything by itself. It opens the same
+    /// consent dialog the recovery button uses; the run starts only after the person
+    /// clicks confirm, and a cancel leaves read-only diagnosis available.
+    /// </summary>
     public static bool Recover { get; private set; }
 
     private void OnStartup(object sender, StartupEventArgs e)

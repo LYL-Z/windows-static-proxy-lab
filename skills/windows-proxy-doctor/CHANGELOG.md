@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.1.0 RC3
+
+- Adds `recovery/Invoke-Recovery.ps1`, the only Skill-side recovery entry. It verifies the packaged engine manifest and the reviewed SHA-256 values, shows the shared consent text, runs the packaged `engine\scripts\Invoke-IsolatedRecovery.ps1`, and passes the result through `scripts/RecoveryVerdict.ps1`. It implements no recovery logic of its own.
+- Requires an operation-bound phrase (`RECOVER-ISOLATED <target>`) typed by the person. A wrong target, different case, extra word, empty value or `--yes` is a refusal that starts nothing; read-only diagnosis stays available.
+- Rewrites `SKILL.md` into three stages with what each one actually does: read-only diagnosis, isolated rehearsal, and real operations that need authorization.
+- States in the UI, the CLI and the Skill that the production write is not implemented: the executor is still `V4_TEST_MODE` + stub.
+- Adds `tests/Run-RecoveryTests.ps1` (refusal, tampered engine, real isolated rehearsal, reviewed-hash sync with `ProxyDoctor.RecoveryTrust`, and the three-stage documentation).
+
 ## 2.0.0 RC2
 
 - Resumes saved setup on explicit Auto and keeps a temporary diagnostic check from replacing the setup goal. Reports the particular client still unconfirmed after each installation.

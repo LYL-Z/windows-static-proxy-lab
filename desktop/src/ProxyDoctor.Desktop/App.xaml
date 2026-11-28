@@ -7,9 +7,15 @@
       <ResourceDictionary.MergedDictionaries>
         <ResourceDictionary Source="Themes/Light.xaml" />
       </ResourceDictionary.MergedDictionaries>
+      <!--
+        D6: this implicit style must not set Foreground. It also applies to the TextBlock
+        that a Button's ContentPresenter creates, and a dark ink value there overrides the
+        button's own Foreground, leaving ~2:1 contrast on the accent background.
+        The window sets Foreground="{DynamicResource App.Ink}" instead, which text
+        inherits, while button content keeps the colour the Button style sets.
+      -->
       <Style TargetType="TextBlock">
         <Setter Property="FontFamily" Value="Segoe UI" />
-        <Setter Property="Foreground" Value="{DynamicResource App.Ink}" />
       </Style>
       <Style TargetType="Button">
         <Setter Property="FontFamily" Value="Segoe UI" />

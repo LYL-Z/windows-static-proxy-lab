@@ -326,8 +326,10 @@ public static class DiagnosticEngine
         bool automatic, bool persistEvent, IReadOnlyList<ListenerFact> listeners, IReadOnlyList<string> clients, IReadOnlyList<ProbeFact> probes,
         IReadOnlyList<CapabilityFact> capabilities)
     {
+        // The stored line must not repeat the timestamp: EventLog.Append adds one, and
+        // FormatEventLine prints that stored "at". The in-memory copy keeps a readable stamp.
         var line = $"{DateTimeOffset.Now:HH:mm:ss} 完成一次只读采样。分类 {fault.Class}。";
-        if (!demo && persistEvent) EventLog.Append(line);
+        if (!demo && persistEvent) EventLog.Append("完成一次只读采样。分类 " + fault.Class + "。");
         var events = new List<string> { line };
         events.AddRange(EventLog.Recent());
         if (fault.Class == FaultClass.Aligned)

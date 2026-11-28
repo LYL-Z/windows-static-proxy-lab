@@ -2,7 +2,9 @@
 
 中文名：网络代理医生。它以当前用户权限运行。故障分类与已合并的 Windows Proxy Doctor Skill 一致。
 
-只读检查不写入系统代理。恢复按钮会把 `proxy_v4\rollback-v4.ps1` 复制到临时目录，强制 `V4_TEST_MODE=1`，执行后删除临时目录，并比较执行前后的当前用户代理指纹。它不重启 StarSky 或 Clash，也不提供账号安全结论。
+只读检查不写入系统代理。恢复按钮会先弹出确认框：操作名、目标（例如 `127.0.0.1:7897`）、操作范围、受影响资源、是否写系统代理、回滚方式，点确认才算这次授权；取消后仍可只做只读诊断。确认后它把 `proxy_v4\rollback-v4.ps1` 复制到临时目录，强制 `V4_TEST_MODE=1`，执行后删除临时目录，并比较执行前后的当前用户代理指纹。它不重启 StarSky 或 Clash，也不提供账号安全结论。真实生产写入未实现：Executor 固定 `V4_TEST_MODE` + stub。
+
+命令行同样要求授权：`proxy-doctor --recovery-brief` 打印与确认框相同的一段文字；`proxy-doctor --isolated-recovery` 只有在交互输入与本次操作和目标绑定的短语（`RECOVER-ISOLATED <目标>`）后才运行，`--yes` 一类一键标志会被明确拒绝（exit 2，`AuthorizationRefused=true`）。没有随包 `engine\` 或哈希不符时同样拒绝并保持 `ScriptStarted=false`。
 
 运行窗口时，本地心跳每 20 秒采样。Windows 报告地址变化后，桌面在下一次空闲刷新时补读本地状态。上游 HTTPS 每 90 秒单独采样，手动检查也可触发。检查执行期间可能跳过周期采样。协议通道按需检查。通道分别显示采样时间、执行耗时、证据有效期和连续失败次数。轮询可能错过短于采样间隔的故障。
 
