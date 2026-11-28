@@ -58,8 +58,8 @@ jobs:
           if (-not (Test-Path -LiteralPath $shell)) {
             throw 'Windows PowerShell 5.1 was not found in System32.'
           }
-          & $shell -NoProfile -Command 'Write-Host ("Windows PowerShell {0}" -f $PSVersionTable.PSVersion); if ($PSVersionTable.PSVersion.Major -ne 5) { exit 2 }'
-          if ($LASTEXITCODE -ne 0) { throw 'Windows PowerShell 5.1 did not start.' }
+          $major = & $shell -NoProfile -Command '$PSVersionTable.PSVersion.Major'
+          if ($LASTEXITCODE -ne 0 -or $major -ne '5') { throw 'Windows PowerShell 5.1 did not start.' }
           $scripts = @(
             'skills/windows-proxy-doctor/tests/Run-Tests.ps1',
             'skills/windows-proxy-doctor/tests/Run-FaultClassTests.ps1',
@@ -86,7 +86,8 @@ jobs:
             }
             $pwshPath = $command.Source
           }
-          & $pwshPath -NoProfile -Command 'Write-Host ("pwsh {0}" -f $PSVersionTable.PSVersion)'
+          $pwshVersion = & $pwshPath -NoProfile -Command '$PSVersionTable.PSVersion.ToString()'
+          Write-Host $pwshVersion
           if ($LASTEXITCODE -ne 0) { throw ("pwsh could not report its version (exit {0})." -f $LASTEXITCODE) }
           $scripts = @(
             'skills/windows-proxy-doctor/tests/Run-Tests.ps1',
