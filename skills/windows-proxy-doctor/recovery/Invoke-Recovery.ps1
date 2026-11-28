@@ -202,7 +202,14 @@ if (-not $engineRoot) {
 
 $target = Get-RecoveryTarget
 $phrase = $OperationName + ' ' + $target
-$authorized = ([string]$ConfirmPhrase).Trim() -eq $phrase
+# Strict ordinal comparison: PowerShell's -eq is case-insensitive, which let
+# "RECOVER-ISOLATED OFF" authorise a target of "off" and diverged from the C#
+# RecoveryConsent implementation (StringComparison.Ordinal).
+$authorized = [string]::Equals(
+    ([string]$ConfirmPhrase).Trim(),
+    $phrase,
+    [System.StringComparison]::Ordinal
+)
 
 # Interpolation, not '+': inside a multi-line @() a plus-expression would be parsed
 # with the array separator binding tighter than '+', splitting each line into pieces.

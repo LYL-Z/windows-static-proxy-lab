@@ -143,7 +143,17 @@ try {
     }
 
     Check 'wrong-phrase-is-refused-and-starts-nothing' {
-        foreach ($wrong in @('RECOVER-ISOLATED 127.0.0.1:1', 'RECOVER-ISOLATED OFF', 'recover-isolated ' + $target, 'YES', '')) {
+        # Wrong phrases must be wrong on every host, not only where the live target differs.
+# 'RECOVER-ISOLATED OFF' matched a target of 'off' once -eq (case-insensitive) applied,
+# so the fixture now derives host-independent wrong phrases.
+$wrongs = @(
+    'RECOVER-ISOLATED 127.0.0.1:1',
+    ('RECOVER-ISOLATED ' + $target + '-x'),
+    ('recover-isolated ' + $target),
+    'YES',
+    ''
+)
+foreach ($wrong in $wrongs) {
             $run = Invoke-Entry $app $wrong
             Assert-True ($run.Exit -eq 1) ('phrase <' + $wrong + '> exit=' + $run.Exit)
             Assert-True ($run.Result.authorized -eq $false) ('phrase <' + $wrong + '> was accepted')
