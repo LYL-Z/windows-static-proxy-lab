@@ -35,6 +35,15 @@
     2  PARTIAL : something passed, or nothing failed but nothing was verified
     3  UNUSABLE: nothing measured passed at all
 
+  BODY CAPTURE (v2, opt-in):
+    Invoke-DiagProbe -CaptureBody keeps at most -MaxBodyBytes of the response
+    body in .body (whitespace collapsed, control characters stripped).  This is
+    what path-report.ps1 / webrtc-probe.ps1 need to read an egress-IP echo
+    ("107.149.115.70", "ip=..." in a Cloudflare trace) through the SAME probe
+    instead of a second curl wrapper.  Without -CaptureBody .body is $null and
+    the body is still discarded to NUL exactly as in v1, so existing callers
+    keep their behaviour and output.
+
   REDACTION ($Hide-DiagUserInfo):
     any scheme://user:pass@host becomes scheme://***:***@; Proxy-Authorization
     values become ***.  Raw proxy environment values are never emitted; only
@@ -52,7 +61,7 @@
 #>
 
 $script:DiagContractName = 'cab-diag-contract'
-$script:DiagContractVersion = 1
+$script:DiagContractVersion = 2
 $script:DiagExit = [ordered]@{ ALL_PASS = 0; PARTIAL = 2; UNUSABLE = 3 }
 $script:DiagTransportKind = @(
     'OK', 'DNS_FAIL', 'CONNECT_REFUSED', 'TIMEOUT', 'TLS_FAIL',
@@ -80,7 +89,8 @@ function Get-DiagContractInfo {
             partial  = $script:DiagExit.PARTIAL
             unusable = $script:DiagExit.UNUSABLE
         }
-        fields         = @('target', 'via', 'proxy', 'transport', 'httpStatus', 'ok', 'state', 'rc', 'metrics', 'err')
+        fields         = @('target', 'via', 'proxy', 'transport', 'httpStatus', 'ok', 'state', 'rc', 'metrics', 'err', 'body')
+        bodyCapture    = 'opt-in via Invoke-DiagProbe -CaptureBody; .body is $null unless requested (v2)'
     }
 }
 
@@ -260,12 +270,17 @@ function Invoke-DiagProbe {
         [ValidateSet('GET', 'POST')][string]$Method = 'GET',
         [AllowNull()][string]$Body = $null,
         [int]$TimeoutSec = 20,
-        [switch]$ForceIPv4
+        [switch]$ForceIPv4,
+        [switch]$CaptureBody,
+        [ValidateRange(16, 65536)][int]$MaxBodyBytes = 2048
     )
 
     $safeProxy = if ($ProxyArg) { Get-DiagMaskedEndpoint $ProxyArg } else { '' }
     $fmt = 'code=%{http_code};dns=%{time_namelookup};conn=%{time_connect};tls=%{time_appconnect};ttfb=%{time_starttransfer};total=%{time_total};dl=%{size_download}'
-    $cargs = @('-sS', '-m', "$TimeoutSec", '-o', 'NUL', '-w', $fmt)
+    # v2: opt-in body capture.  Without -CaptureBody the body still goes to NUL.
+    $bodyFile = if ($CaptureBody) { [IO.Path]::GetTempFileName() } else { $null }
+    $outTarget = if ($bodyFile) { $bodyFile } else { 'NUL' }
+    $cargs = @('-sS', '-m', "$TimeoutSec", '-o', $outTarget, '-w', $fmt)
     if ($ForceIPv4) { $cargs += '-4' }
     if ($ProxyArg) {
         # F73: -x alone does not override NO_PROXY (measured).  Do both.
@@ -282,6 +297,7 @@ function Invoke-DiagProbe {
     $rc = 1
     $metricsText = ''
     $launchError = ''
+    $capturedBody = $null
     try {
         if ($ProxyArg) { Clear-DiagNoProxy }
         try {
@@ -296,9 +312,23 @@ function Invoke-DiagProbe {
         try { $fileErr = [string](Get-Content -LiteralPath $errFile -Raw -ErrorAction SilentlyContinue) } catch { }
         $errText = (($launchError + ' ' + $fileErr) -replace '\s+', ' ').Trim()
         $metricsText = ([string]::Join(' ', @($raw))).Trim()
+        $capturedBody = $null
+        if ($bodyFile -and (Test-Path -LiteralPath $bodyFile)) {
+            try {
+                $bytes = [IO.File]::ReadAllBytes($bodyFile)
+                if ($bytes.Length -gt $MaxBodyBytes) { $bytes = $bytes[0..($MaxBodyBytes - 1)] }
+                $text = [Text.Encoding]::UTF8.GetString($bytes)
+                # collapse whitespace/control chars: an echo body is one short line,
+                # and no control byte may reach a report.
+                $text = ($text -replace '[\u0000-\u001f\u007f]', ' ') -replace '\s+', ' '
+                $capturedBody = $text.Trim()
+            }
+            catch { $capturedBody = $null }
+        }
     }
     finally {
         Remove-Item -LiteralPath $errFile -Force -ErrorAction SilentlyContinue
+        if ($bodyFile) { Remove-Item -LiteralPath $bodyFile -Force -ErrorAction SilentlyContinue }
         Restore-DiagNoProxy -Snapshot $snapshot
     }
 
@@ -332,5 +362,6 @@ function Invoke-DiagProbe {
         rc         = $rc
         metrics    = [pscustomobject]$metrics
         err        = (Hide-DiagUserInfo $errText)
+        body       = $capturedBody
     }
 }
