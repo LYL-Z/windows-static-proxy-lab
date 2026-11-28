@@ -46,7 +46,7 @@
 ### 3.2 `proxy_v4/tests/incidents/invoke-inc-checks.ps1`
 把两次事故转成可复跑断言 INC-01..INC-10。
 
-结果：**executed 7, passed 7, skipped 3**，exit 0。
+结果：**executed 10, passed 10, skipped 0**，exit 0。所有场景由本脚本自带的本地受控服务产生，不依赖 Google/百度当天是否可用。
 
 | ID | 场景 | 结论 |
 |---|---|---|
@@ -81,3 +81,45 @@
 - 已排除：本机第一跳监听正常、第一跳 CONNECT 到 9506 返回 200、DNS 正常、非证书校验问题
 - 失败阶段：TCP 可达后，**应用层无任何 SOCKS 响应**（明文请求即 `Empty reply`）
 - 请求供应商核查：该实例在同一时段的服务端连接日志、是否有来源限制或封禁记录
+---
+
+## 7. INC 全量结果（本地 fixture，取代第 3.2 节的旧表）
+
+| ID | 场景 | fixture | 实测 | 结论 |
+|---|---|---|---|---|
+| INC-01 | 端口在听、上游不可用 | mock proxy 回 502 | listen=True, rate=0, exit=3 | PASS |
+| INC-02 | 接受 TCP 后丢弃 | mock proxy 直接 close | rate=0, kind=`RECV_FAIL` | PASS |
+| INC-03 | 恢复一次后再次失效 | 502 → 真链路 → 502 | 0, 100, 0 | PASS |
+| INC-04 | 页面可开、上传失败 | mock origin: GET 200 / POST 500 | pass=1, uploadFailed=true, exit=2 | PASS |
+| INC-05 | 间歇性故障 | mock proxy 奇数连接真实转发 | **pass=3/6** | PASS |
+| INC-06 | 状态脚本不崩溃 | 空配置 / 损坏 settings.json / 文本模式 | exit 3/3/3，无 `VariableIsUndefined` | PASS |
+| INC-07 | marker 丢失可检测 | 合成 profiles 目录 + 运行时文件 | profileExists=True, markerOk=False | PASS |
+| INC-08 | 部分可用 ≠ 健康 | 同上 alternate fixture | rate=50, exit=2 | PASS |
+| INC-09 | 无无人值守恢复器 | 计划任务 + 进程 + Run 键 + 启动目录 | 0/0/0/0 | PASS |
+| INC-10 | 受保护资源未变 | 4 配置文件哈希 + 新增文件 + HKCU 代理值 | files=0, reg=False, new=0 | PASS |
+
+**与旧版的差别（对应复审 F43–F52）**：旧版 INC-01 用的是关闭端口（场景不符）、INC-05 断言 `pass -ge 0` 恒真、INC-08 的 OR 条件可空过、上传失败不进退出码、curl 报错会丢证据、INC-10 只比 4 个哈希、覆盖范围声明与实际不符、未处理 `NO_PROXY`、state 回归只测空配置、INC-09 只查任务。以上逐项已改。
+
+## 8. 生产 state-v4.ps1 的最小更新方案（**未执行，需授权**）
+
+| 项 | 值 |
+|---|---|
+| 生产文件 | `D:\claude防封\proxy_v4\state-v4.ps1` |
+| 生产 SHA-256 | `94F1B43D6979032255E31B17832D7C9733F4D6BE447FABCA331BF916A5D3AE10`（4153 字节） |
+| 候选文件 | `proxy_v4/state-v4.ps1` @ `cab/p0-state-truth` |
+| 候选 SHA-256 | `E15D24B27932BD525A817AA1C376DADFF57502953121E9AC56D93653718D6CA8`（8382 字节） |
+| 依赖 | 同目录 `lib\V4.ps1`；候选版要求新版 lib（`Get-V4Integrity` / `Get-V4Journal` / `Get-V4RepairReceipt` / `chainStatus` / `uiSystemProxy` 等字段） |
+| 兼容性 | **不兼容**：生产 lib 与候选 state 成对变更，只换 state 会因缺少新函数而失败 |
+| 建议范围 | 只读脚本成组更新（`state-v4.ps1` + `lib\V4.ps1`），**不动** `apply-v4.ps1` / `rollback-v4.ps1`（有写系统能力） |
+| 备份 | 先复制到 `backup\p0-<stamp>\` 并记录哈希 |
+| 回滚 | 用备份原样覆盖，比对 SHA-256 一致即回滚成功 |
+| 只读验收 | `state-v4.ps1 -Json -ConfigDirectory <生产配置目录>` 应返回合法 JSON 且 exit ∈ {2,3}，**不再出现 `VariableIsUndefined`** |
+| 预计影响 | 只影响诊断输出；不写配置、不重启客户端、不改系统代理 |
+
+> 该方案已通过 INC-06 / INC-10 验证：更新动作本身不触碰受保护资源。
+
+## 9. 仍未做的（本轮明确未完成）
+
+- INC 之外的真实浏览器栈验证（Chrome/Edge 的实际上传）——需要人工在浏览器里操作。
+- NexIP 侧根因（拒来源 / 账号 / 线路），需厂商服务端日志。
+- 生产脚本替换本身：**等待授权**。
