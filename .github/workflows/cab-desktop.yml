@@ -1,0 +1,60 @@
+# CAB desktop CI check. Windows runners only. No secrets and no production credentials.
+#
+# Runs ProxyDoctor.Core.Tests in Release when
+# desktop/tests/ProxyDoctor.Core.Tests/ProxyDoctor.Core.Tests.csproj exists.
+# The project targets net8.0-windows. This job does not publish, sign, or
+# change a live proxy.
+
+name: CAB desktop
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cab-desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  core-tests:
+    name: ProxyDoctor.Core.Tests
+    runs-on: windows-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Detect the Core test project
+        id: project
+        run: |
+          $proj = 'desktop/tests/ProxyDoctor.Core.Tests/ProxyDoctor.Core.Tests.csproj'
+          $utf8 = New-Object System.Text.UTF8Encoding $false
+          if (Test-Path -LiteralPath $proj) {
+            Write-Host "Found $proj"
+            [System.IO.File]::AppendAllText($env:GITHUB_OUTPUT, "present=true`n", $utf8)
+          } else {
+            Write-Host "SKIP: $proj is not in this tree. No Core tests were run."
+            [System.IO.File]::AppendAllText($env:GITHUB_OUTPUT, "present=false`n", $utf8)
+          }
+
+      - name: Setup .NET 8
+        if: steps.project.outputs.present == 'true'
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Test ProxyDoctor.Core.Tests in Release
+        if: steps.project.outputs.present == 'true'
+        run: |
+          $proj = 'desktop/tests/ProxyDoctor.Core.Tests/ProxyDoctor.Core.Tests.csproj'
+          & dotnet test $proj --configuration Release --nologo
+          if ($null -eq $LASTEXITCODE) { exit 1 }
+          exit $LASTEXITCODE
