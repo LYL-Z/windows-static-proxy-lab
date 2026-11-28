@@ -272,6 +272,13 @@
           <Border Style="{StaticResource Card}" Margin="0,0,0,12">
             <TextBlock Text="{Binding ClientLine}" TextWrapping="Wrap" />
           </Border>
+          <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+            <StackPanel>
+              <TextBlock Text="手动步骤" Foreground="{DynamicResource App.Muted}" />
+              <TextBlock Text="{Binding ClientSteps}" TextWrapping="Wrap" LineHeight="24" Margin="0,6,0,0" />
+              <TextBlock Text="这些句子只由你自己执行。本程序不启动客户端、不重启、不调用正在运行的控制器，也不改当前用户代理。" Foreground="{DynamicResource App.Muted}" TextWrapping="Wrap" Margin="0,8,0,0" />
+            </StackPanel>
+          </Border>
           <Border Style="{StaticResource Card}" Margin="0,0,0,8">
             <StackPanel>
               <TextBlock Text="正在运行的进程" Foreground="{DynamicResource App.Muted}" />

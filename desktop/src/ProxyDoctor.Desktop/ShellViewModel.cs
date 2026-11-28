@@ -31,6 +31,7 @@ public partial class ShellViewModel : ObservableObject
     [ObservableProperty] private string _channels = "本地心跳、上游和协议检查还没有各自的采样。";
     [ObservableProperty] private string _upstreamLine = "上游通道还没有采样。本地监听正常不等于上游可用。";
     [ObservableProperty] private string _clientLine = "还没有把进程、监听和上游放在一起看。";
+    [ObservableProperty] private string _clientSteps = "还没有采样。手动步骤只在读完进程、监听和这次上游之后才给出。";
 
     public ObservableCollection<CheckRow> Checks { get; } = new();
     public event Action<string>? AlertRequested;
@@ -64,6 +65,9 @@ public partial class ShellViewModel : ObservableObject
         ClientLine = value
             ? "演示数据不判断这台电脑的客户端。进程和端口来自固定样例。"
             : "已离开演示。上一次客户端结论已清除。";
+        ClientSteps = value
+            ? "演示数据不给出手动步骤。"
+            : "已离开演示。上一次手动步骤已清除。";
         OnPropertyChanged(nameof(ModeLabel));
     }
 
@@ -416,12 +420,14 @@ public partial class ShellViewModel : ObservableObject
         if (Demo)
         {
             ClientLine = "演示数据不判断这台电脑的客户端。进程和端口来自固定样例。";
+            ClientSteps = "演示数据不给出手动步骤。";
             return;
         }
         if (_latestLocal is not { } report ||
             DateTimeOffset.Now - report.SampledAt > MonitorEngine.LocalHeartbeat.Ttl)
         {
             ClientLine = "还没有采样。只读检查之后才会比较进程、监听和上游。";
+            ClientSteps = "还没有采样。手动步骤只在读完进程、监听和这次上游之后才给出。";
             return;
         }
         var observation = report.Observation;
@@ -434,6 +440,32 @@ public partial class ShellViewModel : ObservableObject
         ClientLine = Describe("StarSky", hopRunning, observation.FirstHopOpen) + "\n"
             + Describe("Clash 核心", observation.CoreRunning == true, observation.MixedPortOpen) + "\n"
             + "默认路径 HTTPS 单独显示。要恢复加速，请先在客户端界面确认状态，随后重新检查真实应用路径。";
+        // ManualSteps is rendered from the Clash core state: it is the only client with a
+        // documented local listener. Everything it says stays advice; nothing here acts.
+        var coreState = ClientLifecycle.Classify(
+            observation.CoreRunning == true,
+            observation.MixedPortOpen == true,
+            null,
+            CurrentUpstreamOk(),
+            userOff).State;
+        ClientSteps = RenderSteps(coreState);
+    }
+
+    private bool? CurrentUpstreamOk()
+    {
+        var upstream = _monitorEngine.Read(MonitorEngine.UpstreamChannelId, DateTimeOffset.Now);
+        if (upstream.SampledAt is null || upstream.Expired) return null;
+        if (upstream.DisplayState == EvidenceState.Verified) return true;
+        if (upstream.DisplayState == EvidenceState.Fault) return false;
+        return null;
+    }
+
+    private static string RenderSteps(ClientLifecycleState state)
+    {
+        var steps = ClientLifecycle.ManualSteps(state);
+        var lines = new List<string> { "状态 " + state + "。下面只由你自己核对。" };
+        for (var i = 0; i < steps.Count; i++) lines.Add($"{i + 1}. {steps[i]}");
+        return string.Join("\n", lines);
     }
 
     private static string FormatEvents(IEnumerable<string> lines)
