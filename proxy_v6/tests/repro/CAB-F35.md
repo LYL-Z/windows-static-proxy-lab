@@ -2,9 +2,13 @@
 
 `docs/CAB-INTEGRATION.md` counts 15 independent cross-process recovery cases. GitHub PR #7 (the CAB integration draft) counts 19 preparation-transaction assertions. `HANDOFF.md` describes the preparation behavior and does not use the number 19. These are two inventories. They are not added together, and neither number is the Engine 114-case suite.
 
+This file is the single note for that distinction; the earlier draft of it duplicated the same conclusion in `CAB-COUNT-NOTE.md`, which was removed. Two further inventories are separate again: the Engine harness (`proxy_v6/tests/Run-Tests.ps1`, 114 registered cases, run by `.github/workflows/cab-windows.yml`) and the Skill basic suite (the 15 `Check` calls in `skills/windows-proxy-doctor/tests/Run-Tests.ps1`).
+
 ## 15 cross-process recovery cases
 
-Source: the `results` rows built by `run` in `proxy_v6/tests/repro/V69Recovery.py`. Each row is one fresh Windows PowerShell process against a file-backed selection. The fixture appended only to that temporary library copy is `proxy_v6/tests/repro/V69RecoveryFixture.ps1`. The runner prints `passed N / 15`.
+Source: the `results` rows built by `run` in `proxy_v6/tests/repro/V69Recovery.py`. Each row is one fresh Windows PowerShell 5.1 process, or one grouped result from such processes, against a file-backed selection. The fixture appended only to that temporary library copy is `proxy_v6/tests/repro/V69RecoveryFixture.ps1`. The runner prints `passed N / 15`.
+
+Rows 1–10 and row 14 each call `apply-v4.ps1 -Repair` once. Rows 11–13 each drive a crashed repair, a guarded apply, a guarded rollback, a state read, and a resolve, and each of those groups is still one row.
 
 1. `user-off`
 2. `user-other-target`
