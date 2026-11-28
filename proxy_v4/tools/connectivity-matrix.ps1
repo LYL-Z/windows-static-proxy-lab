@@ -12,12 +12,24 @@
     * curl exit code, stderr text and the -w metrics are captured SEPARATELY, so a
       failure never loses its evidence (a 502 with timings still shows the 502)
     * the optional upload is part of the final verdict, not a side note
-    * proxy environment variables are reported, and -x/--noproxy override them explicitly
+    * proxy environment variables are reported by NAME and PRESENCE only; their
+      values are masked (scheme://***:***@host:port), never printed verbatim
+
+  Proxy environment handling is measured, not assumed.  curl honours NO_PROXY /
+  no_proxy even when -x is given: -x is NOT an override.  Locally measured with a
+  loopback 502 proxy and a loopback origin (curl 8.x):
+      -x proxy, NO_PROXY=127.0.0.1   -> HTTP 200 from the origin (proxy bypassed)
+      -x proxy, NO_PROXY cleared     -> HTTP 502 from the proxy (proxy used)
+      -x proxy, --noproxy=           -> HTTP 502 from the proxy (list disabled)
+  Therefore a proxied run removes NO_PROXY / no_proxy from this process before any
+  curl child is started AND passes --noproxy= explicitly.  -Direct uses --noproxy "*".
 
   Scope is stated, not implied: IPv4 unless -ForceIPv4 is off, DNS resolved by the
   proxy itself (not tested locally) when a proxy is used.
 
-  Exit: 0 all stages passed, 2 partial, 3 unusable.
+  Exit: 0 all GET stages passed and the upload passed (when requested)
+        2 partial: some GET passed, or the upload (only) failed
+        3 unusable: no GET succeeded at all, regardless of the upload
 
 .EXAMPLE
   .\connectivity-matrix.ps1 -Proxy http://127.0.0.1:11119
@@ -37,12 +49,51 @@ param(
 )
 $ErrorActionPreference = 'Continue'
 
+function Hide-UserInfo {
+    # F64: strip userinfo from anything that ends up in the report.
+    param([string]$Text)
+    if (-not $Text) { return $Text }
+    return ($Text -replace '(?i)([a-z][a-z0-9+.-]*://)[^/\s@]*@', '$1***:***@')
+}
+
+function Get-MaskedProxyEndpoint {
+    # F64: never print a proxy value verbatim; keep only scheme, a masked userinfo
+    # marker and host:port.
+    param([string]$Value)
+    if (-not $Value) { return '' }
+    $u = $null
+    if ([Uri]::TryCreate($Value, [UriKind]::Absolute, [ref]$u)) {
+        $auth = if ($u.UserInfo) { '***:***@' } else { '' }
+        $port = if ($u.IsDefaultPort) { '' } else { ':' + $u.Port }
+        return ('{0}://{1}{2}{3}' -f $u.Scheme, $auth, $u.Host, $port)
+    }
+    return '***'
+}
+
 function Get-ProxyEnvFacts {
-    # F50: these variables change what curl does unless explicitly overridden.
+    # F50/F64: these variables change what curl does unless explicitly overridden.
+    # Report name + presence only; the value is masked, and NO_PROXY is never echoed.
     $o = [ordered]@{}
     foreach ($n in @('HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'NO_PROXY', 'http_proxy', 'https_proxy', 'no_proxy')) {
         $v = [Environment]::GetEnvironmentVariable($n)
-        if ($v) { $o[$n] = $v }
+        if (-not $v) {
+            $o[$n] = [ordered]@{ present = $false }
+            continue
+        }
+        if ($n -match '^no_proxy$') {
+            $o[$n] = [ordered]@{
+                present = $true
+                valueMasked = '***'
+                entries = @($v -split ',' | Where-Object { $_ -ne '' }).Count
+            }
+        }
+        else {
+            $o[$n] = [ordered]@{
+                present = $true
+                valueMasked = (Get-MaskedProxyEndpoint $v)
+                hasCredentials = [bool]($v -match '://[^/\s@]*@')
+            }
+        }
     }
     return $o
 }
@@ -72,7 +123,14 @@ function Invoke-CurlStage {
     $fmt = 'code=%{http_code};dns=%{time_namelookup};conn=%{time_connect};tls=%{time_appconnect};ttfb=%{time_starttransfer};total=%{time_total};dl=%{size_download}'
     $cargs = @('-sS', '-m', "$TimeoutSec", '-o', 'NUL', '-w', $fmt)
     if ($ForceIPv4) { $cargs += '-4' }
-    if ($ProxyArg) { $cargs += @('-x', $ProxyArg) } else { $cargs += @('--noproxy', '*') }
+    if ($ProxyArg) {
+        # F63: -x does not override NO_PROXY.  --noproxy= disables the no-proxy list
+        # explicitly (measured); the matrix process also clears NO_PROXY/no_proxy.
+        $cargs += @('-x', $ProxyArg, '--noproxy=')
+    }
+    else {
+        $cargs += @('--noproxy', '*')
+    }
     if ($Method -eq 'POST') { $cargs += @('-X', 'POST', '--data-binary', $Body) }
     $cargs += $Url
 
@@ -83,7 +141,8 @@ function Invoke-CurlStage {
         $errText = ''
         try { $errText = (Get-Content -LiteralPath $errFile -Raw -ErrorAction SilentlyContinue) } catch { }
         if ($null -eq $errText) { $errText = '' }
-        $errText = ($errText -replace '\s+', ' ').Trim()
+        $errText = (([string]::Join(' ', @($errText))) -replace '\s+', ' ').Trim()
+        $errText = Hide-UserInfo $errText
     }
     finally { Remove-Item -LiteralPath $errFile -Force -ErrorAction SilentlyContinue }
 
@@ -99,8 +158,10 @@ function Invoke-CurlStage {
     }
     # an HTTP status is only a pass when curl itself succeeded
     $o.ok = ($rc -eq 0 -and $o.code -ge 200 -and $o.code -lt 400)
-    if (-not $o.ok -and -not $o.err -and $o.code) {
-        $o.err = ("HTTP {0}" -f $o.code)      # F47: never return a failure without evidence
+    if ($rc -eq 0 -and -not $o.ok) {
+        # an HTTP-level rejection is not "OK": keep the status as the classification
+        $o.kind = if ($o.code) { 'HTTP_' + $o.code } else { 'EMPTY_REPLY' }
+        if (-not $o.err) { $o.err = ("HTTP {0}" -f $o.code) }   # F47: never fail without evidence
     }
     return [pscustomobject]$o
 }
@@ -113,30 +174,53 @@ function Get-Percentile($values, [double]$q) {
 }
 
 $proxyArg = if ($Direct) { '' } else { $Proxy }
-$rows = @()
-foreach ($t in $Targets) {
-    $stageRuns = 1..$Samples | ForEach-Object { Invoke-CurlStage -Url $t -ProxyArg $proxyArg }
-    $okRuns = @($stageRuns | Where-Object { $_.ok })
-    $badRuns = @($stageRuns | Where-Object { -not $_.ok })
-    $rows += [pscustomobject]@{
-        target = ($t -replace '^https?://', '')
-        pass = $okRuns.Count; fail = $badRuns.Count
-        rate = [Math]::Round(100.0 * $okRuns.Count / $Samples, 0)
-        tlsP50Ms = Get-Percentile @($okRuns | ForEach-Object { $_.tls }) 0.5
-        totalP50Ms = Get-Percentile @($okRuns | ForEach-Object { $_.total }) 0.5
-        totalP95Ms = Get-Percentile @($okRuns | ForEach-Object { $_.total }) 0.95
-        bytes = ($okRuns | Select-Object -First 1).dl
-        kind = ($badRuns | Select-Object -First 1).kind
-        err = ($badRuns | Select-Object -First 1).err
-    }
+
+# F63/F64: capture the environment facts (masked) BEFORE touching anything.
+$envFacts = Get-ProxyEnvFacts
+$envOverriddenBy = if ($Direct) { '--noproxy "*"' } else { '-x <proxy> + --noproxy=; NO_PROXY/no_proxy cleared in this process' }
+
+# F63: a proxied measurement is only valid when NO_PROXY cannot bypass the proxy.
+$savedNoProxy = [Environment]::GetEnvironmentVariable('NO_PROXY')
+$savedNoProxyLower = [Environment]::GetEnvironmentVariable('no_proxy')
+$clearedNoProxy = $false
+if (-not $Direct) {
+    Remove-Item Env:NO_PROXY -ErrorAction SilentlyContinue
+    Remove-Item Env:no_proxy -ErrorAction SilentlyContinue
+    $clearedNoProxy = $true
 }
 
+$rows = @()
 $upload = $null
-if ($PostUrl) {
-    $buf = New-Object byte[] 8192
-    (New-Object System.Random).NextBytes($buf)
-    $up = Invoke-CurlStage -Url $PostUrl -Method POST -Body ('payload=' + [Convert]::ToBase64String($buf)) -ProxyArg $proxyArg
-    $upload = [pscustomobject]@{ url = $PostUrl; ok = $up.ok; code = $up.code; kind = $up.kind; bytes = $up.dl; err = $up.err }
+try {
+    foreach ($t in $Targets) {
+        $stageRuns = 1..$Samples | ForEach-Object { Invoke-CurlStage -Url $t -ProxyArg $proxyArg }
+        $okRuns = @($stageRuns | Where-Object { $_.ok })
+        $badRuns = @($stageRuns | Where-Object { -not $_.ok })
+        $rows += [pscustomobject]@{
+            target = (Hide-UserInfo $t) -replace '^https?://', ''
+            pass = $okRuns.Count; fail = $badRuns.Count
+            rate = [Math]::Round(100.0 * $okRuns.Count / $Samples, 0)
+            tlsP50Ms = Get-Percentile @($okRuns | ForEach-Object { $_.tls }) 0.5
+            totalP50Ms = Get-Percentile @($okRuns | ForEach-Object { $_.total }) 0.5
+            totalP95Ms = Get-Percentile @($okRuns | ForEach-Object { $_.total }) 0.95
+            bytes = ($okRuns | Select-Object -First 1).dl
+            kind = ($badRuns | Select-Object -First 1).kind
+            err = ($badRuns | Select-Object -First 1).err
+        }
+    }
+
+    if ($PostUrl) {
+        $buf = New-Object byte[] 8192
+        (New-Object System.Random).NextBytes($buf)
+        $up = Invoke-CurlStage -Url $PostUrl -Method POST -Body ('payload=' + [Convert]::ToBase64String($buf)) -ProxyArg $proxyArg
+        $upload = [pscustomobject]@{ url = Hide-UserInfo $PostUrl; ok = $up.ok; code = $up.code; kind = $up.kind; bytes = $up.dl; err = $up.err }
+    }
+}
+finally {
+    if ($clearedNoProxy) {
+        if ($null -ne $savedNoProxy) { [Environment]::SetEnvironmentVariable('NO_PROXY', $savedNoProxy, 'Process') }
+        if ($null -ne $savedNoProxyLower) { [Environment]::SetEnvironmentVariable('no_proxy', $savedNoProxyLower, 'Process') }
+    }
 }
 
 $sumPass = ($rows | Measure-Object pass -Sum).Sum
@@ -145,9 +229,16 @@ $uploadFailed = ($upload -and -not $upload.ok)
 
 $result = [ordered]@{
     observedAt = [datetimeoffset]::Now.ToString('o')
-    path = if ($Direct) { 'DIRECT' } else { $Proxy }
-    proxyEnv = Get-ProxyEnvFacts
-    envOverriddenBy = if ($Direct) { '--noproxy *' } else { '-x <proxy> (overrides *_PROXY)' }
+    path = if ($Direct) { 'DIRECT' } else { Get-MaskedProxyEndpoint $Proxy }
+    curl = ((& curl.exe --version 2>$null | Select-Object -First 1) -join '')
+    proxyEnv = $envFacts
+    envOverriddenBy = $envOverriddenBy
+    noProxyHandling = [ordered]@{
+        proxied = -not $Direct
+        noProxyClearedInChild = $clearedNoProxy
+        mechanism = if ($Direct) { '--noproxy "*"' } else { 'NO_PROXY/no_proxy removed for the probe + --noproxy=' }
+        basis = 'measured with local fixtures by tests/incidents/invoke-inc-checks.ps1; -x alone does not override NO_PROXY'
+    }
     samplesPerTarget = $Samples
     targets = $rows
     upload = $upload
@@ -182,7 +273,11 @@ else {
     Write-Host ''
 }
 
-# F46: a failed upload must not produce a full-success exit code
-if ($sumFail -eq 0 -and -not $uploadFailed) { exit 0 }
-elseif ($sumPass -gt 0 -or $uploadFailed) { exit 2 }
-else { exit 3 }
+# F67: exit code is a three-way verdict and "everything failed" is never partial.
+#   0 = every GET passed and the upload (when requested) passed
+#   3 = no GET passed at all (even if the upload somehow passed)
+#   2 = some GET passed, or every GET passed but the upload failed
+if (($sumPass + $sumFail) -eq 0) { exit 3 }
+elseif ($sumPass -eq 0) { exit 3 }
+elseif ($sumFail -eq 0 -and -not $uploadFailed) { exit 0 }
+else { exit 2 }
