@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.IO;
 using System.Net.NetworkInformation;
 using System.Text.Json;
 using System.Windows.Threading;
@@ -32,6 +33,7 @@ public partial class ShellViewModel : ObservableObject
     [ObservableProperty] private string _upstreamLine = "上游通道还没有采样。本地监听正常不等于上游可用。";
     [ObservableProperty] private string _clientLine = "还没有把进程、监听和上游放在一起看。";
     [ObservableProperty] private string _clientSteps = "还没有采样。手动步骤只在读完进程、监听和这次上游之后才给出。";
+    [ObservableProperty] private string _monitorEvents = "监测事件窗口还没有内容。";
 
     public ObservableCollection<CheckRow> Checks { get; } = new();
     public event Action<string>? AlertRequested;
@@ -97,6 +99,7 @@ public partial class ShellViewModel : ObservableObject
     public void StartMonitor()
     {
         if (Interlocked.CompareExchange(ref _monitorStarted, 1, 0) != 0) return;
+        RestoreMonitorEvents();
         if (!Paused && !Demo) _monitorEngine.Start(DateTimeOffset.Now);
         _refresh.Tick += RefreshMonitor;
         _refresh.Start();
@@ -115,8 +118,50 @@ public partial class ShellViewModel : ObservableObject
         _refresh.Stop();
         _refresh.Tick -= RefreshMonitor;
         _monitorEngine.Stop(DateTimeOffset.Now);
+        PersistMonitorEvents();
         _monitorStop.Cancel();
         PersistEvent("监测已停止。");
+    }
+
+    // The monitor event window is the only writer of monitor-events.jsonl. The session EventLog keeps
+    // events.jsonl and its {at,message} lines. MonitorEngine refuses the other file name, so the events
+    // page cannot end up reading MonitorEvent JSON.
+    private void RestoreMonitorEvents()
+    {
+        if (Demo || _monitorEngine.Events.Count > 0) return;
+        try
+        {
+            _monitorEngine.LoadEvents(MonitorEngine.DefaultEventPath);
+        }
+        catch (FileNotFoundException) { }
+        catch (InvalidDataException)
+        {
+            Monitor = "上一次的监测事件文件读不懂，这次从空窗口开始。文件没有被覆盖。";
+        }
+        catch (IOException)
+        {
+            Monitor = "上一次的监测事件文件读不出来，这次从空窗口开始。";
+        }
+    }
+
+    private int _eventSaveGate;
+
+    private void PersistMonitorEvents()
+    {
+        if (Demo || _monitorEngine.Events.Count == 0) return;
+        if (Interlocked.Exchange(ref _eventSaveGate, 1) == 1) return;
+        try
+        {
+            _monitorEngine.SaveEvents(MonitorEngine.DefaultEventPath);
+        }
+        catch (Exception ex)
+        {
+            Monitor = "监测事件窗口没有写入：" + ex.GetType().Name + "。";
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _eventSaveGate, 0);
+        }
     }
 
     private void NetworkAddressChanged(object? sender, EventArgs e) =>
@@ -412,7 +457,25 @@ public partial class ShellViewModel : ObservableObject
               + $"  连续失败 {sample.ConsecutiveFailures}  状态变化 {sample.Flaps}";
         Channels = string.Join("\n", snapshot.Channels.Select(Line));
         UpstreamLine = Line(snapshot.Channels.Single(item => item.Id == MonitorEngine.UpstreamChannelId));
+        RenderMonitorEvents();
         RenderClientLine();
+    }
+
+    private void RenderMonitorEvents()
+    {
+        var window = _monitorEngine.Events;
+        if (window.Count == 0)
+        {
+            MonitorEvents = "监测事件窗口还没有内容。";
+            return;
+        }
+        var lines = new List<string>
+        {
+            $"共 {window.Count} 条，最多保留 {MonitorEngine.MaxEvents} 条。最新在上。"
+        };
+        for (var i = window.Count - 1; i >= 0 && lines.Count <= 20; i--)
+            lines.Add($"{window[i].At:HH:mm:ss}  {window[i].Kind}  {window[i].Detail}");
+        MonitorEvents = string.Join("\n", lines);
     }
 
     private void RenderClientLine()

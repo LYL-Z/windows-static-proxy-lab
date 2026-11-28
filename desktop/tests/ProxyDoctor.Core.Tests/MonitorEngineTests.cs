@@ -227,7 +227,7 @@ public class MonitorEngineTests
     public void Event_file_rotates_to_200_lines_and_reloads_the_same_window()
     {
         var directory = Path.Combine(Path.GetTempPath(), "proxy-doctor-monitor-" + Guid.NewGuid().ToString("N"));
-        var path = Path.Combine(directory, "events.jsonl");
+        var path = Path.Combine(directory, MonitorEngine.EventFileName);
         try
         {
             var engine = Running();
@@ -298,6 +298,43 @@ public class MonitorEngineTests
             Assert.Equal(MonitorEngine.LocalChannelId, reloaded.Events[^1].ChannelId);
             Assert.Null(reloaded.Read(MonitorEngine.UpstreamChannelId, T0.AddSeconds(300)).SampledAt);
             Assert.False(reloaded.UpstreamIsSuccessful(T0.AddSeconds(300)));
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Monitor_events_and_the_session_log_stay_on_different_files()
+    {
+        Assert.NotEqual(EventLog.FileName, MonitorEngine.EventFileName);
+        Assert.Equal(
+            Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ProxyDoctor", MonitorEngine.EventFileName),
+            MonitorEngine.DefaultEventPath);
+
+        var directory = Path.Combine(Path.GetTempPath(), "proxy-doctor-monitor-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var engine = Running();
+            engine.Record(MonitorEngine.LocalChannelId, Healthy("本地心跳"), T0);
+
+            var shared = Path.Combine(directory, EventLog.FileName);
+            var rejectedSource = Assert.Throws<ArgumentException>(() => engine.SaveEvents(shared));
+            Assert.Contains(MonitorEngine.EventFileName, rejectedSource.Message, StringComparison.Ordinal);
+            Assert.False(File.Exists(shared));
+            Assert.Throws<ArgumentException>(() => engine.LoadEvents(shared));
+            Assert.Single(engine.Events, item => item.ChannelId == MonitorEngine.LocalChannelId);
+
+            // The rule is about the file name, not the folder: the dedicated name is accepted.
+            var dedicated = Path.Combine(directory, MonitorEngine.EventFileName);
+            engine.SaveEvents(dedicated);
+            Assert.True(File.Exists(dedicated));
+            var reloaded = new MonitorEngine();
+            reloaded.LoadEvents(dedicated);
+            Assert.Equal(engine.Events, reloaded.Events);
         }
         finally
         {

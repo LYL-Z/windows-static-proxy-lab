@@ -82,6 +82,16 @@ public sealed class MonitorEngine
     public const string ProtocolChannelId = "protocol";
 
     /// <summary>
+    /// The file name this window persists to. It is deliberately not <see cref="EventLog.FileName"/>:
+    /// that file holds {at,message} session lines, this one holds <see cref="MonitorEvent"/> lines.
+    /// </summary>
+    public const string EventFileName = "monitor-events.jsonl";
+
+    /// <summary>Default persistence path: <c>%LOCALAPPDATA%\ProxyDoctor\monitor-events.jsonl</c>.</summary>
+    public static string DefaultEventPath => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ProxyDoctor", EventFileName);
+
+    /// <summary>
     /// Polling is not instant detection. Outages shorter than a channel interval are invisible.
     /// </summary>
     public const string PollingIsNotInstantDetection =
@@ -217,6 +227,7 @@ public sealed class MonitorEngine
     public void SaveEvents(string path)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        RejectSessionLogPath(path);
         MonitorEvent[] events;
         lock (_gate) events = _events.ToArray();
         WriteEventFile(path, events);
@@ -229,6 +240,7 @@ public sealed class MonitorEngine
     public void LoadEvents(string path)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        RejectSessionLogPath(path);
         var events = ReadEventFile(path);
         lock (_gate)
         {
@@ -239,6 +251,18 @@ public sealed class MonitorEngine
             foreach (var item in _events)
                 if (item.Sequence > _sequence) _sequence = item.Sequence;
         }
+    }
+
+    // The session EventLog already owns events.jsonl with {at,message} lines and the same 200-line
+    // cap. Pointing this window at that file would make the events page read MonitorEvent JSON or
+    // lose lines, so the two writers are kept on separate files by a check, not by convention.
+    private static void RejectSessionLogPath(string path)
+    {
+        var full = Path.GetFullPath(path);
+        if (string.Equals(Path.GetFileName(full), EventLog.FileName, StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException(
+                "The monitor event window must not share the session log file " + EventLog.FileName +
+                ". Use " + EventFileName + " in the same folder.", nameof(path));
     }
 
     private void ChangeRunState(MonitorRunState next, string kind, DateTimeOffset at, string detail)

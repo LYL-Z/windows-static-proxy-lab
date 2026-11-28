@@ -47,8 +47,14 @@ public static class IntentStore
 
 public static class EventLog
 {
+    /// <summary>
+    /// The session log file name. Its lines are {at,message} objects and it is the only writer of
+    /// this file; <see cref="MonitorEngine"/> owns <see cref="MonitorEngine.EventFileName"/> instead.
+    /// </summary>
+    public const string FileName = "events.jsonl";
+
     private static string PathName => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ProxyDoctor", "events.jsonl");
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ProxyDoctor", FileName);
 
     private static readonly Mutex Gate = new(false, "Local\\ProxyDoctorEvents");
 
