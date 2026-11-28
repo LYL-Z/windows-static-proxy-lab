@@ -275,6 +275,92 @@ public class ProtocolEvidenceTests
         AssertNoProtectionClaim(evidence);
     }
 
+    [Fact]
+    public void System_dns_answer_is_not_a_path_proof()
+    {
+        var evidence = ProtocolEvidence.Dns("Windows", "系统解析器", queried: true,
+            answerReceived: true, receiverSawQuery: false, errorCode: null, timedOut: false, elapsedMs: 20);
+
+        Assert.Equal(ProtocolClass.PathUnknown, evidence.Result);
+        Assert.Contains("not a path proof", evidence.Coverage, StringComparison.Ordinal);
+        Assert.Contains("does not identify the recursive path", evidence.Coverage, StringComparison.Ordinal);
+        Assert.NotEqual(ProtocolClass.Available, evidence.Result);
+        Assert.NotEqual(ProtocolClass.LabOnly, evidence.Result);
+        AssertNoProtectionClaim(evidence);
+    }
+
+    [Theory]
+    [InlineData(200)]
+    [InlineData(204)]
+    [InlineData(403)]
+    public void Doh_http_status_is_not_browser_doh(int status)
+    {
+        var unseen = ProtocolEvidence.Doh("HttpClient", "public-doh", requested: true,
+            httpStatus: status, receiverSawRequest: false, errorCode: null, timedOut: false, elapsedMs: 40);
+        var seen = ProtocolEvidence.Doh("lab-client", "loopback-doh", requested: true,
+            httpStatus: status, receiverSawRequest: true, errorCode: null, timedOut: false, elapsedMs: 9);
+        var flagged = ProtocolEvidence.Classify(new ProtocolObservation
+        {
+            Protocol = "DoH",
+            Initiator = "HttpClient",
+            Receiver = "status-only",
+            Kind = ProtocolKind.Doh,
+            Attempted = true,
+            HttpStatus = status,
+            BrowserCaptured = true,
+            ReceiverHits = 0,
+            ElapsedMs = 5
+        });
+
+        Assert.Equal(ProtocolClass.PathUnknown, unseen.Result);
+        Assert.Equal(ProtocolClass.LabOnly, seen.Result);
+        Assert.Equal(ProtocolClass.PathUnknown, flagged.Result);
+        Assert.Contains("not browser DoH", unseen.Coverage, StringComparison.Ordinal);
+        Assert.Contains("not browser DoH", seen.Coverage, StringComparison.Ordinal);
+        Assert.Contains("not browser DoH", flagged.Coverage, StringComparison.Ordinal);
+        Assert.Contains($"HTTP {status}", unseen.Coverage, StringComparison.Ordinal);
+        Assert.NotEqual(ProtocolClass.Available, unseen.Result);
+        Assert.NotEqual(ProtocolClass.Available, seen.Result);
+        Assert.NotEqual(ProtocolClass.Available, flagged.Result);
+        AssertNoProtectionClaim(unseen);
+        AssertNoProtectionClaim(seen);
+        AssertNoProtectionClaim(flagged);
+    }
+
+    [Theory]
+    [InlineData(true, 1, null, false, ProtocolClass.Available)]
+    [InlineData(false, 0, 10013, false, ProtocolClass.Rejected)]
+    [InlineData(false, 0, null, true, ProtocolClass.TimedOut)]
+    public void Ipv6_loopback_is_not_a_public_ipv6_path(bool exchanged, int hits, int? errorCode, bool timedOut, ProtocolClass expected)
+    {
+        var evidence = ProtocolEvidence.Ipv6Loopback("python", "[::1]", exchanged, hits,
+            errorCode, timedOut, elapsedMs: 6);
+
+        Assert.Equal(expected, evidence.Result);
+        Assert.Contains("not a public IPv6 path", evidence.Coverage, StringComparison.Ordinal);
+        Assert.Contains("not production protection", evidence.Coverage, StringComparison.Ordinal);
+        Assert.Equal("IPv6 loopback", evidence.Protocol);
+        AssertNoProtectionClaim(evidence);
+    }
+
+    [Fact]
+    public void Webrtc_without_a_browser_is_not_tested()
+    {
+        var idle = ProtocolEvidence.WebRtc("none", "none", browserCaptured: false,
+            applicationDataMatched: false, receiverSawBrowser: false, errorCode: null, timedOut: false, elapsedMs: 0);
+        var contradicted = ProtocolEvidence.WebRtc("chrome", "stun", browserCaptured: false,
+            applicationDataMatched: true, receiverSawBrowser: true, errorCode: null, timedOut: false, elapsedMs: 30);
+
+        Assert.Equal(ProtocolClass.NotTested, idle.Result);
+        Assert.Equal(ProtocolClass.NotTested, contradicted.Result);
+        Assert.Contains("no browser capture", idle.Coverage, StringComparison.Ordinal);
+        Assert.Contains("not tested", idle.Coverage, StringComparison.Ordinal);
+        Assert.Contains("no browser capture", contradicted.Coverage, StringComparison.Ordinal);
+        Assert.DoesNotContain("TURN", idle.Coverage, StringComparison.Ordinal);
+        AssertNoProtectionClaim(idle);
+        AssertNoProtectionClaim(contradicted);
+    }
+
     private static void AssertNoProtectionClaim(ProtocolEvidence evidence)
     {
         Assert.DoesNotContain("protected", evidence.Coverage, StringComparison.OrdinalIgnoreCase);

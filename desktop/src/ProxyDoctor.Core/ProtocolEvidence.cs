@@ -224,7 +224,7 @@ public sealed record ProtocolEvidence(
                 "DNS timed out, a timeout does not identify the resolver path, and this is not protection.");
         if (observation.AnswerReceived && observation.ReceiverHits <= 0)
             return Finish(observation, ProtocolClass.PathUnknown,
-                "A DNS answer does not identify the recursive path and is not protection.");
+                "A DNS answer is not a path proof, does not identify the recursive path, and is not protection.");
         if (observation.AnswerReceived && observation.ReceiverHits > 0)
             return Finish(observation, ProtocolClass.LabOnly,
                 "The controlled resolver saw this DNS query and the client received an answer, coverage is this query only, and this is not production protection.");
@@ -245,10 +245,10 @@ public sealed record ProtocolEvidence(
                 "DoH timed out, a timeout does not identify the resolver path, and this is not protection.");
         if (observation.HttpStatus is int status && observation.ReceiverHits <= 0)
             return Finish(observation, ProtocolClass.PathUnknown,
-                $"DoH HTTP {status} does not identify the resolver path and is not protection.");
+                $"DoH HTTP {status} is not browser DoH and does not identify the resolver path, and this is not protection.");
         if (observation.HttpStatus is int seen && observation.ReceiverHits > 0)
             return Finish(observation, ProtocolClass.LabOnly,
-                $"This controlled DoH exchange returned HTTP {seen}, covers this request only, and is not production protection.");
+                $"This controlled DoH exchange returned HTTP {seen}, covers this request only, is not browser DoH, and is not production protection.");
         if (observation.ErrorCode == AccessDenied)
             return Finish(observation, ProtocolClass.Rejected,
                 "DoH was refused with error 10013, the resolver path stays unknown, and this refusal is not protection.");
@@ -322,7 +322,8 @@ public sealed record ProtocolEvidence(
     {
         var socket = socketOnly ? ", and coverage is this socket only" : "";
         var webrtc = webrtcNote ? ", and this is not WebRTC protection" : "";
-        return $"{protocol} {body}{socket}{webrtc}.";
+        var publicIpv6 = protocol == "IPv6 loopback" ? ", and this is not a public IPv6 path" : "";
+        return $"{protocol} {body}{socket}{webrtc}{publicIpv6}.";
     }
 
     private static ProtocolEvidence Finish(ProtocolObservation observation, ProtocolClass result, string coverage)
