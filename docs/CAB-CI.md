@@ -7,6 +7,7 @@ Windows GitHub Actions 覆盖可以在托管 runner 上独立完成的部分。�
 `.github/workflows/cab-windows.yml` 在 push、pull_request 和 workflow_dispatch 时于 `windows-latest` 运行：
 
 - `core-tests`：对 `desktop/tests/ProxyDoctor.Core.Tests` 执行 `dotnet test`。这是 Desktop 和 CLI 共用的 Core 测试。
+- `packaging-tests`：用 Windows PowerShell 5.1 运行 `desktop/packaging/Test-InstallProxyDoctor.ps1`。用例只在 GUID 命名的 TEMP 沙箱里安装、卸载，并证明启动项和系统代理指纹没有变化；复制中断是通过从外部锁住一个源文件触发的，安装器本身没有测试开关。
 - `skill-tests`：用 runner 自带的 Windows PowerShell 5.1 运行 `skills/windows-proxy-doctor/tests/Run-Tests.ps1`、`Run-FaultClassTests.ps1` 和 `Run-OnboardingTests.ps1`。若安装了 `pwsh`，同一组脚本再运行一次，并打印该版本。缺少 `pwsh` 时任务失败，不再静默降级。
 - `engine-tests`：用 Windows PowerShell 5.1 实际执行 `proxy_v6/tests/Run-Tests.ps1`（F77/F53），也就是 114 项引擎回归。先确认 `Run-Tests.ps1`、`Harness.ps1`、`lib/TestSupport.ps1` 三个入口存在，再执行套件；证据写到 `$env:RUNNER_TEMP\v6-evidence\evidence.json`，失败时打印计数、非 PASS 用例和 harness/evidence 错误，然后以套件自己的退出码失败。同一 job 再跑 `proxy_v6/tests/repro/CAB-CorruptPreparationJournal.ps1`（10 条断言，隔离 TEMP 根）。超时 40 分钟。
 - `secret-scan`：在已跟踪文件中查找 PRIVATE KEY 块。失败时只列出路径，不打印文件内容。

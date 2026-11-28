@@ -46,6 +46,32 @@ jobs:
           & dotnet test desktop/tests/ProxyDoctor.Core.Tests/ProxyDoctor.Core.Tests.csproj --configuration Release --verbosity minimal
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+  packaging-tests:
+    name: Packaging rollback tests
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Run Test-InstallProxyDoctor.ps1 with Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $script = 'desktop/packaging/Test-InstallProxyDoctor.ps1'
+          if (-not (Test-Path -LiteralPath $script -PathType Leaf)) {
+            throw ("missing packaging test: " + $script)
+          }
+          # Everything happens under a GUID TEMP sandbox. Startup and WinINET values are
+          # read only, to prove they did not change; no installer or service is started.
+          & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File $script
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host ("{0} exited {1}" -f $script, $LASTEXITCODE)
+            exit $LASTEXITCODE
+          }
+
   skill-tests:
     name: Skill tests
     runs-on: windows-latest
