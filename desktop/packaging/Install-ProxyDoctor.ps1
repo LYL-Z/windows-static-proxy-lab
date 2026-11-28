@@ -3,13 +3,19 @@
   Copies a prepared folder and removes only the files listed in its hash manifest.
   Refuses a destination outside the allowed root, a reparse point, or a Startup folder.
   Does not write logon entries or WinINET proxy settings.
+  If a file copy fails, files written by that attempt are removed. A version directory
+  created by that attempt is removed when nothing else remains; otherwise install-failed.json
+  is left. Another version directory is not modified. Stopping the process mid-copy can
+  still leave a partial directory. FaultAfterCopiedFiles below zero copies every file;
+  zero or higher fails that later copy so tests can interrupt an install.
 #>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][ValidateSet('Install', 'Uninstall')][string]$Action,
     [Parameter(Mandatory = $true)][string]$Destination,
     [string]$Source,
-    [Parameter(Mandatory = $true)][string]$AllowedRoot
+    [Parameter(Mandatory = $true)][string]$AllowedRoot,
+    [int]$FaultAfterCopiedFiles = -1
 )
 $ErrorActionPreference = 'Stop'
 
@@ -129,7 +135,120 @@ function Read-HashManifest([string]$Path) {
     return ($json | ConvertFrom-Json)
 }
 
-function Install-Package([string]$DestinationPath, [string]$SourcePath) {
+function Copy-VersionFile([string]$Source, [string]$Target, [bool]$Fault, [int]$AlreadyCopied) {
+    $lock = $null
+    $errorText = $null
+    try {
+        if ($Fault) {
+            $lock = [System.IO.File]::Open(
+                $Source,
+                [System.IO.FileMode]::Open,
+                [System.IO.FileAccess]::Read,
+                [System.IO.FileShare]::None)
+        }
+        [System.IO.File]::Copy($Source, $Target, $false)
+        if ($Fault) { $errorText = "file copy failed after $AlreadyCopied file(s)" }
+    } catch {
+        $errorText = "file copy failed after $AlreadyCopied file(s)"
+    } finally {
+        if ($null -ne $lock) { $lock.Dispose() }
+    }
+    if ($null -ne $errorText) { throw $errorText }
+}
+
+function Write-FailedInstallMarker([string]$DestinationPath) {
+    if (-not (Test-Path -LiteralPath $DestinationPath -PathType Container)) { return }
+    Assert-PathChainHasNoReparsePoint $DestinationPath
+    Assert-NotReparse $DestinationPath
+    $marker = [System.IO.Path]::GetFullPath((Join-Path $DestinationPath 'install-failed.json'))
+    if (-not (Test-StrictChild $DestinationPath $marker)) { throw 'failed marker escapes the destination' }
+    Assert-NotStartupDestination $marker
+    $json = '{"status":"failed"}'
+    $utf8 = New-Object System.Text.UTF8Encoding $false
+    $stage = $marker + '.' + [Guid]::NewGuid().ToString('N') + '.tmp'
+    try {
+        [System.IO.File]::WriteAllText($stage, $json, $utf8)
+        if ([System.IO.File]::Exists($marker)) { [System.IO.File]::Delete($marker) }
+        [System.IO.File]::Move($stage, $marker)
+    } finally {
+        if ([System.IO.File]::Exists($stage)) { [System.IO.File]::Delete($stage) }
+    }
+}
+
+function Remove-OwnedFile([string]$DestinationPath, [string]$Target, [string]$Sha256) {
+    if (-not (Test-StrictChild $DestinationPath $Target)) { throw 'rollback target escapes the destination' }
+    Assert-NotStartupDestination $Target
+    Assert-PathChainHasNoReparsePoint $Target
+    if (-not (Test-Path -LiteralPath $Target -PathType Leaf)) { return }
+    Assert-NotReparse $Target
+    if (-not [string]::IsNullOrWhiteSpace($Sha256)) {
+        $actual = (Get-FileHash -LiteralPath $Target -Algorithm SHA256).Hash.ToUpperInvariant()
+        if ($actual -ne $Sha256.ToUpperInvariant()) { throw 'rollback file hash changed' }
+    }
+    [System.IO.File]::Delete($Target)
+}
+
+function Undo-IncompleteInstall($State) {
+    # One argument: PowerShell otherwise enumerates the copied-file list into later parameters.
+    $DestinationPath = [string]$State.DestinationPath
+    $CopiedItems = @($State.CopiedItems)
+    $CreatedRelative = @($State.CreatedRelative)
+    $RootCreated = [bool]$State.RootCreated
+    $leftover = $false
+    $manifest = [System.IO.Path]::GetFullPath((Join-Path $DestinationPath 'install-manifest.json'))
+    $files = New-Object System.Collections.Generic.List[object]
+    $files.Add([pscustomobject]@{ Target = $manifest; Sha256 = '' }) | Out-Null
+    foreach ($item in @($CopiedItems)) {
+        if ($null -eq $item) { continue }
+        $files.Add($item) | Out-Null
+    }
+    foreach ($item in $files) {
+        try {
+            Remove-OwnedFile $DestinationPath ([string]$item.Target) ([string]$item.Sha256)
+        } catch {
+            $leftover = $true
+        }
+    }
+    $relativeDirs = @($CreatedRelative | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) })
+    foreach ($relative in @($relativeDirs | Sort-Object { $_.Length } -Descending)) {
+        try {
+            Assert-SafeRelativePath $relative 'rollback directory escapes the destination'
+            $dir = [System.IO.Path]::GetFullPath((Join-Path $DestinationPath $relative))
+            if (-not (Test-StrictChild $DestinationPath $dir)) { throw 'rollback directory escapes the destination' }
+            Assert-NotStartupDestination $dir
+            Assert-PathChainHasNoReparsePoint $dir
+            if (-not (Test-Path -LiteralPath $dir -PathType Container)) { continue }
+            Assert-NotReparse $dir
+            if (-not (Get-ChildItem -LiteralPath $dir -Force)) {
+                [System.IO.Directory]::Delete($dir)
+            } else {
+                $leftover = $true
+            }
+        } catch {
+            $leftover = $true
+        }
+    }
+    $stillThere = Test-Path -LiteralPath $DestinationPath -PathType Container
+    if ($RootCreated -and $stillThere) {
+        try {
+            Assert-NotReparse $DestinationPath
+            Assert-PathChainHasNoReparsePoint $DestinationPath
+            if (-not (Get-ChildItem -LiteralPath $DestinationPath -Force)) {
+                [System.IO.Directory]::Delete($DestinationPath)
+                $stillThere = $false
+            } else {
+                $leftover = $true
+            }
+        } catch {
+            $leftover = $true
+        }
+    }
+    if ($stillThere -and ($RootCreated -or $leftover)) {
+        try { Write-FailedInstallMarker $DestinationPath } catch { }
+    }
+}
+
+function Install-Package([string]$DestinationPath, [string]$SourcePath, [int]$FaultAfterCopiedFiles) {
     if ([string]::IsNullOrWhiteSpace($SourcePath)) { throw 'install requires a source' }
     $sourceFull = Get-NormalizedPath $SourcePath
     if (-not (Test-Path -LiteralPath $sourceFull -PathType Container)) {
@@ -167,28 +286,56 @@ function Install-Package([string]$DestinationPath, [string]$SourcePath) {
         if (Test-Path -LiteralPath $item.Target) { throw 'package would overwrite an existing file; use a separate version folder' }
     }
     $rootCreated = -not (Test-Path -LiteralPath $DestinationPath)
-    New-Item -ItemType Directory -Path $DestinationPath -Force | Out-Null
-    Assert-NotReparse $DestinationPath
-
     $entries = New-Object System.Collections.Generic.List[object]
     $created = New-Object System.Collections.Generic.List[string]
-    $destinationPrefix = $DestinationPath + '\'
-    foreach ($item in @($plan | Sort-Object Relative)) {
-        $parent = Split-Path -Parent $item.Target
-        if (-not (Test-Path -LiteralPath $parent)) {
-            $dir = $parent
-            while ((Test-StrictChild $DestinationPath $dir) -and -not (Test-Path -LiteralPath $dir)) {
-                $created.Add($dir.Substring($destinationPrefix.Length))
-                $dir = Split-Path -Parent $dir
+    $copied = New-Object System.Collections.Generic.List[object]
+    try {
+        New-Item -ItemType Directory -Path $DestinationPath -Force | Out-Null
+        Assert-NotReparse $DestinationPath
+        $destinationPrefix = $DestinationPath + '\'
+        foreach ($item in @($plan | Sort-Object Relative)) {
+            $parent = Split-Path -Parent $item.Target
+            if (-not (Test-Path -LiteralPath $parent)) {
+                $dir = $parent
+                while ((Test-StrictChild $DestinationPath $dir) -and -not (Test-Path -LiteralPath $dir)) {
+                    $created.Add($dir.Substring($destinationPrefix.Length)) | Out-Null
+                    $dir = Split-Path -Parent $dir
+                }
+                New-Item -ItemType Directory -Path $parent -Force | Out-Null
             }
-            New-Item -ItemType Directory -Path $parent -Force | Out-Null
+            Assert-PathChainHasNoReparsePoint $item.Target
+            $fault = $FaultAfterCopiedFiles -ge 0 -and $copied.Count -eq $FaultAfterCopiedFiles
+            try {
+                Copy-VersionFile $item.Source $item.Target $fault $copied.Count
+            } catch {
+                if (Test-Path -LiteralPath $item.Target -PathType Leaf) {
+                    $copied.Add([pscustomobject]@{ Target = $item.Target; Sha256 = '' }) | Out-Null
+                }
+                throw
+            }
+            $record = [pscustomobject]@{ Target = $item.Target; Sha256 = '' }
+            $copied.Add($record) | Out-Null
+            $hash = (Get-FileHash -LiteralPath $item.Target -Algorithm SHA256).Hash.ToUpperInvariant()
+            $record.Sha256 = $hash
+            $entries.Add([ordered]@{ path = $item.Relative; sha256 = $hash }) | Out-Null
         }
-        Assert-PathChainHasNoReparsePoint $item.Target
-        [System.IO.File]::Copy($item.Source, $item.Target, $false)
-        $hash = (Get-FileHash -LiteralPath $item.Target -Algorithm SHA256).Hash.ToUpperInvariant()
-        $entries.Add([ordered]@{ path = $item.Relative; sha256 = $hash }) | Out-Null
+        Write-HashManifest $manifestPath $entries $created $rootCreated
+    } catch {
+        $copyError = [string]$_.Exception.Message
+        if ([string]::IsNullOrWhiteSpace($copyError)) { $copyError = [string]$_ }
+        try {
+            $undoState = [pscustomobject]@{
+                DestinationPath = $DestinationPath
+                CopiedItems = $copied.ToArray()
+                CreatedRelative = $created.ToArray()
+                RootCreated = [bool]$rootCreated
+            }
+            Undo-IncompleteInstall $undoState
+        } catch {
+            try { Write-FailedInstallMarker $DestinationPath } catch { }
+        }
+        throw $copyError
     }
-    Write-HashManifest $manifestPath $entries $created $rootCreated
 }
 
 function Remove-EmptyDirectories($Directories) {
@@ -259,7 +406,7 @@ Assert-PathChainHasNoReparsePoint $allowed
 Assert-PathChainHasNoReparsePoint $destination
 
 if ($Action -eq 'Install') {
-    Install-Package $destination $Source
+    Install-Package $destination $Source $FaultAfterCopiedFiles
 } else {
     Uninstall-Package $destination
 }
