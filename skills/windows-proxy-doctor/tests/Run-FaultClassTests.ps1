@@ -183,6 +183,15 @@ try {
         Assert-True ($guide.Contains($note) -and $skill.Contains($note)) 'alert sentence missing from the diagnose guidance'
         Assert-True ($guide.Contains((Text 0x4E0D,0x8981,0x5EFA,0x8BAE,0x6062,0x590D))) 'guide omitted the do-not-restore instruction'
     }
+    Check 'operator-boundary-reference' {
+        $path = Join-Path $root 'references\operator-boundary.md'
+        Assert-True (Test-Path -LiteralPath $path) 'operator boundary reference is missing'
+        $text = Get-Content -LiteralPath $path -Raw -Encoding UTF8
+        Assert-True ($text.Contains('read-only until a specific change is accepted')) 'missing read-only boundary'
+        Assert-True ($text.Contains('no-modify wins over diagnose')) 'missing no-modify boundary'
+        Assert-True ($text.Contains('do not promise unban')) 'missing unban boundary'
+        Assert-True ($text.Contains('StarSky restart is not acceleration')) 'StarSky restart was treated as acceleration'
+    }
     Check 'classifier-does-not-call-live-state' {
         $src = Get-Content -LiteralPath (Join-Path $root 'scripts\ProxyFaultClass.ps1') -Raw -Encoding UTF8
         Assert-True ($src -notmatch 'HKCU:|Get-ItemProperty|Set-ItemProperty|netsh|Start-Process|RunAs|Invoke-WebRequest|HttpClient') 'classifier gained a live side effect'
