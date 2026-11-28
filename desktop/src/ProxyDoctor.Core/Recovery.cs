@@ -23,6 +23,9 @@ public sealed record RecoveryResult(
     public const string ScopeLabel = "LiveUnchanged 只比较开始和结束两次读取的 ProxyEnable 与 ProxyServer。它不能证明这两次读取之间没有写入。";
     public string EvidenceScope { get; init; } = ScopeLabel;
 
+    /// <summary>Engine resolution outcome, so a refusal says which check failed instead of only "not found".</summary>
+    public string Engine { get; init; } = "";
+
     public static RecoveryResult Refused(string detail) => new(
         false, false, false, false, 0, -1, RecoveryTrust.ExpectedTransactionExit,
         false, false, false, true, IsolationLabel, "", detail);
@@ -51,32 +54,15 @@ public static class IsolatedRecovery
         ]);
     }
 
-    public static string? FindEngineRoot()
-    {
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        for (var i = 0; i < 8 && dir is not null; i++, dir = dir.Parent)
-        {
-            var rollback = Path.Combine(dir.FullName, "proxy_v4", "rollback-v4.ps1");
-            var library = Path.Combine(dir.FullName, "proxy_v4", "lib", "V4.ps1");
-            if (RecoveryTrust.ReviewedFile(rollback, RecoveryTrust.RollbackSha256) &&
-                RecoveryTrust.ReviewedFile(library, RecoveryTrust.LibrarySha256))
-                return dir.FullName.TrimEnd('\\', '/');
-        }
-        return null;
-    }
+    /// <summary>
+    /// Root that contains <c>proxy_v4\</c>. In a published install this is
+    /// <c>AppContext.BaseDirectory\engine\</c>; there is no parent-directory fallback
+    /// in a Release build.
+    /// </summary>
+    public static string? FindEngineRoot() => EnginePackage.Resolve().EngineRoot;
 
-    public static string? FindScript()
-    {
-        var beside = Path.Combine(AppContext.BaseDirectory, "scripts", "Invoke-IsolatedRecovery.ps1");
-        if (RecoveryTrust.ReviewedScript(beside)) return beside;
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        for (var i = 0; i < 8 && dir is not null; i++, dir = dir.Parent)
-        {
-            var candidate = Path.Combine(dir.FullName, "desktop", "scripts", "Invoke-IsolatedRecovery.ps1");
-            if (RecoveryTrust.ReviewedScript(candidate)) return candidate;
-        }
-        return null;
-    }
+    /// <summary>The reviewed wrapper script, always inside the validated engine folder.</summary>
+    public static string? FindScript() => EnginePackage.Resolve().ScriptPath;
 
     public static async Task<RecoveryResult> ExecuteAsync(string authorization, CancellationToken cancellationToken)
     {
@@ -84,10 +70,12 @@ public static class IsolatedRecovery
             return RecoveryResult.Refused("已取消。没有启动脚本。") with { Cancelled = true };
         if (!string.Equals(authorization, AuthorizationText, StringComparison.Ordinal))
             return RecoveryResult.Refused("授权文字不匹配。没有启动脚本。");
-        var engine = FindEngineRoot();
-        var script = FindScript();
-        if (engine is null || script is null)
-            return RecoveryResult.Refused("没有找到哈希相符的 rollback-v4.ps1、V4.ps1 或隔离脚本。没有启动恢复。");
+        var package = EnginePackage.Resolve();
+        if (!package.Ok || package.EngineRoot is null || package.ScriptPath is null)
+            return RecoveryResult.Refused("恢复引擎被拒绝：" + package.Detail) with { Engine = package.Detail };
+        var engine = package.EngineRoot;
+        var script = package.ScriptPath;
+        var engineDetail = package.Detail;
 
         var before = NetworkReader.LiveProxyStamp();
         var work = Path.Combine(Path.GetFullPath(Path.GetTempPath()), "proxy-doctor-recovery-" + Guid.NewGuid().ToString("N"));
@@ -95,7 +83,7 @@ public static class IsolatedRecovery
         try
         {
             if (RecoveryTrust.IsReparsePoint(work) || !RecoveryTrust.ContainedAfterResolve(Path.GetTempPath(), work))
-                return RecoveryResult.Refused("临时目录没有通过包含关系和重解析点检查。没有启动脚本。") with { LiveUnchanged = true };
+                return RecoveryResult.Refused("临时目录没有通过包含关系和重解析点检查。没有启动脚本。") with { LiveUnchanged = true, Engine = engineDetail };
 
             var shell = Path.Combine(Environment.SystemDirectory, "WindowsPowerShell", "v1.0", "powershell.exe");
             var start = new ProcessStartInfo(shell)
@@ -149,7 +137,7 @@ public static class IsolatedRecovery
                 var why = cancelled ? "已取消，并结束了隔离进程。" : timedOut ? "隔离脚本超过 90 秒，已结束进程。" : "脚本没有留下结果。";
                 return new RecoveryResult(false, true, cancelled, timedOut, process.HasExited ? process.ExitCode : -1,
                     40, RecoveryTrust.ExpectedTransactionExit, false, false, false, before == after,
-                    RecoveryResult.IsolationLabel, "", why);
+                    RecoveryResult.IsolationLabel, "", why) { Engine = engineDetail };
             }
             using var document = JsonDocument.Parse(await File.ReadAllTextAsync(resultPath, CancellationToken.None));
             var root = document.RootElement;
@@ -168,7 +156,7 @@ public static class IsolatedRecovery
                 before == after,
                 RecoveryResult.IsolationLabel,
                 writes,
-                root.TryGetProperty("detail", out var detail) ? detail.GetString() ?? "" : "").WithVerdict();
+                root.TryGetProperty("detail", out var detail) ? detail.GetString() ?? "" : "") { Engine = engineDetail }.WithVerdict();
         }
         finally
         {
