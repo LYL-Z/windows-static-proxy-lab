@@ -1,8 +1,14 @@
-# CAB Windows CI for the shared Desktop/CLI core, the skill scripts, and a
-# private-key scan. This file does not call proxy_v6/tests/Run-Tests.ps1.
-# That 114-case engine harness stays manual: it is long and environment-heavy.
+# CAB Windows CI for the shared Desktop/CLI core, the skill scripts, the V6
+# engine harness, and a private-key scan. No production credentials and no
+# repository secrets are read.
+#
+# The engine harness (proxy_v6/tests/Run-Tests.ps1, 114 registered cases) is
+# Windows PowerShell 5.1 only and needs no Python, .NET, admin rights or
+# internet: it runs from an isolated TEMP root with synthetic fixtures. It is
+# the one long job here (a few minutes), so it gets its own job and a wider
+# timeout. A failing case fails the job; nothing is skipped to make it green.
+#
 # The synthetic snapshot seal lives in cab-v69-seal.yml and is workflow_dispatch only.
-# No production credentials and no repository secrets are read.
 
 name: CAB Windows
 
@@ -101,6 +107,81 @@ jobs:
             Write-Host ("RUN pwsh " + $relative)
             & $pwshPath -NoProfile -ExecutionPolicy Bypass -File $relative
             if ($LASTEXITCODE -ne 0) { throw ("pwsh {0} exited {1}" -f $relative, $LASTEXITCODE) }
+          }
+
+  engine-tests:
+    name: V6 engine harness (114 cases)
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Confirm the harness entry point exists
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $entry = 'proxy_v6/tests/Run-Tests.ps1'
+          $harness = 'proxy_v6/tests/Harness.ps1'
+          $support = 'proxy_v6/tests/lib/TestSupport.ps1'
+          foreach ($relative in @($entry, $harness, $support)) {
+            if (-not (Test-Path -LiteralPath $relative -PathType Leaf)) {
+              throw ("required engine file is missing: " + $relative)
+            }
+          }
+          Write-Host ("found " + $entry)
+
+      - name: Run the V6 engine harness with Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $shell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+          if (-not (Test-Path -LiteralPath $shell)) {
+            throw 'Windows PowerShell 5.1 was not found in System32; the harness requires 5.1.'
+          }
+          # -OutFile keeps the evidence outside the tracked tree. The harness owns
+          # its own V4_TEST_MODE and TEMP root, so no host setting is inherited.
+          $outFile = Join-Path $env:RUNNER_TEMP 'v6-evidence\evidence.json'
+          $started = Get-Date
+          & $shell -NoProfile -ExecutionPolicy Bypass -File 'proxy_v6\tests\Run-Tests.ps1' -OutFile $outFile
+          $code = $LASTEXITCODE
+          $elapsed = (Get-Date) - $started
+          Write-Host ("engine harness exited {0} after {1:n1}s" -f $code, $elapsed.TotalSeconds)
+          if (Test-Path -LiteralPath $outFile) {
+            try {
+              $report = Get-Content -LiteralPath $outFile -Raw | ConvertFrom-Json
+              $counts = $report.counts
+              Write-Host ("registered={0} executed={1} passed={2} failed={3} skipped={4} outcome={5} exitCode={6}" -f `
+                $counts.registered, $counts.executed, $counts.passed, $counts.failed, $counts.skipped, $report.outcome, $report.exitCode)
+              foreach ($item in @($report.cases)) {
+                if ($item.status -ne 'pass') {
+                  Write-Host ("{0} {1} {2} {3}" -f $item.id, $item.status, $item.expected, $item.detail)
+                }
+              }
+              foreach ($item in @($report.harnessErrors)) { Write-Host ("harness-error: " + $item) }
+              foreach ($item in @($report.evidenceErrors)) { Write-Host ("evidence-error: " + $item) }
+            } catch {
+              Write-Host ("could not read the evidence file: " + $_.Exception.Message)
+            }
+          } else {
+            Write-Host ("no evidence file was written to " + $outFile)
+          }
+          if ($code -ne 0) { exit $code }
+
+      - name: Run the corrupt preparation journal probe
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $script = 'proxy_v6/tests/repro/CAB-CorruptPreparationJournal.ps1'
+          if (-not (Test-Path -LiteralPath $script -PathType Leaf)) {
+            throw ("missing probe: " + $script)
+          }
+          & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File $script
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host ("{0} exited {1}" -f $script, $LASTEXITCODE)
+            exit $LASTEXITCODE
           }
 
   secret-scan:
