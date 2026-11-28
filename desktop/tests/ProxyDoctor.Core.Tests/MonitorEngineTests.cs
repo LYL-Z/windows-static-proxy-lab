@@ -151,6 +151,49 @@ public class MonitorEngineTests
     }
 
     [Fact]
+    public void Log_rotation_keeps_the_newest_window_through_a_250_event_burst()
+    {
+        const int burst = 250;
+        var engine = Running();
+        for (var i = 0; i < burst - 1; i++)
+            engine.Record(MonitorEngine.UpstreamChannelId, Failed("f" + i), T0.AddSeconds(i));
+
+        var events = engine.Events;
+        Assert.Equal(burst, events[^1].Sequence);
+        Assert.Equal(MonitorEngine.MaxEvents, events.Count);
+        Assert.Equal(burst - MonitorEngine.MaxEvents + 1, events[0].Sequence);
+        Assert.Equal("NewFailure f49", events[0].Detail);
+        Assert.Equal(T0.AddSeconds(49), events[0].At);
+        Assert.Equal("NewFailure f248", events[^1].Detail);
+        Assert.DoesNotContain(events, item => item.Detail == "NewFailure f48");
+        Assert.DoesNotContain(events, item => item.Kind == MonitorEngine.EventStart);
+        for (var i = 1; i < events.Count; i++)
+        {
+            Assert.Equal(events[i - 1].Sequence + 1, events[i].Sequence);
+            Assert.True(events[i].At >= events[i - 1].At);
+        }
+
+        var tail = engine.Record(MonitorEngine.UpstreamChannelId, Failed("tail"), T0.AddSeconds(burst));
+        events = engine.Events;
+        Assert.True(tail.Accepted);
+        Assert.Equal(MonitorEngine.MaxEvents, events.Count);
+        Assert.Equal(52, events[0].Sequence);
+        Assert.Equal("NewFailure f50", events[0].Detail);
+        Assert.Equal("NewFailure tail", events[^1].Detail);
+        Assert.Equal(burst + 1, events[^1].Sequence);
+        Assert.DoesNotContain(events, item => item.Detail == "NewFailure f49");
+
+        var upstream = engine.Read(MonitorEngine.UpstreamChannelId, T0.AddSeconds(burst));
+        Assert.Equal(T0.AddSeconds(burst), upstream.SampledAt);
+        Assert.Equal("tail", upstream.Failure);
+        Assert.Equal(EvidenceState.Fault, upstream.RecordedState);
+        Assert.Equal(1, upstream.ConsecutiveFailures);
+        Assert.Equal(249, upstream.Flaps);
+        Assert.False(upstream.Expired);
+        Assert.False(engine.UpstreamIsSuccessful(T0.AddSeconds(burst)));
+    }
+
+    [Fact]
     public void Pause_and_stop_are_explicit_and_reject_later_samples()
     {
         var engine = new MonitorEngine();
