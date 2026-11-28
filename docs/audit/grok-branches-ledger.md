@@ -184,7 +184,7 @@
 | Core xUnit | `dotnet test desktop/tests/ProxyDoctor.Core.Tests -c Release` | 94 passed / 0 failed（含 c-protocol 4 个与 f-monitor 新增用例） |
 | Desktop 编译 | `dotnet build desktop/src/ProxyDoctor.Desktop -c Release` | 0 warning / 0 error |
 | CLI 编译 | `dotnet build desktop/src/ProxyDoctor.Cli -c Release` | 0 warning / 0 error |
-| 引擎套件 | `proxy_v6/tests/Run-Tests.ps1` | registered=114 executed=114 passed=114 failed=0 skipped=0，退出码 0，213.7 秒 |
+| 引擎套件 | `proxy_v6/tests/Run-Tests.ps1` | registered=114 executed=114 passed=114 failed=0 skipped=0，退出码 0；两次计时 213.7 秒与 449.8 秒（同机不同负载） |
 | 损坏 preparation 探针 | `proxy_v6/tests/repro/CAB-CorruptPreparationJournal.ps1` | 10 条断言 PASS，退出码 0 |
 | 安装器回滚 | `desktop/packaging/Test-InstallProxyDoctor.ps1` | PASS，退出码 0，29.9 秒 |
 | Skill 三套 | `Run-Tests.ps1` / `Run-FaultClassTests.ps1` / `Run-OnboardingTests.ps1` | 15/15、22/22、24/24，退出码 0 |
