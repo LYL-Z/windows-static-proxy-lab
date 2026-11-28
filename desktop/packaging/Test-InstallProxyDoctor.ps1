@@ -2,7 +2,8 @@
 <#
   Installs and uninstalls under a TEMP allowed root.
   Reads startup and WinINET proxy values only to prove they do not change.
-  A copy that fails after the first file must not change the previous version directory.
+  A copy that fails after the first file must not change the previous version directory; the
+  failure is caused by locking one source file, not by a switch inside the installer.
 #>
 $ErrorActionPreference = 'Stop'
 $installer = Join-Path $PSScriptRoot 'Install-ProxyDoctor.ps1'
@@ -26,8 +27,24 @@ function Assert-Throws([scriptblock]$Action, [string]$Pattern) {
     throw "expected '$Pattern' but no error was thrown"
 }
 
-function Invoke-Install([string]$DestinationPath, [string]$SourcePath, [string]$Allowed, [int]$FaultAfterCopiedFiles = -1) {
-    & $installer -Action Install -Destination $DestinationPath -Source $SourcePath -AllowedRoot $Allowed -FaultAfterCopiedFiles $FaultAfterCopiedFiles
+function Invoke-Install([string]$DestinationPath, [string]$SourcePath, [string]$Allowed) {
+    & $installer -Action Install -Destination $DestinationPath -Source $SourcePath -AllowedRoot $Allowed
+}
+
+# The installer has no fault-injection switch. A real copy error is provoked from the outside by
+# holding the source file open with FileShare.None, which is what a scanner or a running binary
+# does. The installer's own rollback path then runs unchanged.
+function Invoke-InstallWithLockedSource([string]$DestinationPath, [string]$SourcePath, [string]$LockedFile, [string]$Allowed) {
+    $handle = [System.IO.File]::Open(
+        $LockedFile,
+        [System.IO.FileMode]::Open,
+        [System.IO.FileAccess]::Read,
+        [System.IO.FileShare]::None)
+    try {
+        & $installer -Action Install -Destination $DestinationPath -Source $SourcePath -AllowedRoot $Allowed
+    } finally {
+        $handle.Dispose()
+    }
 }
 
 function Invoke-Uninstall([string]$DestinationPath, [string]$Allowed) {
@@ -369,7 +386,10 @@ try {
     New-Item -ItemType Directory -Path (Join-Path $partialSource 'a') -Force | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $partialSource 'a\1-first.txt'), 'first-copy')
     [System.IO.File]::WriteAllText((Join-Path $partialSource 'z-second.txt'), 'second-copy')
-    Assert-Throws { Invoke-Install $partialVersion $partialSource $allowed 1 } 'file copy failed after 1'
+    # Files are copied in relative-path order, so a\1-first.txt succeeds and z-second.txt is the
+    # copy that fails while it is locked.
+    $lockedSource = Join-Path $partialSource 'z-second.txt'
+    Assert-Throws { Invoke-InstallWithLockedSource $partialVersion $partialSource $lockedSource $allowed } 'file copy failed after 1'
     if (-not (Test-Path -LiteralPath $keptVersion -PathType Container)) {
         throw 'previous version directory is missing after a failed copy'
     }
@@ -407,7 +427,7 @@ try {
     $mixed = Join-Path $allowed 'version-mixed'
     New-Item -ItemType Directory -Path $mixed -Force | Out-Null
     [System.IO.File]::WriteAllText((Join-Path $mixed 'keep.txt'), 'keep-me')
-    Assert-Throws { Invoke-Install $mixed $partialSource $allowed 1 } 'file copy failed after 1'
+    Assert-Throws { Invoke-InstallWithLockedSource $mixed $partialSource $lockedSource $allowed } 'file copy failed after 1'
     if ([System.IO.File]::ReadAllText((Join-Path $mixed 'keep.txt')) -ne 'keep-me') {
         throw 'failed copy removed a pre-existing file'
     }

@@ -6,16 +6,16 @@
   If a file copy fails, files written by that attempt are removed. A version directory
   created by that attempt is removed when nothing else remains; otherwise install-failed.json
   is left. Another version directory is not modified. Stopping the process mid-copy can
-  still leave a partial directory. FaultAfterCopiedFiles below zero copies every file;
-  zero or higher fails that later copy so tests can interrupt an install.
+  still leave a partial directory.
+  This script has no fault-injection switch on purpose: the failure path is reached by a real
+  copy error, and tests provoke one from the outside (an exclusive lock on a source file).
 #>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][ValidateSet('Install', 'Uninstall')][string]$Action,
     [Parameter(Mandatory = $true)][string]$Destination,
     [string]$Source,
-    [Parameter(Mandatory = $true)][string]$AllowedRoot,
-    [int]$FaultAfterCopiedFiles = -1
+    [Parameter(Mandatory = $true)][string]$AllowedRoot
 )
 $ErrorActionPreference = 'Stop'
 
@@ -135,25 +135,16 @@ function Read-HashManifest([string]$Path) {
     return ($json | ConvertFrom-Json)
 }
 
-function Copy-VersionFile([string]$Source, [string]$Target, [bool]$Fault, [int]$AlreadyCopied) {
-    $lock = $null
-    $errorText = $null
+function Copy-VersionFile([string]$Source, [string]$Target, [int]$AlreadyCopied) {
+    # A locked or unreadable source is the real-world failure this rollback exists for, so the
+    # count of files already copied is reported instead of the raw I/O text only.
     try {
-        if ($Fault) {
-            $lock = [System.IO.File]::Open(
-                $Source,
-                [System.IO.FileMode]::Open,
-                [System.IO.FileAccess]::Read,
-                [System.IO.FileShare]::None)
-        }
         [System.IO.File]::Copy($Source, $Target, $false)
-        if ($Fault) { $errorText = "file copy failed after $AlreadyCopied file(s)" }
     } catch {
-        $errorText = "file copy failed after $AlreadyCopied file(s)"
-    } finally {
-        if ($null -ne $lock) { $lock.Dispose() }
+        $reason = [string]$_.Exception.Message
+        if ([string]::IsNullOrWhiteSpace($reason)) { $reason = [string]$_ }
+        throw ("file copy failed after {0} file(s): {1}" -f $AlreadyCopied, $reason)
     }
-    if ($null -ne $errorText) { throw $errorText }
 }
 
 function Write-FailedInstallMarker([string]$DestinationPath) {
@@ -248,7 +239,7 @@ function Undo-IncompleteInstall($State) {
     }
 }
 
-function Install-Package([string]$DestinationPath, [string]$SourcePath, [int]$FaultAfterCopiedFiles) {
+function Install-Package([string]$DestinationPath, [string]$SourcePath) {
     if ([string]::IsNullOrWhiteSpace($SourcePath)) { throw 'install requires a source' }
     $sourceFull = Get-NormalizedPath $SourcePath
     if (-not (Test-Path -LiteralPath $sourceFull -PathType Container)) {
@@ -304,9 +295,8 @@ function Install-Package([string]$DestinationPath, [string]$SourcePath, [int]$Fa
                 New-Item -ItemType Directory -Path $parent -Force | Out-Null
             }
             Assert-PathChainHasNoReparsePoint $item.Target
-            $fault = $FaultAfterCopiedFiles -ge 0 -and $copied.Count -eq $FaultAfterCopiedFiles
             try {
-                Copy-VersionFile $item.Source $item.Target $fault $copied.Count
+                Copy-VersionFile $item.Source $item.Target $copied.Count
             } catch {
                 if (Test-Path -LiteralPath $item.Target -PathType Leaf) {
                     $copied.Add([pscustomobject]@{ Target = $item.Target; Sha256 = '' }) | Out-Null
@@ -406,7 +396,7 @@ Assert-PathChainHasNoReparsePoint $allowed
 Assert-PathChainHasNoReparsePoint $destination
 
 if ($Action -eq 'Install') {
-    Install-Package $destination $Source $FaultAfterCopiedFiles
+    Install-Package $destination $Source
 } else {
     Uninstall-Package $destination
 }
