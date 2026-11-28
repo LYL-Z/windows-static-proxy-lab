@@ -71,9 +71,9 @@ flowchart LR
 
 **CAB Desktop（Windows Proxy Doctor Desktop 1.0）— 开发候选。** 基于 C#、.NET 8、WPF 与 CommunityToolkit.Mvvm。默认以普通用户身份运行。
 
-[![Desktop 1.0 实机截图（开发候选）](https://raw.githubusercontent.com/LYL-Z/windows-static-proxy-lab/ec92e36422f0cee8f732ada5ee641281ac970502/desktop/overview.png)](https://github.com/LYL-Z/windows-static-proxy-lab/blob/ec92e36422f0cee8f732ada5ee641281ac970502/desktop/overview.png)
+[![Desktop 1.0 实机截图（开发候选）](desktop/overview.png)](desktop/overview.png)
 
-截图来自该候选的实机运行记录，不能代表当前访问者的网络状态。
+截图来自该候选的实机运行记录，不能代表当前访问者的网络状态。图里的页头「当前页面 / 概览」与左侧高亮就是这一版的界面；截图里的端口和进程名来自作者本机，不是凭据。
 
 | 功能 | 当前候选状态 |
 | --- | --- |
