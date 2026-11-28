@@ -14,4 +14,6 @@ Windows GitHub Actions 覆盖可以在托管 runner 上独立完成的部分。�
 
 `.github/workflows/cab-v69-seal.yml` 只在 workflow_dispatch 时运行 `proxy_v6/tests/repro/V69SnapshotSeal.ps1`。
 
-114 项引擎套件 `proxy_v6/tests/Run-Tests.ps1` 保持手工执行，不进入 CI。
+`proxy_v6/tests/repro/CabProtocolLocal.ps1` 与 `proxy_v6/tests/repro/cab-protocol/`（含 836 行 `protocol_probe.py`）是可选证据工具，不进入 CI，也不作为门禁；`ProtocolEvidence` 的行为由上面的 `core-tests` 覆盖。
+
+114 项引擎套件 `proxy_v6/tests/Run-Tests.ps1` 见下一节。

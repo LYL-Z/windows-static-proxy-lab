@@ -4,6 +4,10 @@ Local evidence records what one observation can support. It does not establish p
 
 `CabProtocolLocal.ps1` looks up `example.com` through the current resolver and opens loopback sockets only. It does not change system DNS, the firewall, or the proxy, and it does not start a browser.
 
+## Status of these probes: optional
+
+`CabProtocolLocal.ps1`, `cab-protocol\Run-SelfTest.ps1` and `cab-protocol\protocol_probe.py` are optional evidence tools. They are not run by `.github/workflows/cab-windows.yml` and they gate nothing. `protocol_probe.py` overlaps `V69Protocols.py`, `V69SocketStages.py` and `Run-V68Loopback.py` on the same loopback measurements, so keeping it out of CI avoids a second maintenance line for the same checks. The behavior that must be covered is covered by `.github/workflows/cab-windows.yml`, which runs `dotnet test desktop/tests/ProxyDoctor.Core.Tests` by itself.
+
 ## Still not tested
 
 - **System resolver path.** An answer for `example.com` shows that some resolver returned addresses. It does not identify the recursive resolver, cache, or proxy path that produced the answer.
