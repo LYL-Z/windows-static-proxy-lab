@@ -1,0 +1,17 @@
+{
+    "id":  "F07-09",
+    "requirement":  "F07",
+    "precondition":  "app was not running before",
+    "injectedFault":  "second write fails",
+    "expected":  "app remains stopped",
+    "actual":  "F07-09: pre-existing stopped state preserved; recovery attempted stop",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 2",
+    "durationMs":  754,
+    "assertions":  2,
+    "startedAt":  "2026-11-18T07:02:13.591-08:00",
+    "finishedAt":  "2026-11-18T07:02:14.345-08:00",
+    "evidenceFile":  "C:\\CAB-Lab\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0030-F07-09.json",
+    "testOutput":  ""
+}

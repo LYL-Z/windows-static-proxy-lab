@@ -1,0 +1,17 @@
+{
+    "id":  "INF-REDACT-03",
+    "requirement":  "SEC-03",
+    "precondition":  "JSON key / spaces / URL / Cookie",
+    "injectedFault":  "structured secret forms",
+    "expected":  "all redacted",
+    "actual":  "JSON keys, user with spaces, URL userinfo and Cookie redacted",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  654,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T07:03:32.567-08:00",
+    "finishedAt":  "2026-11-18T07:03:33.221-08:00",
+    "evidenceFile":  "C:\\CAB-Lab\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0091-INF-REDACT-03.json",
+    "testOutput":  ""
+}

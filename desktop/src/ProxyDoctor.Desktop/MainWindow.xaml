@@ -1,0 +1,382 @@
+<Window x:Class="ProxyDoctor.Desktop.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:ProxyDoctor.Desktop"
+        Title="网络代理医生"
+        Width="1180" Height="760" MinWidth="980" MinHeight="640"
+        Background="{DynamicResource App.Background}"
+        Foreground="{DynamicResource App.Ink}"
+        FontFamily="Segoe UI" FontSize="14">
+  <Window.Resources>
+    <local:SectionVisibilityConverter x:Key="SectionVisible" />
+    <local:SectionMatchConverter x:Key="SectionMatch" />
+    <local:SectionTitleConverter x:Key="SectionTitle" />
+    <local:InverseBooleanConverter x:Key="NotBusy" />
+    <local:IdleLiveConverter x:Key="IdleLive" />
+    <Style x:Key="Card" TargetType="Border">
+      <Setter Property="Background" Value="{DynamicResource App.Card}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource App.Line}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="Padding" Value="16" />
+    </Style>
+    <Style x:Key="NavButton" TargetType="Button">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="Foreground" Value="{DynamicResource App.Ink}" />
+      <Setter Property="HorizontalContentAlignment" Value="Left" />
+      <Setter Property="Margin" Value="0,0,0,4" />
+      <Setter Property="Padding" Value="10,8" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="FontFamily" Value="Segoe UI" />
+      <Setter Property="FontSize" Value="14" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="Root"
+                    Background="{TemplateBinding Background}"
+                    BorderBrush="{DynamicResource App.Accent}"
+                    BorderThickness="0"
+                    CornerRadius="8"
+                    Padding="{TemplateBinding Padding}">
+              <TextBlock Text="{TemplateBinding Content}"
+                         HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                         VerticalAlignment="Center"
+                         Foreground="{TemplateBinding Foreground}"
+                         FontFamily="{TemplateBinding FontFamily}"
+                         FontSize="{TemplateBinding FontSize}"
+                         FontWeight="{TemplateBinding FontWeight}" />
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsKeyboardFocused" Value="True">
+                <Setter TargetName="Root" Property="BorderThickness" Value="1" />
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+      <Style.Triggers>
+        <Trigger Property="IsMouseOver" Value="True">
+          <Setter Property="Background" Value="{DynamicResource App.AccentSoft}" />
+        </Trigger>
+        <DataTrigger Value="True">
+          <DataTrigger.Binding>
+            <MultiBinding Converter="{StaticResource SectionMatch}">
+              <Binding Path="Section" />
+              <Binding Path="CommandParameter" RelativeSource="{RelativeSource Self}" />
+            </MultiBinding>
+          </DataTrigger.Binding>
+          <Setter Property="Background" Value="{DynamicResource App.Accent}" />
+          <Setter Property="Foreground" Value="{DynamicResource App.OnAccent}" />
+          <Setter Property="FontWeight" Value="SemiBold" />
+        </DataTrigger>
+      </Style.Triggers>
+    </Style>
+    <Style x:Key="EvidenceText" TargetType="TextBlock" BasedOn="{StaticResource {x:Type TextBlock}}">
+      <Setter Property="Foreground" Value="{DynamicResource App.Muted}" />
+      <Style.Triggers>
+        <DataTrigger Binding="{Binding Evidence}" Value="Verified">
+          <Setter Property="Foreground" Value="{DynamicResource App.Ok}" />
+        </DataTrigger>
+        <DataTrigger Binding="{Binding Evidence}" Value="Partial">
+          <Setter Property="Foreground" Value="{DynamicResource App.Warn}" />
+        </DataTrigger>
+        <DataTrigger Binding="{Binding Evidence}" Value="Unknown">
+          <Setter Property="Foreground" Value="{DynamicResource App.Warn}" />
+        </DataTrigger>
+        <DataTrigger Binding="{Binding Evidence}" Value="Fault">
+          <Setter Property="Foreground" Value="{DynamicResource App.Bad}" />
+        </DataTrigger>
+      </Style.Triggers>
+    </Style>
+  </Window.Resources>
+  <Grid>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="228" />
+      <ColumnDefinition Width="*" />
+    </Grid.ColumnDefinitions>
+    <Border Grid.Column="0" Background="{DynamicResource App.Sidebar}" BorderBrush="{DynamicResource App.Line}" BorderThickness="0,0,1,0" Padding="18,22">
+      <DockPanel>
+        <StackPanel DockPanel.Dock="Top">
+          <TextBlock Text="网络代理医生" FontFamily="Georgia" FontSize="22" />
+          <TextBlock Text="Windows Proxy Doctor" Foreground="{DynamicResource App.Muted}" Margin="0,2,0,18" />
+          <TextBlock Text="{Binding ModeLabel}" TextWrapping="Wrap" Foreground="{DynamicResource App.Accent}" Margin="0,0,0,16" />
+        </StackPanel>
+        <StackPanel DockPanel.Dock="Bottom">
+          <CheckBox Content="暂停监测" IsChecked="{Binding Paused}" Foreground="{DynamicResource App.Ink}" Margin="0,0,0,8" />
+          <CheckBox Content="深色" IsChecked="{Binding Dark}" Foreground="{DynamicResource App.Ink}" Margin="0,0,0,8" />
+          <CheckBox Content="演示数据" IsChecked="{Binding Demo}" Foreground="{DynamicResource App.Ink}" />
+        </StackPanel>
+        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+          <StackPanel>
+            <Button Content="概览" Command="{Binding ShowCommand}" CommandParameter="overview" Style="{StaticResource NavButton}" />
+            <Button Content="检查" Command="{Binding ShowCommand}" CommandParameter="checks" Style="{StaticResource NavButton}" />
+            <Button Content="监测" Command="{Binding ShowCommand}" CommandParameter="monitor" Style="{StaticResource NavButton}" />
+            <Button Content="隐私" Command="{Binding ShowCommand}" CommandParameter="privacy" Style="{StaticResource NavButton}" />
+            <Button Content="客户端" Command="{Binding ShowCommand}" CommandParameter="clients" Style="{StaticResource NavButton}" />
+            <Button Content="恢复" Command="{Binding ShowCommand}" CommandParameter="recovery" Style="{StaticResource NavButton}" />
+            <Button Content="事件" Command="{Binding ShowCommand}" CommandParameter="events" Style="{StaticResource NavButton}" />
+            <Button Content="开始使用" Command="{Binding ShowCommand}" CommandParameter="guide" Style="{StaticResource NavButton}" />
+          </StackPanel>
+        </ScrollViewer>
+      </DockPanel>
+    </Border>
+    <Grid Grid.Column="1">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="*" />
+      </Grid.RowDefinitions>
+      <Border Grid.Row="0" Padding="28,18,28,16" BorderBrush="{DynamicResource App.Line}" BorderThickness="0,0,0,1">
+        <DockPanel MaxWidth="860" HorizontalAlignment="Left">
+          <Button DockPanel.Dock="Right" Content="只读检查" Command="{Binding DiagnoseCommand}" MinWidth="120"
+                  VerticalAlignment="Top" Margin="20,0,0,0" MinHeight="38"
+                  Foreground="{DynamicResource App.OnAccent}" IsEnabled="{Binding Busy, Converter={StaticResource NotBusy}}" />
+          <StackPanel>
+            <TextBlock Text="当前页面" Foreground="{DynamicResource App.Muted}" FontSize="12" />
+            <TextBlock Text="{Binding Section, Converter={StaticResource SectionTitle}}"
+                       FontFamily="Georgia" FontSize="32" Foreground="{DynamicResource App.Accent}" Margin="0,2,0,0" />
+            <TextBlock Text="{Binding Status}" FontSize="22" FontWeight="SemiBold" Margin="0,8,0,0" />
+            <TextBlock Text="{Binding Summary}" Foreground="{DynamicResource App.Muted}" TextWrapping="Wrap" Margin="0,6,0,0" />
+          </StackPanel>
+        </DockPanel>
+      </Border>
+      <ScrollViewer Grid.Row="1" Padding="28,18,28,24" VerticalScrollBarVisibility="Auto">
+        <StackPanel MaxWidth="860" HorizontalAlignment="Left">
+        <StackPanel Visibility="{Binding Section, Converter={StaticResource SectionVisible}, ConverterParameter=overview}">
+          <Grid Margin="0,0,0,12">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition />
+              <ColumnDefinition />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <Border Style="{StaticResource Card}" Margin="0,0,8,8">
+              <StackPanel>
+                <TextBlock Text="系统代理" Foreground="{DynamicResource App.Muted}" />
+                <TextBlock Text="{Binding Proxy}" FontSize="18" Margin="0,6,0,0" TextWrapping="Wrap" />
+              </StackPanel>
+            </Border>
+            <Border Grid.Column="1" Style="{StaticResource Card}" Margin="8,0,0,8">
+              <StackPanel>
+                <TextBlock Text="客户端进程" Foreground="{DynamicResource App.Muted}" />
+                <TextBlock Text="{Binding Clients}" FontSize="18" Margin="0,6,0,0" TextWrapping="Wrap" />
+              </StackPanel>
+            </Border>
+            <Border Grid.Row="1" Style="{StaticResource Card}" Margin="0,8,8,0">
+              <StackPanel>
+                <TextBlock Text="回环监听" Foreground="{DynamicResource App.Muted}" />
+                <TextBlock Text="{Binding Listeners}" FontSize="16" Margin="0,6,0,0" TextWrapping="Wrap" />
+              </StackPanel>
+            </Border>
+            <Border Grid.Row="1" Grid.Column="1" Style="{StaticResource Card}" Margin="8,8,0,0">
+              <StackPanel>
+                <TextBlock Text="默认代理路径的 HTTPS" Foreground="{DynamicResource App.Muted}" />
+                <TextBlock Text="{Binding Probes}" FontSize="15" Margin="0,6,0,0" TextWrapping="Wrap" />
+              </StackPanel>
+            </Border>
+          </Grid>
+          <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+            <StackPanel>
+              <TextBlock Text="连接拓扑" FontWeight="SemiBold" />
+              <TextBlock Text="应用 → Windows 代理选择 → 本地核心 → 上游" TextWrapping="Wrap" Margin="0,8,0,0" />
+              <TextBlock Text="{Binding ClientLine}" Foreground="{DynamicResource App.Muted}" TextWrapping="Wrap" Margin="0,8,0,0" />
+            </StackPanel>
+          </Border>
+          <Border Style="{StaticResource Card}">
+            <StackPanel>
+              <TextBlock Text="这次能说明什么" FontWeight="SemiBold" />
+              <TextBlock Text="{Binding Advice}" TextWrapping="Wrap" Margin="0,8,0,0" />
+              <TextBlock Text="逐项采样在检查页。进程和监听在客户端页。预览不会启动恢复脚本。" Foreground="{DynamicResource App.Muted}" TextWrapping="Wrap" Margin="0,10,0,0" />
+            </StackPanel>
+          </Border>
+          <Button Content="预览方案" Command="{Binding PreviewRecoveryCommand}" HorizontalAlignment="Left" Margin="0,12,0,0"
+                  IsEnabled="{Binding Busy, Converter={StaticResource NotBusy}}" />
+        </StackPanel>
+
+        <StackPanel Visibility="{Binding Section, Converter={StaticResource SectionVisible}, ConverterParameter=guide}">
+          <TextBlock Text="开始使用 CAB" FontSize="20" FontWeight="SemiBold" />
+          <Border Style="{StaticResource Card}" Margin="0,12,0,0">
+            <StackPanel>
+              <TextBlock Text="检查这台电脑" FontWeight="SemiBold" />
+              <TextBlock Text="保留现有网络配置。先确认系统代理、客户端进程与回环监听，再查看 HTTPS 采样和协议证据。" TextWrapping="Wrap" Margin="0,8,0,10" />
+              <WrapPanel>
+                <Button Content="运行诊断" Command="{Binding DiagnoseCommand}" IsEnabled="{Binding Busy, Converter={StaticResource NotBusy}}" Margin="0,0,8,8" />
+                <Button Content="查看检查项" Command="{Binding ShowCommand}" CommandParameter="checks" Margin="0,0,8,8" />
+                <Button Content="查看客户端" Command="{Binding ShowCommand}" CommandParameter="clients" Margin="0,0,8,8" />
+              </WrapPanel>
+            </StackPanel>
+          </Border>
+          <Border Style="{StaticResource Card}" Margin="0,12,0,0">
+            <StackPanel>
+              <TextBlock Text="出现故障时" FontWeight="SemiBold" />
+              <TextBlock Text="先确认哪些路径有证据。恢复页可以预览方案，并在确认框里逐项确认后才运行一次隔离演练；真实生产写入仍未实现。首次配置、软件渠道、费用说明及人工步骤可由 CAB Skill 引导。" TextWrapping="Wrap" Margin="0,8,0,10" />
+              <Button Content="查看恢复方案" Command="{Binding PreviewRecoveryCommand}" HorizontalAlignment="Left" IsEnabled="{Binding Busy, Converter={StaticResource NotBusy}}" />
+            </StackPanel>
+          </Border>
+        </StackPanel>
+
+        <StackPanel Visibility="{Binding Section, Converter={StaticResource SectionVisible}, ConverterParameter=checks}">
+          <TextBlock Text="检查" FontSize="20" FontWeight="SemiBold" />
+          <TextBlock Text="每一项单独采样。重测只跑这一项，不借用本地心跳的时间。演示数据不会填这些项目。" Foreground="{DynamicResource App.Muted}" TextWrapping="Wrap" Margin="0,6,0,12" />
+          <Button Content="只读检查" Command="{Binding DiagnoseCommand}" HorizontalAlignment="Left" Margin="0,0,0,12"
+                  IsEnabled="{Binding Busy, Converter={StaticResource NotBusy}}" />
+          <ItemsControl ItemsSource="{Binding Checks}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Border Background="{DynamicResource App.Card}" BorderBrush="{DynamicResource App.Line}" BorderThickness="1" CornerRadius="10" Padding="16" Margin="0,0,0,8">
+                  <StackPanel>
+                    <DockPanel>
+                      <TextBlock DockPanel.Dock="Right" Text="{Binding State}" Style="{StaticResource EvidenceText}" Margin="12,0,0,0" />
+                      <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                    </DockPanel>
+                    <TextBlock Text="{Binding Purpose}" TextWrapping="Wrap" Foreground="{DynamicResource App.Muted}" Margin="0,6,0,0" />
+                    <TextBlock Text="{Binding Detail}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                    <Button Content="重测这项" HorizontalAlignment="Left" Margin="0,8,0,0"
+                            Command="{Binding DataContext.RecheckCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                            CommandParameter="{Binding Id}">
+                      <Button.IsEnabled>
+                        <MultiBinding Converter="{StaticResource IdleLive}">
+                          <Binding Path="DataContext.Busy" RelativeSource="{RelativeSource AncestorType=Window}" />
+                          <Binding Path="DataContext.Demo" RelativeSource="{RelativeSource AncestorType=Window}" />
+                        </MultiBinding>
+                      </Button.IsEnabled>
+                    </Button>
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+
+        <StackPanel Visibility="{Binding Section, Converter={StaticResource SectionVisible}, ConverterParameter=monitor}">
+          <TextBlock Text="监测" FontSize="20" FontWeight="SemiBold" />
+          <TextBlock Text="暂停只停掉后面的采样，不会把上一次结果改写成正常。" Foreground="{DynamicResource App.Muted}" TextWrapping="Wrap" Margin="0,6,0,12" />
+          <Border Style="{StaticResource Card}">
+            <StackPanel>
+              <TextBlock Text="{Binding Monitor}" TextWrapping="Wrap" />
+              <TextBlock Text="{Binding Channels}" TextWrapping="Wrap" LineHeight="26" Margin="0,12,0,0" />
+              <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+                <Button Content="{Binding PauseLabel}" Command="{Binding TogglePauseCommand}" Margin="0,0,8,0" />
+                <Button Content="重测上游 HTTPS" Command="{Binding RecheckCommand}" CommandParameter="https">
+                  <Button.IsEnabled>
+                    <MultiBinding Converter="{StaticResource IdleLive}">
+                      <Binding Path="Busy" />
+                      <Binding Path="Demo" />
+                    </MultiBinding>
+                  </Button.IsEnabled>
+                </Button>
+              </StackPanel>
+            </StackPanel>
+          </Border>
+          <Border Style="{StaticResource Card}" Margin="0,12,0,0">
+            <StackPanel>
+              <TextBlock Text="监测事件窗口" Foreground="{DynamicResource App.Muted}" />
+              <TextBlock Text="{Binding MonitorEvents}" TextWrapping="Wrap" LineHeight="22" Margin="0,6,0,0" />
+              <TextBlock Text="窗口写在 %LOCALAPPDATA%\ProxyDoctor\monitor-events.jsonl，最多 200 行；会话记录 events.jsonl 是另一个文件。" Foreground="{DynamicResource App.Muted}" TextWrapping="Wrap" Margin="0,8,0,0" />
+            </StackPanel>
+          </Border>
+        </StackPanel>
+
+        <StackPanel Visibility="{Binding Section, Converter={StaticResource SectionVisible}, ConverterParameter=privacy}">
+          <Border Style="{StaticResource Card}">
+            <StackPanel>
+              <TextBlock Text="保护范围" FontSize="20" FontWeight="SemiBold" />
+              <TextBlock Text="未验证和未部署的项目不会显示成正常。" Foreground="{DynamicResource App.Muted}" Margin="0,6,0,12" TextWrapping="Wrap" />
+              <TextBlock Text="{Binding Capabilities}" TextWrapping="Wrap" LineHeight="26" />
+              <Button Content="只读检查" Command="{Binding DiagnoseCommand}" HorizontalAlignment="Left" Margin="0,16,0,0"
+                      IsEnabled="{Binding Busy, Converter={StaticResource NotBusy}}" />
+            </StackPanel>
+          </Border>
+        </StackPanel>
+
+        <StackPanel Visibility="{Binding Section, Converter={StaticResource SectionVisible}, ConverterParameter=clients}">
+          <TextBlock Text="客户端" FontSize="20" FontWeight="SemiBold" />
+          <TextBlock Text="进程、本地监听和上游是三件事。没有可调用的官方重连接口，这里不会启动客户端。" Foreground="{DynamicResource App.Muted}" TextWrapping="Wrap" Margin="0,6,0,12" />
+          <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+            <TextBlock Text="{Binding ClientLine}" TextWrapping="Wrap" />
+          </Border>
+          <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+            <StackPanel>
+              <TextBlock Text="手动步骤" Foreground="{DynamicResource App.Muted}" />
+              <TextBlock Text="{Binding ClientSteps}" TextWrapping="Wrap" LineHeight="24" Margin="0,6,0,0" />
+              <TextBlock Text="这些句子只由你自己执行。本程序不启动客户端、不重启、不调用正在运行的控制器，也不改当前用户代理。" Foreground="{DynamicResource App.Muted}" TextWrapping="Wrap" Margin="0,8,0,0" />
+            </StackPanel>
+          </Border>
+          <Border Style="{StaticResource Card}" Margin="0,0,0,8">
+            <StackPanel>
+              <TextBlock Text="进程、监听与建议" FontWeight="SemiBold" />
+              <TextBlock Text="进程" Foreground="{DynamicResource App.Muted}" Margin="0,10,0,0" />
+              <TextBlock Text="{Binding Clients}" FontSize="16" Margin="0,4,0,0" TextWrapping="Wrap" />
+              <TextBlock Text="回环监听" Foreground="{DynamicResource App.Muted}" Margin="0,10,0,0" />
+              <TextBlock Text="{Binding Listeners}" FontSize="16" Margin="0,4,0,0" TextWrapping="Wrap" />
+              <TextBlock Text="建议" Foreground="{DynamicResource App.Muted}" Margin="0,10,0,0" />
+              <TextBlock Text="{Binding Advice}" Margin="0,4,0,0" TextWrapping="Wrap" />
+            </StackPanel>
+          </Border>
+          <Border Style="{StaticResource Card}">
+            <StackPanel>
+              <TextBlock Text="系统代理选择" Foreground="{DynamicResource App.Muted}" />
+              <TextBlock Text="{Binding Proxy}" FontSize="16" Margin="0,6,0,0" TextWrapping="Wrap" />
+            </StackPanel>
+          </Border>
+          <WrapPanel Margin="0,16,0,0">
+            <Button Content="重测系统代理" Command="{Binding RecheckCommand}" CommandParameter="selection" Margin="0,0,8,8">
+              <Button.IsEnabled>
+                <MultiBinding Converter="{StaticResource IdleLive}">
+                  <Binding Path="Busy" />
+                  <Binding Path="Demo" />
+                </MultiBinding>
+              </Button.IsEnabled>
+            </Button>
+            <Button Content="重测回环监听" Command="{Binding RecheckCommand}" CommandParameter="listeners" Margin="0,0,8,8">
+              <Button.IsEnabled>
+                <MultiBinding Converter="{StaticResource IdleLive}">
+                  <Binding Path="Busy" />
+                  <Binding Path="Demo" />
+                </MultiBinding>
+              </Button.IsEnabled>
+            </Button>
+            <Button Content="只读检查" Command="{Binding DiagnoseCommand}" Margin="0,0,8,8"
+                    IsEnabled="{Binding Busy, Converter={StaticResource NotBusy}}" />
+          </WrapPanel>
+        </StackPanel>
+
+        <StackPanel Visibility="{Binding Section, Converter={StaticResource SectionVisible}, ConverterParameter=recovery}">
+          <Border Style="{StaticResource Card}">
+            <StackPanel>
+              <TextBlock Text="恢复" FontSize="20" FontWeight="SemiBold" />
+              <TextBlock Text="{Binding Advice}" TextWrapping="Wrap" Margin="0,8,0,12" />
+              <TextBlock Text="{Binding RecoveryLog}" TextWrapping="Wrap" LineHeight="24" />
+              <TextBlock Text="三段要分开看：1）只读诊断，读取系统代理、进程、监听和探测，不写任何设置；2）隔离演练，在 %TEMP% 下的一次性目录里用 V4_TEST_MODE + stub 跑一次回滚，不写系统代理；3）真实生产写入，未实现。" TextWrapping="Wrap" Margin="0,12,0,0" Foreground="{DynamicResource App.Muted}" />
+              <TextBlock Text="执行隔离演练会弹出确认框，写明操作范围、受影响资源、是否写系统代理和回滚方式；点确认才算这次授权，取消后仍可只做只读诊断。V4_TEST_MODE 是进程内逻辑隔离，不是操作系统强制沙箱。" TextWrapping="Wrap" Margin="0,6,0,0" Foreground="{DynamicResource App.Muted}" />
+              <WrapPanel Margin="0,16,0,0">
+                <Button Content="预览方案" Command="{Binding PreviewRecoveryCommand}" Margin="0,0,8,8"
+                        IsEnabled="{Binding Busy, Converter={StaticResource NotBusy}}" />
+                <Button Content="确认后执行隔离演练" Command="{Binding RunIsolatedRecoveryCommand}" Margin="0,0,8,8"
+                        IsEnabled="{Binding Busy, Converter={StaticResource NotBusy}}" />
+                <Button Content="记录我关闭了代理" Command="{Binding RecordOffCommand}" Margin="0,0,8,8"
+                        IsEnabled="{Binding Busy, Converter={StaticResource NotBusy}}" />
+                <Button Content="清除这条记录" Command="{Binding ClearIntentCommand}" Margin="0,0,8,8"
+                        IsEnabled="{Binding Busy, Converter={StaticResource NotBusy}}" />
+              </WrapPanel>
+            </StackPanel>
+          </Border>
+        </StackPanel>
+
+        <StackPanel Visibility="{Binding Section, Converter={StaticResource SectionVisible}, ConverterParameter=events}">
+          <Border Style="{StaticResource Card}">
+            <StackPanel>
+              <TextBlock Text="本次会话" FontSize="20" FontWeight="SemiBold" />
+              <TextBlock Text="这些是本程序写在这台电脑上的记录，不是 Windows 事件查看器。" Foreground="{DynamicResource App.Muted}" TextWrapping="Wrap" Margin="0,6,0,0" />
+              <TextBlock Text="{Binding Events}" TextWrapping="Wrap" Margin="0,12,0,0" LineHeight="24" />
+              <Button Content="读取本次记录" Command="{Binding RefreshEventsCommand}" HorizontalAlignment="Left" Margin="0,16,0,0" />
+            </StackPanel>
+          </Border>
+        </StackPanel>
+        </StackPanel>
+      </ScrollViewer>
+    </Grid>
+  </Grid>
+</Window>

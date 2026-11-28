@@ -1,0 +1,15 @@
+
+== V6 TEST HARNESS 6.0.0 ==
+Run ID: b98c12e1971640c0898558837977098b
+Git HEAD: 36222c92c829a2ef08b71af2a3a3ff9a3c44b396
+Git branch: v5/short-run-hardening
+Filter: *
+--------------------------------------------------------------
+[FAIL] FIX-FAIL-01 (META-02) 23ms
+       assertion failed: intentional failure one (expected: 1; actual: 2)
+[FAIL] FIX-FAIL-02 (META-02) 8ms
+       unexpected exception: intentional unexpected exception | stack: �� <ScriptBlock>��D:\CAB-Lab\publish\proxy_v6\tests\self\fixtures\fail.ps1 ��: �� 18 �� | �� Invoke-HarnessCase��D:\CAB-Lab\publish\proxy_v6\tests\Harness.ps1 ��: �� 434 �� | �� Invoke-TestRun��D:\CAB-Lab\publish\proxy_v6\tests\Harness.ps1 ��: �� 618 �� | �� <ScriptBlock>��D:\CAB-Lab\publish\proxy_v6\tests\self\fixtures\fail.ps1 ��: �� 21 �� | at: ����λ�� D:\CAB-Lab\publish\proxy_v6\tests\self\fixtures\fail.ps1:18 �ַ�: 3 | +   throw 'intentional unexpected exception' | +   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--------------------------------------------------------------
+Counts: registered=2 executed=2 passed=0 failed=2 skipped=0 available=2
+Evidence: C:\CAB-Lab\AppData\Local\Temp\v6-tests\v6-selftest-20261118-050628-121-6078b2a5\META-02\evidence.json
+RESULT: FAIL EXIT 1

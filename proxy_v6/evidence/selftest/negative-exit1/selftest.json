@@ -1,0 +1,131 @@
+{
+    "schemaVersion":  1,
+    "tool":  "proxy_v6/tests/self/SelfTest.ps1",
+    "startedAt":  "2026-11-18T05:06:16.716-08:00",
+    "finishedAt":  "2026-11-18T05:06:26.522-08:00",
+    "durationMs":  9803,
+    "repoRoot":  "C:\\CAB-Lab\\publish",
+    "git":  {
+                "head":  "36222c92c829a2ef08b71af2a3a3ff9a3c44b396",
+                "branch":  "v5/short-run-hardening",
+                "dirty":  true
+            },
+    "filter":  "META-*",
+    "selected":  [
+                     "META-01",
+                     "META-02",
+                     "META-03",
+                     "META-04",
+                     "META-05",
+                     "META-06",
+                     "META-07"
+                 ],
+    "counts":  {
+                   "selected":  7,
+                   "checks":  7,
+                   "passed":  6,
+                   "failed":  1
+               },
+    "exitCode":  1,
+    "outcome":  "SELFTEST_FAIL",
+    "checks":  [
+                   {
+                       "id":  "META-01",
+                       "requirement":  "META-01",
+                       "name":  "all valid tests pass -\u003e exit 0 and evidence written",
+                       "passed":  false,
+                       "detail":  "INJECTED self-test failure for aggregate exit-code control; all assertions met",
+                       "expectedExit":  "0",
+                       "childExitCode":  0,
+                       "childTimedOut":  false,
+                       "stdout":  "C:\\CAB-Lab\\publish\\proxy_v6\\evidence\\selftest\\negative-exit1\\META-01\\stdout.txt",
+                       "stderr":  "C:\\CAB-Lab\\publish\\proxy_v6\\evidence\\selftest\\negative-exit1\\META-01\\stderr.txt",
+                       "evidence":  "C:\\CAB-Lab\\publish\\proxy_v6\\evidence\\selftest\\negative-exit1\\META-01\\evidence.json",
+                       "at":  "2026-11-18T05:06:17.827-08:00"
+                   },
+                   {
+                       "id":  "META-02",
+                       "requirement":  "META-02",
+                       "name":  "any executed test fails -\u003e exit 1",
+                       "passed":  true,
+                       "detail":  "all assertions met",
+                       "expectedExit":  "1",
+                       "childExitCode":  1,
+                       "childTimedOut":  false,
+                       "stdout":  "C:\\CAB-Lab\\publish\\proxy_v6\\evidence\\selftest\\negative-exit1\\META-02\\stdout.txt",
+                       "stderr":  "C:\\CAB-Lab\\publish\\proxy_v6\\evidence\\selftest\\negative-exit1\\META-02\\stderr.txt",
+                       "evidence":  "C:\\CAB-Lab\\publish\\proxy_v6\\evidence\\selftest\\negative-exit1\\META-02\\evidence.json",
+                       "at":  "2026-11-18T05:06:18.732-08:00"
+                   },
+                   {
+                       "id":  "META-03",
+                       "requirement":  "META-03",
+                       "name":  "framework exception -\u003e exit 3, not pass/fail",
+                       "passed":  true,
+                       "detail":  "all assertions met",
+                       "expectedExit":  "3",
+                       "childExitCode":  3,
+                       "childTimedOut":  false,
+                       "stdout":  "C:\\CAB-Lab\\publish\\proxy_v6\\evidence\\selftest\\negative-exit1\\META-03\\stdout.txt",
+                       "stderr":  "C:\\CAB-Lab\\publish\\proxy_v6\\evidence\\selftest\\negative-exit1\\META-03\\stderr.txt",
+                       "evidence":  "C:\\CAB-Lab\\publish\\proxy_v6\\evidence\\selftest\\negative-exit1\\META-03\\evidence.json",
+                       "at":  "2026-11-18T05:06:19.608-08:00"
+                   },
+                   {
+                       "id":  "META-04",
+                       "requirement":  "META-04",
+                       "name":  "zero executed tests -\u003e exit 2 even with a filter",
+                       "passed":  true,
+                       "detail":  "all assertions met",
+                       "expectedExit":  "2",
+                       "childExitCode":  2,
+                       "childTimedOut":  false,
+                       "stdout":  "C:\\CAB-Lab\\publish\\proxy_v6\\evidence\\selftest\\negative-exit1\\META-04-empty\\stdout.txt",
+                       "stderr":  "C:\\CAB-Lab\\publish\\proxy_v6\\evidence\\selftest\\negative-exit1\\META-04-empty\\stderr.txt",
+                       "evidence":  "C:\\CAB-Lab\\publish\\proxy_v6\\evidence\\selftest\\negative-exit1\\META-04-empty\\evidence.json",
+                       "at":  "2026-11-18T05:06:21.277-08:00"
+                   },
+                   {
+                       "id":  "META-05",
+                       "requirement":  "META-05",
+                       "name":  "skips recorded separately; all-skip -\u003e exit 2",
+                       "passed":  true,
+                       "detail":  "all assertions met",
+                       "expectedExit":  "0 mixed / 2 all-skip / 2 runtime",
+                       "childExitCode":  0,
+                       "childTimedOut":  false,
+                       "stdout":  "C:\\CAB-Lab\\publish\\proxy_v6\\evidence\\selftest\\negative-exit1\\META-05-mixed\\stdout.txt",
+                       "stderr":  "C:\\CAB-Lab\\publish\\proxy_v6\\evidence\\selftest\\negative-exit1\\META-05-mixed\\stderr.txt",
+                       "evidence":  "C:\\CAB-Lab\\publish\\proxy_v6\\evidence\\selftest\\negative-exit1\\META-05-mixed\\evidence.json",
+                       "at":  "2026-11-18T05:06:23.884-08:00"
+                   },
+                   {
+                       "id":  "META-06",
+                       "requirement":  "META-06",
+                       "name":  "final evidence write failure -\u003e exit 4",
+                       "passed":  true,
+                       "detail":  "all assertions met",
+                       "expectedExit":  "4",
+                       "childExitCode":  4,
+                       "childTimedOut":  false,
+                       "stdout":  "C:\\CAB-Lab\\publish\\proxy_v6\\evidence\\selftest\\negative-exit1\\META-06\\stdout.txt",
+                       "stderr":  "C:\\CAB-Lab\\publish\\proxy_v6\\evidence\\selftest\\negative-exit1\\META-06\\stderr.txt",
+                       "evidence":  null,
+                       "at":  "2026-11-18T05:06:25.628-08:00"
+                   },
+                   {
+                       "id":  "META-07",
+                       "requirement":  "META-07",
+                       "name":  "later pass never overwrites an earlier failure",
+                       "passed":  true,
+                       "detail":  "all assertions met",
+                       "expectedExit":  "1",
+                       "childExitCode":  1,
+                       "childTimedOut":  false,
+                       "stdout":  "C:\\CAB-Lab\\publish\\proxy_v6\\evidence\\selftest\\negative-exit1\\META-07\\stdout.txt",
+                       "stderr":  "C:\\CAB-Lab\\publish\\proxy_v6\\evidence\\selftest\\negative-exit1\\META-07\\stderr.txt",
+                       "evidence":  "C:\\CAB-Lab\\publish\\proxy_v6\\evidence\\selftest\\negative-exit1\\META-07\\evidence.json",
+                       "at":  "2026-11-18T05:06:26.506-08:00"
+                   }
+               ]
+}

@@ -1,0 +1,17 @@
+{
+    "id":  "F07-11",
+    "requirement":  "F07",
+    "precondition":  "chain verification fails",
+    "injectedFault":  "wrong exit ip",
+    "expected":  "exit code 31 preserved",
+    "actual":  "F07-11: 31 preserved",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 2",
+    "durationMs":  829,
+    "assertions":  2,
+    "startedAt":  "2026-11-18T07:02:15.148-08:00",
+    "finishedAt":  "2026-11-18T07:02:15.978-08:00",
+    "evidenceFile":  "C:\\CAB-Lab\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0032-F07-11.json",
+    "testOutput":  ""
+}

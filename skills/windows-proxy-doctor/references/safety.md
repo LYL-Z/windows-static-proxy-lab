@@ -7,6 +7,8 @@
   DNS, adapters, firewall, Defender, certificates, proxy client configs,
   credentials, and startup entries.
 - A user authorization to deploy does not authorize unrelated changes.
+- The operator-facing rules that are not restated here (no promised unban, a
+  client restart is not a recovered path) live in [operator boundary](operator-boundary.md).
 
 ## Backup and rollback
 

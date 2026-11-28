@@ -1,0 +1,17 @@
+{
+    "id":  "INF-ATOMIC-03",
+    "requirement":  "TX-06",
+    "precondition":  "target locked",
+    "injectedFault":  "file occupied",
+    "expected":  "refused; target intact",
+    "actual":  "locked target refused, intact, staging cleaned",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  691,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T07:02:45.567-08:00",
+    "finishedAt":  "2026-11-18T07:02:46.258-08:00",
+    "evidenceFile":  "C:\\CAB-Lab\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0070-INF-ATOMIC-03.json",
+    "testOutput":  ""
+}

@@ -193,6 +193,27 @@ try {
         Assert-True ($rejectedExit -ne 0 -and -not (Test-Path -LiteralPath $rejectedZip)) 'invalid hash yielded plaintext output'
         Assert-True ((Get-Content -LiteralPath $sentinel) -eq 'existing-file') 'existing temporary file was overwritten or deleted'
     }
+    Check 'recovery-verdict-fixtures' {
+        . (Join-Path $root 'scripts\RecoveryVerdict.ps1')
+        $fixture = Get-Content -LiteralPath (Join-Path $testDir 'fixtures\recovery-fixtures.json') -Raw | ConvertFrom-Json
+        $required = @(
+            'complete-success', 'exit-code-alone', 'decimal-32.5', 'string-true', 'missing-field',
+            'extra-write-line', 'writesmatch-true-raw-differs', 'cancelled', 'timed-out',
+            'illegal-expected-99', 'empty-object', 'raw-write-changed-case',
+            'wrong-cased-required-field', 'wrong-cased-raw-write-field'
+        )
+        $seen = @{}
+        foreach ($case in @($fixture.cases)) {
+            $verdict = Test-ProxyDoctorRecoveryResult $case.result
+            $seen[[string]$case.name] = $true
+            $reasons = @($verdict.Reasons) -join ','
+            Assert-True ($verdict.CompleteSuccess -eq [bool]$case.completeSuccess) ($case.name + ' CompleteSuccess expected ' + $case.completeSuccess + ' actual ' + $verdict.CompleteSuccess + ' reasons=' + $reasons)
+            Assert-True ($verdict.EvidenceScope -eq 'LiveUnchanged compares the proxy selection at the start and end only.') ($case.name + ' LiveUnchanged text changed')
+        }
+        foreach ($name in $required) {
+            Assert-True ($seen.ContainsKey($name)) ('fixture missing ' + $name)
+        }
+    }
 }
 finally { Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue }
 Write-Host ('COUNTS=' + $count + ' failures=' + $failures.Count)

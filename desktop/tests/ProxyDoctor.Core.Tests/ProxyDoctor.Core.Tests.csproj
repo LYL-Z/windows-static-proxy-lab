@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ProxyDoctor.Core\ProxyDoctor.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <!--
+      F69/F70: the recovery tests exercise the packaged engine exactly as an
+      unpacked release folder would, so the same three-file whitelist is copied
+      next to the test binaries in both Debug and Release.
+    -->
+    <Content Include="..\..\..\proxy_v4\rollback-v4.ps1" Link="engine\proxy_v4\rollback-v4.ps1" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\..\proxy_v4\lib\V4.ps1" Link="engine\proxy_v4\lib\V4.ps1" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\scripts\Invoke-IsolatedRecovery.ps1" Link="engine\scripts\Invoke-IsolatedRecovery.ps1" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <Import Project="..\..\packaging\engine-manifest.targets" />
+</Project>

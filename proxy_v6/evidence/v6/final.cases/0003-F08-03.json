@@ -1,0 +1,17 @@
+{
+    "id":  "F08-03",
+    "requirement":  "F08",
+    "precondition":  "similar UID V4Mngd00010 before target",
+    "injectedFault":  "prefix-similar uid",
+    "expected":  "similar profile untouched",
+    "actual":  "F08-03: similar 333333 kept",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 2",
+    "durationMs":  707,
+    "assertions":  2,
+    "startedAt":  "2026-11-18T07:01:31.900-08:00",
+    "finishedAt":  "2026-11-18T07:01:32.607-08:00",
+    "evidenceFile":  "C:\\CAB-Lab\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0003-F08-03.json",
+    "testOutput":  ""
+}

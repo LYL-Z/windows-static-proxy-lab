@@ -1,0 +1,17 @@
+{
+    "id":  "F07-08",
+    "requirement":  "F07",
+    "precondition":  "clean fixture",
+    "injectedFault":  "none",
+    "expected":  "all targets written; proxy owned; owner recorded",
+    "actual":  "F07-08: all targets written",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 2",
+    "durationMs":  792,
+    "assertions":  2,
+    "startedAt":  "2026-11-18T07:02:12.796-08:00",
+    "finishedAt":  "2026-11-18T07:02:13.588-08:00",
+    "evidenceFile":  "C:\\CAB-Lab\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0029-F07-08.json",
+    "testOutput":  ""
+}

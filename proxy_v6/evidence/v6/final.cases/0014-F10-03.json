@@ -1,0 +1,17 @@
+{
+    "id":  "F10-03",
+    "requirement":  "F10",
+    "precondition":  "restore and start ok; log fails",
+    "injectedFault":  "log throws",
+    "expected":  "original code kept; no throw",
+    "actual":  "F10-03: returned 31",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 2",
+    "durationMs":  708,
+    "assertions":  2,
+    "startedAt":  "2026-11-18T07:02:01.631-08:00",
+    "finishedAt":  "2026-11-18T07:02:02.339-08:00",
+    "evidenceFile":  "C:\\CAB-Lab\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0014-F10-03.json",
+    "testOutput":  ""
+}

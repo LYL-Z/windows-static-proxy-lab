@@ -1,0 +1,17 @@
+{
+    "id":  "F07-02",
+    "requirement":  "F07",
+    "precondition":  "snapshot ok",
+    "injectedFault":  "first write fails",
+    "expected":  "files unchanged; restore attempted; app restarted",
+    "actual":  "F07-02: first write rejected, state restored",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 2",
+    "durationMs":  869,
+    "assertions":  2,
+    "startedAt":  "2026-11-18T07:02:07.771-08:00",
+    "finishedAt":  "2026-11-18T07:02:08.640-08:00",
+    "evidenceFile":  "C:\\CAB-Lab\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0023-F07-02.json",
+    "testOutput":  ""
+}

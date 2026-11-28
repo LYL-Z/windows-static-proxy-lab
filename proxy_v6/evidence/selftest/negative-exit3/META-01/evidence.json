@@ -1,0 +1,78 @@
+{
+    "schemaVersion":  1,
+    "tool":  "proxy_v6/tests/Harness.ps1",
+    "harnessVersion":  "6.0.0",
+    "runId":  "5e4281e222264b93b4a1121285971f8e",
+    "host":  {
+                 "psVersion":  "5.1.26100.9818",
+                 "psEdition":  "Desktop",
+                 "os":  "Microsoft Windows NT 10.0.26300.0",
+                 "clr":  "4.0.30319.42000",
+                 "is64BitProcess":  true,
+                 "pid":  37308
+             },
+    "git":  {
+                "available":  true,
+                "head":  "36222c92c829a2ef08b71af2a3a3ff9a3c44b396",
+                "branch":  "v5/short-run-hardening",
+                "dirty":  true,
+                "error":  null
+            },
+    "repoRoot":  "C:\\CAB-Lab\\publish",
+    "filter":  "*",
+    "startedAt":  "2026-11-18T05:06:28.707-08:00",
+    "finishedAt":  "2026-11-18T05:06:29.000-08:00",
+    "durationMs":  92,
+    "counts":  {
+                   "registered":  2,
+                   "executed":  2,
+                   "passed":  2,
+                   "failed":  0,
+                   "skipped":  0,
+                   "available":  2
+               },
+    "exitCode":  0,
+    "outcome":  "PASS",
+    "harnessErrors":  [
+
+                      ],
+    "evidenceErrors":  [
+
+                       ],
+    "cases":  [
+                  {
+                      "id":  "FIX-PASS-01",
+                      "requirement":  "META-01",
+                      "precondition":  "isolated child process; temp evidence directory",
+                      "injectedFault":  "none",
+                      "expected":  "Assert-Equal 1 1 passes",
+                      "actual":  "1 equals 1",
+                      "status":  "pass",
+                      "passed":  true,
+                      "detail":  "assertions passed: 1",
+                      "durationMs":  10,
+                      "assertions":  1,
+                      "startedAt":  "2026-11-18T05:06:28.743-08:00",
+                      "finishedAt":  "2026-11-18T05:06:28.761-08:00",
+                      "evidenceFile":  "C:\\CAB-Lab\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-050628-121-6078b2a5\\META-01\\cases\\0001-FIX-PASS-01.json",
+                      "testOutput":  ""
+                  },
+                  {
+                      "id":  "FIX-PASS-02",
+                      "requirement":  "META-01",
+                      "precondition":  "isolated child process; temp evidence directory",
+                      "injectedFault":  "none",
+                      "expected":  "pattern abc123 matches ^[a-z]+[0-9]+$",
+                      "actual":  "all assertions passed",
+                      "status":  "pass",
+                      "passed":  true,
+                      "detail":  "assertions passed: 2",
+                      "durationMs":  6,
+                      "assertions":  2,
+                      "startedAt":  "2026-11-18T05:06:28.791-08:00",
+                      "finishedAt":  "2026-11-18T05:06:28.797-08:00",
+                      "evidenceFile":  "C:\\CAB-Lab\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-050628-121-6078b2a5\\META-01\\cases\\0002-FIX-PASS-02.json",
+                      "testOutput":  ""
+                  }
+              ]
+}

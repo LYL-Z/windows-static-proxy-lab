@@ -1,0 +1,61 @@
+{
+    "schemaVersion":  1,
+    "tool":  "proxy_v6/tests/Harness.ps1",
+    "harnessVersion":  "6.0.0",
+    "runId":  "fd0004bc31a7495ab178b6059e3cac3f",
+    "host":  {
+                 "psVersion":  "5.1.26100.9818",
+                 "psEdition":  "Desktop",
+                 "os":  "Microsoft Windows NT 10.0.26300.0",
+                 "clr":  "4.0.30319.42000",
+                 "is64BitProcess":  true,
+                 "pid":  57068
+             },
+    "git":  {
+                "available":  true,
+                "head":  "79198fd1046f08e17ca9ca819a464ca7a7a19921",
+                "branch":  "HEAD",
+                "dirty":  false,
+                "error":  null
+            },
+    "repoRoot":  "C:\\CAB-Lab\\AppData\\Local\\Temp\\v6-selftest-wt",
+    "filter":  "*",
+    "startedAt":  "2026-11-18T06:33:41.677-08:00",
+    "finishedAt":  "2026-11-18T06:33:41.994-08:00",
+    "durationMs":  98,
+    "counts":  {
+                   "registered":  1,
+                   "executed":  0,
+                   "passed":  0,
+                   "failed":  0,
+                   "skipped":  1,
+                   "available":  1
+               },
+    "exitCode":  2,
+    "outcome":  "NO_TESTS_EXECUTED",
+    "harnessErrors":  [
+
+                      ],
+    "evidenceErrors":  [
+
+                       ],
+    "cases":  [
+                  {
+                      "id":  "FIX-SKIP-RUNTIME",
+                      "requirement":  "META-05",
+                      "precondition":  "runtime skip requested inside the body",
+                      "injectedFault":  "runtime skip",
+                      "expected":  "runtime skip is recorded separately and the run exits 2",
+                      "actual":  "skipped",
+                      "status":  "skip",
+                      "passed":  false,
+                      "detail":  "skipped at runtime: fixture runtime skip: simulated missing dependency",
+                      "durationMs":  15,
+                      "assertions":  0,
+                      "startedAt":  "2026-11-18T06:33:41.716-08:00",
+                      "finishedAt":  "2026-11-18T06:33:41.741-08:00",
+                      "evidenceFile":  "C:\\CAB-Lab\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-063333-906-8e782058\\META-05-runtime\\cases\\0001-FIX-SKIP-RUNTIME.json",
+                      "testOutput":  ""
+                  }
+              ]
+}

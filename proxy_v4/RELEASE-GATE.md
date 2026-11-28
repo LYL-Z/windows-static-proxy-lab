@@ -1,3 +1,7 @@
+> **历史文档（V4）。已被 proxy_v6/RELEASE-GATE-V6.md 取代。**
+> V4 的 13/13 故障注入套件已退役；其中 FT12 会修改真实 hosts ACL，禁止运行。
+> 当前 V6 证据：92/92 隔离测试、META 7/7、Gitleaks 0；真实生产 apply/rollback/boot 未执行。
+
 # RELEASE-GATE（发布 Gate）
 
 | Gate 项 | 要求 | 状态 |

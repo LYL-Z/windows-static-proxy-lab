@@ -9,11 +9,12 @@ A close arriving in ~0-5 ms = something on the local/path side killed it
 
 No credentials are used or printed here.
 """
+import os
 import socket
 import sys
 import time
 
-HOST = "72.245.197.103"
+HOST = os.environ["PX_HOST"]
 PORT = 9506
 
 

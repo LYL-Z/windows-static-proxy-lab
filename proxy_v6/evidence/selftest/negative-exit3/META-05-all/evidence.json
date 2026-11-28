@@ -1,0 +1,61 @@
+{
+    "schemaVersion":  1,
+    "tool":  "proxy_v6/tests/Harness.ps1",
+    "harnessVersion":  "6.0.0",
+    "runId":  "0c7e73047c0d449289504c828be40f23",
+    "host":  {
+                 "psVersion":  "5.1.26100.9818",
+                 "psEdition":  "Desktop",
+                 "os":  "Microsoft Windows NT 10.0.26300.0",
+                 "clr":  "4.0.30319.42000",
+                 "is64BitProcess":  true,
+                 "pid":  4992
+             },
+    "git":  {
+                "available":  true,
+                "head":  "36222c92c829a2ef08b71af2a3a3ff9a3c44b396",
+                "branch":  "v5/short-run-hardening",
+                "dirty":  true,
+                "error":  null
+            },
+    "repoRoot":  "C:\\CAB-Lab\\publish",
+    "filter":  "*",
+    "startedAt":  "2026-11-18T05:06:34.052-08:00",
+    "finishedAt":  "2026-11-18T05:06:34.332-08:00",
+    "durationMs":  78,
+    "counts":  {
+                   "registered":  1,
+                   "executed":  0,
+                   "passed":  0,
+                   "failed":  0,
+                   "skipped":  1,
+                   "available":  1
+               },
+    "exitCode":  2,
+    "outcome":  "NO_TESTS_EXECUTED",
+    "harnessErrors":  [
+
+                      ],
+    "evidenceErrors":  [
+
+                       ],
+    "cases":  [
+                  {
+                      "id":  "FIX-SKIP-ONLY",
+                      "requirement":  "META-05",
+                      "precondition":  "dependency intentionally absent",
+                      "injectedFault":  "registration skip",
+                      "expected":  "all-skipped run must be exit 2",
+                      "actual":  "skipped",
+                      "status":  "skip",
+                      "passed":  false,
+                      "detail":  "skipped at registration: fixture registration skip: only test skipped",
+                      "durationMs":  2,
+                      "assertions":  0,
+                      "startedAt":  "2026-11-18T05:06:34.086-08:00",
+                      "finishedAt":  "2026-11-18T05:06:34.097-08:00",
+                      "evidenceFile":  "C:\\CAB-Lab\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-050628-121-6078b2a5\\META-05-all\\cases\\0001-FIX-SKIP-ONLY.json",
+                      "testOutput":  ""
+                  }
+              ]
+}

@@ -2,7 +2,7 @@
 
 - 时间：2026-11-18 02:00 → 02:35 (America/Los_Angeles)
 - 环境：Windows 11 家庭中文版 (10.0.26300)，用户 `老黄之友\lenovo`（非管理员），PowerShell 5.1
-- 工作目录：`D:\claude防封\proxy_v2\`（V1 成果保留在 `D:\claude防封\proxy_diag\`）
+- 工作目录：`C:\CAB-Lab\proxy_v2\`（V1 成果保留在 `C:\CAB-Lab\proxy_diag\`）
 - 性质：通用网络连接 / 隐私 / 可靠性工程。涉及第三方服务时只做公开政策核验，不规避地区限制。
 
 ---
@@ -70,7 +70,7 @@ profiles\LWMoQxn0PeIP.yaml     2866DBD6110A97EE
 3. **mihomo 崩溃前日志**（`logs\sidecar_latest.log`）：
    ```
    01:40:16  dial PROXY (match Match/) ... --> login.live.com:443
-             error: 72.245.197.103:9506 connect error: 127.0.0.1:11119 connect error:
+             error: 192.0.2.254:9506 connect error: 127.0.0.1:11119 connect error:
              dial tcp 127.0.0.1:11119: connectex: No connection could be made
              because the target machine actively refused it.
    ```
@@ -232,7 +232,7 @@ hash verification passed for all restored files
 | 窗口 | 02:11:52 → 02:25:30（约 13.6 分钟） |
 | 请求数 / 成功 | **300 / 300（100%）** |
 | 失败原因分布 | 无（0 次失败） |
-| 出口 IP | `72.245.197.103` × 300（100% 一致） |
+| 出口 IP | `192.0.2.254` × 300（100% 一致） |
 | 延迟 | min **2324** / p50 **2678** / p90 **2950** / p95 **3201** / p99 **4274** / max **4577** ms |
 
 对照工程验收目标：

@@ -1,0 +1,12 @@
+
+== V6 TEST HARNESS 6.0.0 ==
+Run ID: 80ab755bc5644c48b9cb59f6d029eb41
+Git HEAD: 36222c92c829a2ef08b71af2a3a3ff9a3c44b396
+Git branch: v5/short-run-hardening
+Filter: *
+--------------------------------------------------------------
+--------------------------------------------------------------
+Counts: registered=0 executed=0 passed=0 failed=0 skipped=0 available=0
+[NO-TESTS] no test executed; a green result is not permitted (exit 2).
+Evidence: C:\CAB-Lab\AppData\Local\Temp\v6-tests\v6-selftest-20261118-050616-730-164fbd46\META-04-empty\evidence.json
+RESULT: NO_TESTS_EXECUTED EXIT 2

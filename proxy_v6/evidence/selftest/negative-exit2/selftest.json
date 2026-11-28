@@ -1,0 +1,28 @@
+{
+    "schemaVersion":  1,
+    "tool":  "proxy_v6/tests/self/SelfTest.ps1",
+    "startedAt":  "2026-11-18T05:06:27.291-08:00",
+    "finishedAt":  "2026-11-18T05:06:27.397-08:00",
+    "durationMs":  104,
+    "repoRoot":  "C:\\CAB-Lab\\publish",
+    "git":  {
+                "head":  "36222c92c829a2ef08b71af2a3a3ff9a3c44b396",
+                "branch":  "v5/short-run-hardening",
+                "dirty":  true
+            },
+    "filter":  "META-99",
+    "selected":  [
+
+                 ],
+    "counts":  {
+                   "selected":  0,
+                   "checks":  0,
+                   "passed":  0,
+                   "failed":  0
+               },
+    "exitCode":  2,
+    "outcome":  "NO_TESTS_EXECUTED",
+    "checks":  [
+
+               ]
+}

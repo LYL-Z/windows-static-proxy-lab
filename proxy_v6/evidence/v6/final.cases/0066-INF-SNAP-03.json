@@ -1,0 +1,17 @@
+{
+    "id":  "INF-SNAP-03",
+    "requirement":  "DATA-04",
+    "precondition":  "manifest with traversal path",
+    "injectedFault":  "unsafe path",
+    "expected":  "refused",
+    "actual":  "unsafe snapshot path refused",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  927,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T07:02:42.300-08:00",
+    "finishedAt":  "2026-11-18T07:02:43.227-08:00",
+    "evidenceFile":  "C:\\CAB-Lab\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0066-INF-SNAP-03.json",
+    "testOutput":  ""
+}

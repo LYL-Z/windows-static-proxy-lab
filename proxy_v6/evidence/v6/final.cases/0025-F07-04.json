@@ -1,0 +1,17 @@
+{
+    "id":  "F07-04",
+    "requirement":  "F07",
+    "precondition":  "first two writes ok",
+    "injectedFault":  "third write fails",
+    "expected":  "both writes rolled back",
+    "actual":  "F07-04: third write failure rolled back",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 2",
+    "durationMs":  877,
+    "assertions":  2,
+    "startedAt":  "2026-11-18T07:02:09.498-08:00",
+    "finishedAt":  "2026-11-18T07:02:10.376-08:00",
+    "evidenceFile":  "C:\\CAB-Lab\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0025-F07-04.json",
+    "testOutput":  ""
+}

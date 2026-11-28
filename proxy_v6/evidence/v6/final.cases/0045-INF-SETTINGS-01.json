@@ -1,0 +1,17 @@
+{
+    "id":  "INF-SETTINGS-01",
+    "requirement":  "SEC-02",
+    "precondition":  "clean root",
+    "injectedFault":  "none",
+    "expected":  "settings DPAPI at rest, ACL restricted, roundtrip",
+    "actual":  "DPAPI at rest, no plaintext, ACL restricted, Get-V4Settings roundtrip",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  963,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T07:02:25.066-08:00",
+    "finishedAt":  "2026-11-18T07:02:26.029-08:00",
+    "evidenceFile":  "C:\\CAB-Lab\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0045-INF-SETTINGS-01.json",
+    "testOutput":  ""
+}

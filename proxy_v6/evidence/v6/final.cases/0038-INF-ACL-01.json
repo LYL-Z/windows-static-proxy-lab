@@ -1,0 +1,17 @@
+{
+    "id":  "INF-ACL-01",
+    "requirement":  "SEC-02",
+    "precondition":  "protected temp directory + injected Everyone ACE",
+    "injectedFault":  "weak ACE added after hardening",
+    "expected":  "second hardening removes Everyone and returns true",
+    "actual":  "Everyone ACE removed; second pass returned true",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  790,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T07:02:19.847-08:00",
+    "finishedAt":  "2026-11-18T07:02:20.637-08:00",
+    "evidenceFile":  "C:\\CAB-Lab\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0038-INF-ACL-01.json",
+    "testOutput":  ""
+}

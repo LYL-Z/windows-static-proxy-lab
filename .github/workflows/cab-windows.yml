@@ -1,0 +1,304 @@
+# CAB Windows CI for the shared Desktop/CLI core, the skill scripts, the V6
+# engine harness, and a private-key scan. No production credentials and no
+# repository secrets are read.
+#
+# The engine harness (proxy_v6/tests/Run-Tests.ps1, 114 registered cases) is
+# Windows PowerShell 5.1 only and needs no Python, .NET, admin rights or
+# internet: it runs from an isolated TEMP root with synthetic fixtures. It is
+# the one long job here (a few minutes), so it gets its own job and a wider
+# timeout. A failing case fails the job; nothing is skipped to make it green.
+#
+# The synthetic snapshot seal lives in cab-v69-seal.yml and is workflow_dispatch only.
+
+name: CAB Windows
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  core-tests:
+    name: Desktop/CLI Core tests
+    runs-on: windows-latest
+    timeout-minutes: 20
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+      DOTNET_NOLOGO: 1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Test ProxyDoctor.Core.Tests
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & dotnet test desktop/tests/ProxyDoctor.Core.Tests/ProxyDoctor.Core.Tests.csproj --configuration Release --verbosity minimal
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      # F72: the CLI must refuse a one-key flag and a wrong phrase, then run the
+      # isolated rehearsal only for the operation-bound phrase read from this machine.
+      # The rehearsal owns its own TEMP root; no live proxy value is written.
+      - name: CLI requires the bound phrase and refuses one-key authorization
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & dotnet build desktop/src/ProxyDoctor.Cli/ProxyDoctor.Cli.csproj --configuration Release --verbosity minimal
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $cli = 'desktop/src/ProxyDoctor.Cli/bin/Release/net8.0-windows/proxy-doctor.exe'
+          if (-not (Test-Path -LiteralPath $cli -PathType Leaf)) { throw 'the CLI executable was not built' }
+
+          $key = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings'
+          $enable = (Get-ItemProperty -LiteralPath $key -Name ProxyEnable -ErrorAction SilentlyContinue).ProxyEnable
+          $server = (Get-ItemProperty -LiteralPath $key -Name ProxyServer -ErrorAction SilentlyContinue).ProxyServer
+          $target = 'unknown'
+          if ($enable -is [int]) {
+            if ($enable -eq 0) { $target = 'off' }
+            elseif ($enable -eq 1 -and $server -match '^127\.0\.0\.1:(\d{1,5})$') { $target = '127.0.0.1:' + $Matches[1] }
+            elseif ($enable -eq 1) { $target = 'other' }
+          }
+          $phrase = 'RECOVER-ISOLATED ' + $target
+          $outFile = Join-Path $env:RUNNER_TEMP 'cli-recovery-out.json'
+          $errFile = Join-Path $env:RUNNER_TEMP 'cli-recovery-err.txt'
+          $inFile = Join-Path $env:RUNNER_TEMP 'cli-recovery-in.txt'
+
+          function Invoke-Cli([string]$Arguments, [string]$StandardInput) {
+            Set-Content -LiteralPath $inFile -Value $StandardInput -Encoding ASCII
+            Remove-Item -LiteralPath $outFile, $errFile -ErrorAction SilentlyContinue
+            $started = Start-Process -FilePath $cli -ArgumentList $Arguments -RedirectStandardInput $inFile `
+              -RedirectStandardOutput $outFile -RedirectStandardError $errFile -NoNewWindow -Wait -PassThru
+            return [pscustomobject]@{ Exit = $started.ExitCode; Json = (Get-Content -LiteralPath $outFile -Raw | ConvertFrom-Json) }
+          }
+
+          $flagged = Invoke-Cli '--isolated-recovery --yes' ''
+          if ($flagged.Exit -ne 2) { throw ('--yes exited ' + $flagged.Exit + ', expected 2') }
+          if ($flagged.Json.AuthorizationRefused -ne $true -or $flagged.Json.ScriptStarted -ne $false) {
+            throw '--yes was not refused as an authorization failure'
+          }
+
+          $wrongTarget = if ($target -eq 'off') { 'other' } else { 'off' }
+          $wrong = Invoke-Cli '--isolated-recovery' ('RECOVER-ISOLATED ' + $wrongTarget)
+          if ($wrong.Exit -ne 2) { throw ('the wrong phrase exited ' + $wrong.Exit + ', expected 2') }
+          if ($wrong.Json.AuthorizationRefused -ne $true -or $wrong.Json.ScriptStarted -ne $false) {
+            throw 'a phrase for another target was accepted'
+          }
+
+          $run = Invoke-Cli '--isolated-recovery' $phrase
+          if ($run.Exit -ne 0) { throw ('the bound phrase exited ' + $run.Exit + ': ' + $run.Json.Detail) }
+          if ($run.Json.CompleteSuccess -ne $true) { throw ('isolated rehearsal incomplete: ' + $run.Json.Detail) }
+          if ($run.Json.GrantedBy -ne 'phrase' -or $run.Json.Target -ne $target) { throw 'the grant was not bound to this target' }
+          if ($run.Json.TransactionExit -ne 32 -or $run.Json.WritesMatch -ne $true) { throw 'isolated transaction evidence is missing' }
+          if ($run.Json.AuthorizationRefused -ne $false) { throw 'an accepted run reported an authorization refusal' }
+          Write-Host 'CLI authorization flow verified: one-key flag refused, wrong phrase refused, bound phrase ran the isolated rehearsal.'
+
+  packaging-tests:
+    name: Packaging rollback tests
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Run Test-InstallProxyDoctor.ps1 with Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $script = 'desktop/packaging/Test-InstallProxyDoctor.ps1'
+          if (-not (Test-Path -LiteralPath $script -PathType Leaf)) {
+            throw ("missing packaging test: " + $script)
+          }
+          # Everything happens under a GUID TEMP sandbox. Startup and WinINET values are
+          # read only, to prove they did not change; no installer or service is started.
+          & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File $script
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host ("{0} exited {1}" -f $script, $LASTEXITCODE)
+            exit $LASTEXITCODE
+          }
+
+  skill-tests:
+    name: Skill tests
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Run skill tests with Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $shell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+          if (-not (Test-Path -LiteralPath $shell)) {
+            throw 'Windows PowerShell 5.1 was not found in System32.'
+          }
+          $major = & $shell -NoProfile -Command '$PSVersionTable.PSVersion.Major'
+          if ($LASTEXITCODE -ne 0 -or $major -ne '5') { throw 'Windows PowerShell 5.1 did not start.' }
+          $scripts = @(
+            'skills/windows-proxy-doctor/tests/Run-Tests.ps1',
+            'skills/windows-proxy-doctor/tests/Run-FaultClassTests.ps1',
+            'skills/windows-proxy-doctor/tests/Run-OnboardingTests.ps1',
+            'skills/windows-proxy-doctor/tests/Run-RecoveryTests.ps1'
+          )
+          foreach ($relative in $scripts) {
+            Write-Host ("RUN " + $relative)
+            & $shell -NoProfile -ExecutionPolicy Bypass -File $relative
+            if ($LASTEXITCODE -ne 0) { throw ("{0} exited {1}" -f $relative, $LASTEXITCODE) }
+          }
+
+      - name: Repeat skill tests with pwsh when it is installed
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $explicit = 'C:\Program Files\PowerShell\7\pwsh.exe'
+          if (Test-Path -LiteralPath $explicit) {
+            $pwshPath = $explicit
+          } else {
+            $command = Get-Command pwsh -ErrorAction SilentlyContinue
+            if (-not $command) {
+              # A silent skip used to turn a reduced-coverage run into a green job.
+              # PowerShell 7 is not a product dependency (every script is 5.1), but the
+              # dual-version regression IS a required check, so a missing pwsh must fail
+              # loudly instead of degrading the run.
+              throw 'pwsh is not installed. The dual-PowerShell regression may not be skipped; install PowerShell 7 on the runner.'
+            }
+            $pwshPath = $command.Source
+          }
+          $pwshVersion = & $pwshPath -NoProfile -Command '$PSVersionTable.PSVersion.ToString()'
+          Write-Host $pwshVersion
+          if ($LASTEXITCODE -ne 0) { throw ("pwsh could not report its version (exit {0})." -f $LASTEXITCODE) }
+          $scripts = @(
+            'skills/windows-proxy-doctor/tests/Run-Tests.ps1',
+            'skills/windows-proxy-doctor/tests/Run-FaultClassTests.ps1',
+            'skills/windows-proxy-doctor/tests/Run-OnboardingTests.ps1',
+            'skills/windows-proxy-doctor/tests/Run-RecoveryTests.ps1'
+          )
+          foreach ($relative in $scripts) {
+            Write-Host ("RUN pwsh " + $relative)
+            & $pwshPath -NoProfile -ExecutionPolicy Bypass -File $relative
+            if ($LASTEXITCODE -ne 0) { throw ("pwsh {0} exited {1}" -f $relative, $LASTEXITCODE) }
+          }
+
+  engine-tests:
+    name: V6 engine harness (114 cases)
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Confirm the harness entry point exists
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $entry = 'proxy_v6/tests/Run-Tests.ps1'
+          $harness = 'proxy_v6/tests/Harness.ps1'
+          $support = 'proxy_v6/tests/lib/TestSupport.ps1'
+          foreach ($relative in @($entry, $harness, $support)) {
+            if (-not (Test-Path -LiteralPath $relative -PathType Leaf)) {
+              throw ("required engine file is missing: " + $relative)
+            }
+          }
+          Write-Host ("found " + $entry)
+
+      - name: Run the V6 engine harness with Windows PowerShell 5.1
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $shell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+          if (-not (Test-Path -LiteralPath $shell)) {
+            throw 'Windows PowerShell 5.1 was not found in System32; the harness requires 5.1.'
+          }
+          # -OutFile keeps the evidence outside the tracked tree. The harness owns
+          # its own V4_TEST_MODE and TEMP root, so no host setting is inherited.
+          $outFile = Join-Path $env:RUNNER_TEMP 'v6-evidence\evidence.json'
+          $started = Get-Date
+          & $shell -NoProfile -ExecutionPolicy Bypass -File 'proxy_v6\tests\Run-Tests.ps1' -OutFile $outFile
+          $code = $LASTEXITCODE
+          $elapsed = (Get-Date) - $started
+          Write-Host ("engine harness exited {0} after {1:n1}s" -f $code, $elapsed.TotalSeconds)
+          if (Test-Path -LiteralPath $outFile) {
+            try {
+              $report = Get-Content -LiteralPath $outFile -Raw | ConvertFrom-Json
+              $counts = $report.counts
+              Write-Host ("registered={0} executed={1} passed={2} failed={3} skipped={4} outcome={5} exitCode={6}" -f `
+                $counts.registered, $counts.executed, $counts.passed, $counts.failed, $counts.skipped, $report.outcome, $report.exitCode)
+              foreach ($item in @($report.cases)) {
+                if ($item.status -ne 'pass') {
+                  Write-Host ("{0} {1} {2} {3}" -f $item.id, $item.status, $item.expected, $item.detail)
+                }
+              }
+              foreach ($item in @($report.harnessErrors)) { Write-Host ("harness-error: " + $item) }
+              foreach ($item in @($report.evidenceErrors)) { Write-Host ("evidence-error: " + $item) }
+            } catch {
+              Write-Host ("could not read the evidence file: " + $_.Exception.Message)
+            }
+          } else {
+            Write-Host ("no evidence file was written to " + $outFile)
+          }
+          if ($code -ne 0) { exit $code }
+
+      - name: Run the corrupt preparation journal probe
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $script = 'proxy_v6/tests/repro/CAB-CorruptPreparationJournal.ps1'
+          if (-not (Test-Path -LiteralPath $script -PathType Leaf)) {
+            throw ("missing probe: " + $script)
+          }
+          & "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File $script
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host ("{0} exited {1}" -f $script, $LASTEXITCODE)
+            exit $LASTEXITCODE
+          }
+
+  secret-scan:
+    name: Private key scan
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Fail on PRIVATE KEY blocks
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $pattern = ('-' * 5) + 'BEGIN[ A-Z0-9]*PRIVATE KEY' + ('-' * 5)
+          $raw = @(& git --no-pager grep -I -l -E -e $pattern -- .)
+          $code = $LASTEXITCODE
+          if ($code -eq 0) {
+            Write-Host 'PRIVATE KEY block detected. Paths only; file contents are not printed.'
+            foreach ($item in $raw) {
+              $text = [string]$item
+              if ($text -match '-----') {
+                Write-Host '(line omitted)'
+                continue
+              }
+              Write-Host $text
+            }
+            exit 1
+          }
+          if ($code -eq 1) {
+            Write-Host 'No PRIVATE KEY blocks found.'
+            exit 0
+          }
+          Write-Host ("git grep could not finish (exit {0})." -f $code)
+          exit $code

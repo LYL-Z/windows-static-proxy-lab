@@ -1,0 +1,17 @@
+{
+    "id":  "FIX-ORDER-01",
+    "requirement":  "META-07",
+    "precondition":  "isolated child process",
+    "injectedFault":  "earlier failing assertion",
+    "expected":  "earlier test fails",
+    "actual":  "assertion failed: earlier failure must persist (actual: False)",
+    "status":  "fail",
+    "passed":  false,
+    "detail":  "assertion failed: earlier failure must persist (actual: False)",
+    "durationMs":  20,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T05:06:37.550-08:00",
+    "finishedAt":  "2026-11-18T05:06:37.577-08:00",
+    "evidenceFile":  "C:\\CAB-Lab\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-050628-121-6078b2a5\\META-07\\cases\\0001-FIX-ORDER-01.json",
+    "testOutput":  ""
+}

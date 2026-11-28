@@ -137,23 +137,60 @@ try {
         $reopened = 'StarSky' + (Text 0x5DF2,0x7ECF,0x91CD,0x65B0,0x5F00,0x542F) + '，但 Clash ' + (Text 0x6CA1,0x6709,0x6D41,0x91CF)
         $config = (Text 0x68C0,0x67E5,0x6211,0x7684) + (Text 0x7535,0x8111,0x7F51,0x7EDC,0x914D,0x7F6E,0x662F,0x5426,0x6B63,0x5E38)
         $plan = (Text 0x68C0,0x67E5) + (Text 0x7F51,0x7EDC,0x6545,0x969C) + (Text 0x5E76,0x63D0,0x4F9B) + (Text 0x6062,0x590D,0x65B9,0x6848)
-        foreach ($sample in @($exact, $equivalent, 'why isn''t my proxy working', 'why is my proxy not working', $reopened, $config, $plan, 'StarSky is back but Clash has no traffic')) {
+        $fullNetwork = Text 0x5168,0x9762,0x68C0,0x67E5,0x6211,0x7684,0x7F51,0x7EDC
+        $network = Text 0x68C0,0x67E5,0x6211,0x7684,0x7F51,0x7EDC
+        $stopped = 'StarSky ' + (Text 0x505C,0x6B62,0x8FD0,0x884C,0x4E86)
+        $clashQuiet = 'Clash ' + (Text 0x6CA1,0x6709,0x6D41,0x91CF)
+        $abnormalPlan = (Text 0x68C0,0x67E5,0x5F02,0x5E38,0x5E76,0x63D0,0x4F9B) + (Text 0x6062,0x590D,0x65B9,0x6848)
+        foreach ($sample in @($exact, $equivalent, 'why isn''t my proxy working', 'why is my proxy not working', $reopened, $config, $plan, 'StarSky is back but Clash has no traffic', $fullNetwork, $network, 'check my network', $stopped, $clashQuiet.ToUpperInvariant(), $abnormalPlan)) {
             $route = Resolve-ProxyDoctorUserRequest $sample
-            Assert-True ($route.goal -eq 'Diagnose' -and $route.entry -eq 'scripts/Start-ProxyDoctor.ps1 -Goal Diagnose' -and $route.classify -eq 'Get-ProxyDoctorFaultClass' -and $route.authorization -eq 'read-only until the user accepts one specific change') ('route missed: ' + $sample)
+            Assert-True ($route.goal -eq 'Diagnose' -and $route.intent -eq 'diagnose' -and $route.entry -eq 'scripts/Start-ProxyDoctor.ps1 -Goal Diagnose' -and $route.classify -eq 'Get-ProxyDoctorFaultClass' -and $route.authorization -eq 'read-only until the user accepts one specific change') ('route missed: ' + $sample)
         }
         foreach ($sample in @($setup, 'help me prepare proxy settings', 'why is my proxy working', '')) {
             $route = Resolve-ProxyDoctorUserRequest $sample
-            Assert-True ($route.goal -eq 'Unspecified' -and $null -eq $route.classify) ('setup or healthy wording was classified: ' + $sample)
+            Assert-True ($route.goal -eq 'Unspecified' -and $route.intent -eq 'unspecified' -and $null -eq $route.classify) ('setup or healthy wording was classified: ' + $sample)
         }
+        $keep = (Text 0x4FDD,0x6301,0x539F,0x914D,0x7F6E) + '，' + (Text 0x4E0D,0x64C5,0x81EA,0x4FEE,0x6539)
+        $held = Resolve-ProxyDoctorUserRequest $keep
+        Assert-True ($held.goal -eq 'NoModify' -and $held.intent -eq 'no-modify' -and $held.authorization -eq 'do-not-modify' -and $null -eq $held.entry -and $null -eq $held.classify -and $null -eq $held.script) 'keep-config sentence was not an explicit no-modify route'
+        $heldWithCheck = Resolve-ProxyDoctorUserRequest ($fullNetwork + '，' + $keep)
+        Assert-True ($heldWithCheck.goal -eq 'NoModify' -and $heldWithCheck.intent -eq 'no-modify' -and $null -eq $heldWithCheck.classify) 'a do-not-modify sentence was routed into diagnosis'
+        $doNotChange = Text 0x4E0D,0x8981,0x4FEE,0x6539
+        $heldWithCheck = Resolve-ProxyDoctorUserRequest ($network + ', ' + $doNotChange)
+        Assert-True ($heldWithCheck.goal -eq 'NoModify' -and $null -eq $heldWithCheck.entry) 'short do-not-modify wording lost its precedence'
+        $checkNetwork = Text 0x68C0,0x67E5,0x7F51,0x7EDC
+        $keepCurrent = Text 0x4FDD,0x7559,0x73B0,0x6709,0x914D,0x7F6E
+        $preserveCurrent = Text 0x4FDD,0x6301,0x73B0,0x6709,0x914D,0x7F6E
+        Assert-True ((Resolve-ProxyDoctorUserRequest $checkNetwork).intent -eq 'diagnose') 'plain network check was not routed'
+        Assert-True ((Resolve-ProxyDoctorUserRequest ($checkNetwork + ', ' + $keepCurrent)).intent -eq 'no-modify') 'keep current configuration wording lost its precedence'
+        Assert-True ((Resolve-ProxyDoctorUserRequest ($checkNetwork + ', ' + $preserveCurrent)).intent -eq 'no-modify') 'preserve current configuration wording lost its precedence'
     }
     Check 'docs-point-at-classifier' {
         $skill = Get-Content -LiteralPath (Join-Path $root 'SKILL.md') -Raw -Encoding UTF8
         $guide = Get-Content -LiteralPath (Join-Path $root 'references\troubleshooting.md') -Raw -Encoding UTF8
         $exact = Text 0x68C0,0x67E5,0x6211,0x7684,0x4EE3,0x7406,0x4E3A,0x4EC0,0x4E48,0x6CA1,0x6709,0x6B63,0x5E38,0x5DE5,0x4F5C
         Assert-True ($skill.Contains($exact) -and $skill.Contains('Get-ProxyDoctorFaultClass') -and $skill.Contains('Start-ProxyDoctor.ps1 -Goal Diagnose')) 'skill entry does not point at the classify step'
+        $fullNetwork = Text 0x5168,0x9762,0x68C0,0x67E5,0x6211,0x7684,0x7F51,0x7EDC
+        $stopped = 'StarSky ' + (Text 0x505C,0x6B62,0x8FD0,0x884C,0x4E86)
+        $clashQuiet = 'Clash ' + (Text 0x6CA1,0x6709,0x6D41,0x91CF)
+        $abnormalPlan = Text 0x68C0,0x67E5,0x5F02,0x5E38,0x5E76,0x63D0,0x4F9B,0x6062,0x590D,0x65B9,0x6848
+        $keep = (Text 0x4FDD,0x6301,0x539F,0x914D,0x7F6E) + '，' + (Text 0x4E0D,0x64C5,0x81EA,0x4FEE,0x6539)
+        foreach ($sample in @($fullNetwork, $stopped, $clashQuiet, $abnormalPlan)) {
+            Assert-True ($skill.Contains($sample) -and $guide.Contains($sample)) ('diagnose sentence missing from the guides: ' + $sample)
+        }
+        Assert-True ($skill.Contains($keep) -and $guide.Contains($keep) -and $skill.Contains('no-modify') -and $guide.Contains((Text 0x4E0D,0x4FEE,0x6539,0x610F,0x56FE))) 'guides omitted the explicit no-modify intent'
         Assert-True ($guide.Contains('Get-ProxyDoctorFaultClass') -and $guide.Contains('USER_OFF') -and $guide.Contains('ALIGNED')) 'troubleshooting guide does not point at the classifier'
         Assert-True ($guide.Contains($note) -and $skill.Contains($note)) 'alert sentence missing from the diagnose guidance'
         Assert-True ($guide.Contains((Text 0x4E0D,0x8981,0x5EFA,0x8BAE,0x6062,0x590D))) 'guide omitted the do-not-restore instruction'
+    }
+    Check 'operator-boundary-reference' {
+        $path = Join-Path $root 'references\operator-boundary.md'
+        Assert-True (Test-Path -LiteralPath $path) 'operator boundary reference is missing'
+        $text = Get-Content -LiteralPath $path -Raw -Encoding UTF8
+        Assert-True ($text.Contains('read-only until a specific change is accepted')) 'missing read-only boundary'
+        Assert-True ($text.Contains('no-modify wins over diagnose')) 'missing no-modify boundary'
+        Assert-True ($text.Contains('do not promise unban')) 'missing unban boundary'
+        Assert-True ($text.Contains('StarSky restart is not acceleration')) 'StarSky restart was treated as acceleration'
     }
     Check 'classifier-does-not-call-live-state' {
         $src = Get-Content -LiteralPath (Join-Path $root 'scripts\ProxyFaultClass.ps1') -Raw -Encoding UTF8

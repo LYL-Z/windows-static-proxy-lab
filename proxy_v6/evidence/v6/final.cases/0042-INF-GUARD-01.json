@@ -1,0 +1,17 @@
+{
+    "id":  "INF-GUARD-01",
+    "requirement":  "P4",
+    "precondition":  "V4_TEST_MODE=1",
+    "injectedFault":  "attempt real HKCU/process operations",
+    "expected":  "4/4 blocked; Get-V4Paths does not fall back",
+    "actual":  "registry writes blocked; process start/stop are safe no-ops; paths did not fall back",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  655,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T07:02:23.012-08:00",
+    "finishedAt":  "2026-11-18T07:02:23.668-08:00",
+    "evidenceFile":  "C:\\CAB-Lab\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0042-INF-GUARD-01.json",
+    "testOutput":  ""
+}

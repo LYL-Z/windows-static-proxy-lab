@@ -2,7 +2,7 @@
 
 - 时间：2026-11-18 01:06 → 01:45 (America/Los_Angeles)
 - 机器：Windows 11 家庭中文版 (10.0.26300)，用户 `老黄之友\lenovo`（非管理员）
-- 目标：NexIP 美国华盛顿原生静态 IP `72.245.197.103:9506`（HTTP/SOCKS5 同端口，用户名密码认证）
+- 目标：NexIP 美国华盛顿原生静态 IP `192.0.2.254:9506`（HTTP/SOCKS5 同端口，用户名密码认证）
 - 结论：**已修复并实测可用**；根因是「服务端只接受美国来源 IP 接入」+ Clash Verge 处于「直连」模式。
 
 ---
@@ -15,7 +15,7 @@
 | 第二问题 | Clash Verge 运行在 **直连(direct)** 模式，即使节点正常也不会走代理 |
 | 非问题 | 密码/用户名错误、协议不匹配、本地防火墙、utun119 路由、DNS、端口隔离、StarSky 抢占端口——均已逐项排除 |
 | 修复方式 | Mihomo **`dialer-proxy` 链式代理**：Clash → 本机 StarSky(127.0.0.1:11119) → 静态IP(9506) → 互联网 |
-| 验收 | **20/20 成功（100%）**，全部出口 IP = `72.245.197.103`，连续 11.3 分钟；浏览器实测通过 |
+| 验收 | **20/20 成功（100%）**，全部出口 IP = `192.0.2.254`，连续 11.3 分钟；浏览器实测通过 |
 | 回滚 | `rollback.ps1`（配置已全量备份） |
 
 ---
@@ -43,7 +43,7 @@ hosts         : 无 72.245 / nexip 相关条目（有效条目 0 行）
 
 ### 3.1 配置核对：完全正确
 - 实际生效文件（由 `verge-mihomo.exe` 命令行确认）：`clash-verge.yaml`
-- 商家面板显示：IP `72.245.197.103`，HTTP 端口 `9506`，SOCKS5 端口 `9506`，状态 **正常**，剩余 31 天，
+- 商家面板显示：IP `192.0.2.254`，HTTP 端口 `9506`，SOCKS5 端口 `9506`，状态 **正常**，剩余 31 天，
   代理格式 `socks5://username:password@ip:port`
 - 配置内用户名/密码与面板**逐字节一致**（用精确字符串比对验证，未在日志中输出明文）
 - 结论：**地址、端口、账号密码、协议均无错误**
@@ -78,7 +78,7 @@ hosts         : 无 72.245 / nexip 相关条目（有效条目 0 行）
 | `223.5.5.5:53` (TCP，非 443，空闲) | **保持打开 4 s** |
 | `114.114.114.114:53` (TCP，空闲) | **保持打开 4 s** |
 | `github.com:22` | 正常收到 SSH banner |
-| `72.245.197.103:9506` | **+253 ms 被对端关闭** |
+| `192.0.2.254:9506` | **+253 ms 被对端关闭** |
 | 该 IP 的 80/443/8080/22/21/25… | 全部超时（仅 9506 放通） |
 
 → 本网络可以正常承载任意非 443 端口的 TCP 会话，因此 9506 的关闭不是校园网/运营商/防火墙造成；
@@ -99,10 +99,10 @@ hosts         : 无 72.245 / nexip 相关条目（有效条目 0 行）
 5 auth             OK   accepted
 7 recv CONNECT rep OK   05 00 00 01
 8 tunnel           OK   established
-9 HTTPS via tunnel OK   HTTP/1.1 200 OK | 72.245.197.103   ← 出口 IP 正确
+9 HTTPS via tunnel OK   HTTP/1.1 200 OK | 192.0.2.254   ← 出口 IP 正确
 ```
 
-商家面板同一时刻自测也恢复为：**测试连接成功 171.95ms，出口 IP 72.245.197.103**。
+商家面板同一时刻自测也恢复为：**测试连接成功 171.95ms，出口 IP 192.0.2.254**。
 
 ---
 
@@ -131,8 +131,8 @@ hosts         : 无 72.245 / nexip 相关条目（有效条目 0 行）
    └─► Clash Verge 混合端口 127.0.0.1:7897   (mode: rule, tun: off)
          └─► 节点「美国-华盛顿-SOCKS5」 dialer-proxy = 「STAR-首跳」
                └─► StarSky 本机代理 127.0.0.1:11119   (美国1, 出口 142.111.173.93)
-                     └─► NexIP 静态IP 72.245.197.103:9506 (SOCKS5 用户名密码)
-                           └─► 互联网   (出口 = 72.245.197.103 ✔)
+                     └─► NexIP 静态IP 192.0.2.254:9506 (SOCKS5 用户名密码)
+                           └─► 互联网   (出口 = 192.0.2.254 ✔)
 ```
 
 ### 变更清单
@@ -146,7 +146,7 @@ hosts         : 无 72.245 / nexip 相关条目（有效条目 0 行）
 
 - **未改动**：StarSky 的任何设置、Windows Defender、防火墙、任何网络软件、路由表。
 - **未关闭**任何安全功能。
-- 备份目录：`D:\claude防封\proxy_diag\backup\20261118-011610\`
+- 备份目录：`C:\CAB-Lab\proxy_diag\backup\20261118-011610\`
 
 ### 操作方法（日常）
 1. 先开 **StarSky** → 点「开始加速」（保持"加速中"，TUN 模式开/关均可，只要本地 11119 在监听）
@@ -156,13 +156,13 @@ hosts         : 无 72.245 / nexip 相关条目（有效条目 0 行）
 
 ### 回滚
 ```powershell
-powershell -ExecutionPolicy Bypass -File "D:\claude防封\proxy_diag\rollback.ps1"
+powershell -ExecutionPolicy Bypass -File "C:\CAB-Lab\proxy_diag\rollback.ps1"
 ```
 （还原全部 yaml + 关闭系统代理 + 重启 Clash Verge，回到 01:16 的原始状态）
 
 ### 重新应用
 ```powershell
-powershell -ExecutionPolicy Bypass -File "D:\claude防封\proxy_diag\apply-chain.ps1"
+powershell -ExecutionPolicy Bypass -File "C:\CAB-Lab\proxy_diag\apply-chain.ps1"
 ```
 （幂等；会先检查 StarSky 11119 是否在监听，再写配置、校验、重启、改系统代理并验证出口 IP）
 
@@ -175,10 +175,10 @@ powershell -ExecutionPolicy Bypass -File "D:\claude防封\proxy_diag\apply-chain
 | Clash 配置加载 | 成功 | `mihomo -t` 两份配置均 `test is successful`，exit=0；重启后 API `mode=rule` | ✅ |
 | 代理建立连接 | SOCKS5 或 HTTP 任一 | SOCKS5：认证通过 + CONNECT 成功 + TLS 成功 | ✅ |
 | HTTPS 访问 | 正常 | `https://ipinfo.io/ip` 200；Google 204、Bing 200、API OpenAI 401(已到达) | ✅ |
-| 出口 IP | 72.245.197.103 | **20/20 次全部为 72.245.197.103** | ✅ |
+| 出口 IP | 192.0.2.254 | **20/20 次全部为 192.0.2.254** | ✅ |
 | 10 分钟 / 20 次 | 统计成功率与延迟 | **20/20 = 100%**，连续 **11.3 分钟**（01:24:02 → 01:35:17） | ✅ |
 | 延迟 | 统计 | min 4,259 / p50 5,252 / avg 5,441 / max 7,823 ms（每次含完整 TLS 握手） | ⚠ 偏高，见下 |
-| 浏览器 | 正常使用代理 | Chrome 打开 `ipinfo.io/ip` 显示 `72.245.197.103`（修复前后各验证一次） | ✅ |
+| 浏览器 | 正常使用代理 | Chrome 打开 `ipinfo.io/ip` 显示 `192.0.2.254`（修复前后各验证一次） | ✅ |
 | 原网络可恢复 | 可还原 | `rollback.ps1` 就绪；StarSky 未改动，仍正常（直连出口 142.111.173.93） | ✅ |
 | 最终配置 | 给出 | 本报告 + `apply-chain.ps1` / `profile.WORKING.yaml` / `US-Static-fixed.yaml` | ✅ |
 
@@ -204,7 +204,7 @@ powershell -ExecutionPolicy Bypass -File "D:\claude防封\proxy_diag\apply-chain
 
 ## 八、可选：向 NexIP 提交的技术说明
 
-> 购买线路：`72.245.197.103:9506`（SOCKS5，美国华盛顿，原生静态IP），订单状态"正常"。
+> 购买线路：`192.0.2.254:9506`（SOCKS5，美国华盛顿，原生静态IP），订单状态"正常"。
 >
 > 问题：从中国大陆（中国联通四川；出口 IP `112.194.196.x`）直连该接入地址时，
 > **TCP 三次握手成功（约 250 ms，与华盛顿 RTT 一致），但服务器在约 1 个 RTT 后立即发送 FIN 关闭，
@@ -212,7 +212,7 @@ powershell -ExecutionPolicy Bypass -File "D:\claude防封\proxy_diag\apply-chain
 > 用裸 socket 分阶段测试复现：认证阶段从未到达（一个认证字节都未发出）。
 >
 > 对照：同一台机器、同一份凭据，改由美国来源 IP（`142.111.173.93`）接入时，
-> SOCKS5 认证 `0x01 0x00` 通过、CONNECT 成功、HTTPS 出口 IP 正确显示 `72.245.197.103`；
+> SOCKS5 认证 `0x01 0x00` 通过、CONNECT 成功、HTTPS 出口 IP 正确显示 `192.0.2.254`；
 > 商家后台"测试"按钮此时也显示 `测试连接成功 171.95ms`。
 >
 > 请确认：该线路是否限制来源 IP（仅允许境外/指定 IP 接入）？若为策略，请说明支持的国家/地区；
@@ -221,7 +221,7 @@ powershell -ExecutionPolicy Bypass -File "D:\claude防封\proxy_diag\apply-chain
 
 ---
 
-## 九、文件清单（`D:\claude防封\proxy_diag\`）
+## 九、文件清单（`C:\CAB-Lab\proxy_diag\`）
 
 | 文件 | 用途 |
 |---|---|

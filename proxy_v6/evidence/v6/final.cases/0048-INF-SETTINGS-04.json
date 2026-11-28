@@ -1,0 +1,17 @@
+{
+    "id":  "INF-SETTINGS-04",
+    "requirement":  "R2C-03",
+    "precondition":  "hardened settings, then Everyone read ACE",
+    "injectedFault":  "ACL widened after save",
+    "expected":  "Get-V4Settings refuses with code 12",
+    "actual":  "Get-V4Settings refuses a settings file whose ACL was widened",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  823,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T07:02:27.573-08:00",
+    "finishedAt":  "2026-11-18T07:02:28.396-08:00",
+    "evidenceFile":  "C:\\CAB-Lab\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0048-INF-SETTINGS-04.json",
+    "testOutput":  ""
+}

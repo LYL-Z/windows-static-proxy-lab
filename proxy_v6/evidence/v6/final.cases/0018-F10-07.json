@@ -1,0 +1,17 @@
+{
+    "id":  "F10-07",
+    "requirement":  "F10",
+    "precondition":  "app was not running before",
+    "injectedFault":  "failure with snapshot",
+    "expected":  "stop only; never start",
+    "actual":  "F10-07: stopped only",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 2",
+    "durationMs":  656,
+    "assertions":  2,
+    "startedAt":  "2026-11-18T07:02:04.297-08:00",
+    "finishedAt":  "2026-11-18T07:02:04.954-08:00",
+    "evidenceFile":  "C:\\CAB-Lab\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0018-F10-07.json",
+    "testOutput":  ""
+}

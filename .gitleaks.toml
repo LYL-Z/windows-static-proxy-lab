@@ -1,0 +1,9 @@
+# V6 secret-scan configuration.
+# The only historical hit is the exact synthetic fixture string abcdef123456.
+# Do NOT allowlist the whole fixture path: that would hide any future secret there.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Exact synthetic V6 test literal only (not a credential)"
+regexes = ['''abcdef123456''']

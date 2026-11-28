@@ -1,0 +1,17 @@
+{
+    "id":  "FT20",
+    "requirement":  "F11",
+    "precondition":  "state core with ProxyServer=x",
+    "injectedFault":  "corrupt proxy / wrong exit",
+    "expected":  "DEGRADED, never HEALTHY",
+    "actual":  "x proxy and wrong exit IP are DEGRADED, never HEALTHY",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  799,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T07:03:38.436-08:00",
+    "finishedAt":  "2026-11-18T07:03:39.237-08:00",
+    "evidenceFile":  "C:\\CAB-Lab\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0096-FT20.json",
+    "testOutput":  ""
+}

@@ -1,0 +1,336 @@
+# ROUND3 事务 / 并发独立复审 — code `d5f2134`（证据 `b9bb9a0`，HEAD `01baaf5`）
+
+> 复审角色：round2-transaction（第三轮定向复审；不采信主代理自评）
+>
+> **最新状态**：本报告末尾 §DELTA 覆盖其后代码提交 `0268e17`（证据 `1c7fdad`、自验 `ebbf2e6`、HEAD `990d896`）；正文其余部分锚定 `d5f2134`。
+>
+> **复审对象（精确提交）**
+> - 代码：`d5f2134`（"fix(v6): verify snapshot before allowing rollback restart"）。`b9bb9a0`、`6e3cd09`、`01baaf5` 与 `d5f2134` 在 `proxy_v4/**` 与 `proxy_v6/tests/**` 上 **`git diff` 为空**（已核）。
+> - 证据：`b9bb9a0` 的 `proxy_v6/evidence/v6/final.json` + `final.cases/0001..0092`；`01baaf5` 只改 `evidence/v6/repo-acl.json`。
+> - 复审结束时 HEAD：`01baaf5`（工作树干净）。
+> - 中间目标亦已核对：`c562c18` / `93027c6`（与 `d5f2134` 的唯一代码差异 = `rollback-v4.ps1` 的 2 行 manifest 预校验）。
+> - 上一轮报告 `ROUND2-TRANSACTION-REVIEW.md` 锚定 `abe0eaa`，保持原样不改（见 §6 的更正说明，不在旧文件上静默改结论）。
+
+---
+
+## 1. 结论摘要
+
+| 维度 | 裁定 |
+|---|---|
+| **F11 根因** | **独立确认成立**：`36222c9` 的 `Set-V4SystemProxy` **完全没有** `Assert-V4ProductionOperation`；探针 05:02:37 运行时 `abe0eaa`（05:27:12 提交，才加入断言）尚不存在 → 测试模式只隔离了文件根，未隔离注册表 → 真实写 HKCU。见 §2 |
+| **F11 隔离洞是否关闭** | **针对该写路径：已关闭**（测试模式无 writer 即抛；生产模式需门闩）。**广义"测试代码可改生产"面：部分关闭**（ACL 写入器、`Start-V4ClashCore -Launch`、settings/owner/journal 仍不受门闩约束）→ 新增 R3-01（MED），非 HIGH |
+| **R2A-01** | **关闭**（锁内补救启动 + 锁忙 exit 33 + `INF-ROLLBACK-03` 断言 start.log 为空） |
+| **R2A-02** | **关闭**（`settings.mixedPort` → `Restore-V4Snapshot -Port` 与 `Start-V4Clash -Port`；`INF-ROLLBACK-04` 断言 `|65532`） |
+| **R2A-03** | **关闭**（零条目/未覆盖 `profiles.yaml` 的清单被拒；`INF-SNAP-06/07`） |
+| **R2A-04** | **关闭**（恢复后逐文件 `Protect-V4Acl`；`INF-SNAP-08`；另有新副作用见 R3-05） |
+| **R2A-05** | **关闭**（`ProfileTextBuilder` 在快照/停应用之后重读；`F07-16`；本报告 M-变异可证伪） |
+| **R2A-06** | **仍开放（MED，已被文档承认为 OPEN）**：journal 无提交阶段；清 journal 失败/末写后崩溃仍会把用户推向"回滚一个良好状态" |
+| **R2A-07** | **关闭**（零断言即失败；父用例执行 `Assert-*`；92/92 全部 `assertions≥1`，合计 128；干净树锚定） |
+| **R2A-08** | **关闭（并对上一轮表述作更正）**：各 fixture 本来就显式设 `V4_TEST_MODE`；runner 现再兜底。上一轮"仅靠继承环境"表述过强 → 见 §6 |
+| **R2A-09** | **关闭**（F07-05 改为"代理已设置后的失败"，F07-09 增加 `stopCalls≥1`；两个定点变异验证其可证伪） |
+| **92/92 final.json 可信度** | **可信**：`head=d5f2134, dirty=false, 92/92, skipped=0, zeroAssert=0, sum=128`；我以 `git archive d5f2134` 的独立树复跑 **92/92, exit 0, runId 1c0a92ab…, sum=128**，逐项与提交证据一致 |
+| **新增 HIGH** | **无** |
+| **本轮新发现** | 1×MED（R3-01）+ 5×LOW（R3-02…R3-06） |
+| **验收建议** | **事务/并发维度：SHORT_RUN 可接受**，条件见 §7（披露 R2A-06 + R3-01 等；不得声称真实生产 apply/rollback 已验证） |
+
+---
+
+## 2. F11 根因的独立验证（不采信叙述，回到 git）
+
+### 2.1 关键事实（全部可复现）
+
+| 检查 | 结果 |
+|---|---|
+| `36222c9` 的 `Set-V4SystemProxy` | `git show 36222c9:proxy_v4/lib/V4.ps1` → 函数体直接 `Set-ItemProperty HKCU…ProxyServer`，**无任何 Assert/测试模式分支** |
+| `abe0eaa` | 同一函数**新增** `Assert-V4ProductionOperation 'Set-V4SystemProxy'`（测试模式抛错） |
+| 提交时间线（reflog） | `36222c9` 04:40:46 → **探针 05:02:37** → `abe0eaa` 05:27:12 → `c562c18` 05:53:49 → `d5f2134` 05:58:20 |
+| 探针文件 | `_probe-new.ps1` **从未进入任何提交**（`git log --all -- <path>` 为空，工作树不存在）；`git log -S 'GUARD FAIL'` 只命中 `c562c18`（事故文档） |
+| 结论 | 事故发生在 `36222c9` 基线的脏工作树上；当时 `Set-V4SystemProxy` 处于**无守卫**状态，`V4_TEST_MODE=1` 只能隔离 `$script:Root`，注册表写入不受控 → 与事故文档描述**完全一致**。事故**不可归因于 `abe0eaa` 的已提交代码**（该提交已带断言），而是一次**未提交中间态 + ad-hoc 探针**导致 |
+
+### 2.2 新隔离机制的安全动态验证（我在 `%TEMP%` 用函数级 stub 完成，未触真实注册表/进程）
+
+方法：子进程 dot-source `V4.ps1`（**生产模式**，不设 `V4_TEST_MODE`），在 dot-source 之前用同名函数覆盖 `Set-ItemProperty`/`Start-Process`/`Stop-Process`/`Get-Process`，dot-source 之后再覆盖 `Update-V4WinInet`——**即使守卫失效也不可能触达真实注册表**；同时只读比对真实 HKCU 前后值。
+
+| 用例 | 结果 |
+|---|---|
+| L1 生产模式、未 `Enable` → `Set-V4SystemProxy` | 抛 `V4 production write blocked (call Enable-V4ProductionWrites …): system proxy registry write`；registry stub 0 次；真实 HKCU 不变 |
+| L2 未 `Enable` → `Clear-V4SystemProxy` | 抛错，0 次写 |
+| L3 未 `Enable` → `Start-V4Clash`/`Stop-V4Clash` | 均抛错，未触达 process stub |
+| L4 `Enable-V4ProductionWrites` 后 → `Set-V4SystemProxy 'x'` | 恰好 2 次 stub：`ProxyServer=x`、`ProxyEnable=1`；真实 HKCU 不变 → **门闩是唯一闸门** |
+| L5 `Clear` | `ProxyServer=<当前值>` + `ProxyEnable=0`（保留 ProxyServer） |
+| L6 `V4_TEST_MODE=1` 且无 writer | 抛 `no test registry writer is installed`；`Enable` 返回 false 且不解除 |
+| L7 `V4_TEST_MODE=1` + 安装 mock writer | 仅 mock 被调用；registry stub 0 次；真实 HKCU 不变 |
+
+**结论**：F11 的"测试进程裸写 HKCU"路径关闭；L4 同时证明"一旦显式 `Enable`，写入即发生" → 门闩是**行为门闩**，不是能力沙箱（见 R3-01）。
+
+### 2.3 F11 回归用例评估（FT16–FT21）
+
+- `Run-FT-Case.ps1:18-20` 先设 `V4_TEST_MODE=1` 再 dot-source；每个"写"都走 mock；每次前后只读比对 HKCU（`ProxyEnable/ProxyServer/AutoConfigURL/ProxyOverride`）与 `netsh winhttp show proxy`（`Get-WinHttpSnapshot`）。
+- **可证伪性**：若 test-mode 分支退回真实注册表，`Snapshot-Equal` 会在 FT16/17/18/19/21 变红（该断言比较真实 HKCU 的前后值）；FT20 用 `Get-V4StateCore` 证明 `ProxyServer=x` / 错误出口 IP **只能是 DEGRADED，不能是 HEALTHY**——即事故状态在 `state-v4.ps1` 上可见（该逻辑在 `abe0eaa` 已存在，FT20 是回归护栏）。
+- **局限**：这些用例只读真实 HKCU，不写；它们验证的是"守卫存在且有效"，不是"生产路径真的会写"（后者按定义不可在隔离测试里执行）。
+
+---
+
+## 3. R2A-01 … R2A-15 逐条状态（目标 `d5f2134`）
+
+| ID | 上轮严重度 | 现状 | 依据（行号为 `d5f2134`） |
+|---|---|---|---|
+| R2A-01 rollback 无锁补救启动 / 锁忙 40 | HIGH | **关闭** | `rollback-v4.ps1:43-48`（锁忙 `$exit=33` + `return`，不进入补救）；`:84` 仅 `$restoreAttempted` 为真才启动；`INF-ROLLBACK-03` 断言 `exit 33`、winner 锁仍在、`start.log` 为空。残余（c562c18 期）"清单非法也补救启动"已由 `d5f2134:57` 预校验修复；但**无回归用例断言该点** → R3-03 |
+| R2A-02 硬编码 7897 | MED | **关闭** | `rollback-v4.ps1:20-22`（读 `settings.mixedPort`）→ `:59` `Restore-V4Snapshot -Port`、`:71/:86` `Start-V4Clash -Port`；`INF-ROLLBACK-04` 断言 start.log 含 `|65532` |
+| R2A-03 空/残缺清单当成功 | MED | **关闭** | `V4.ps1:884-885`（无条目拒绝、必须覆盖 `profiles.yaml`）；`INF-SNAP-06/07` |
+| R2A-04 恢复不重新加固 ACL | MED | **关闭** | `V4.ps1:909`（逐文件 `Protect-V4Acl`，失败即该条失败）；`INF-SNAP-08` 验证重建文件已加固 |
+| R2A-05 读-停-写顺序 | MED | **关闭** | `V4.ps1:234`（快照后调用 `ProfileTextBuilder`）；`apply-v4.ps1:132-143,167`；`F07-16` + 本报告 M2 变异（关恢复时长红） |
+| R2A-06 无提交阶段 | MED | **仍开放** | journal 结构未变（无 phase）；`V4.ps1:262-263` / `:292-293` 清除失败仍只 WARN；`CHANGELOG`/`TASK-STATE` 已如实标 OPEN |
+| R2A-07 零断言/证据锚定 | MED | **关闭** | `Harness.ps1:441-443`（零断言=fail）；`ReproHelpers`/`Invoke-InfraCase`/`Invoke-FTCase` 改用 `Assert-*`；提交证据 92/92、`assertions` 合计 128、`head=d5f2134, dirty=false`；我的独立复跑同为 128 |
+| R2A-08 隔离依赖继承环境 | MED | **关闭（并更正）** | 各 fixture 本就显式设 `V4_TEST_MODE/ROOT`（`Repro-F09.ps1:7-8`、`Run-InfraCase.ps1:17-18`、`Run-FT-Case.ps1:18-19`），runner 再兜底（`Run-Tests.ps1:29-30`）。上轮"仅靠继承"表述过强 → §6 |
+| R2A-09 F07-05/09 不可证伪 | MED | **关闭** | `Repro-F07.ps1:176-182`（failAcl 使故障发生在 SetSystemProxy 之后）、`:212-221`（`stopCalls≥1`）；变异 M1/M2 见 §5 |
+| R2A-10 锁是路径文件（TOCTOU/ABA） | LOW | **仍开放** | `Enter/Exit-V4Lock` 未改（`V4.ps1:604-687`）：获取=建+写+关，释放=读+比对+按路径删 |
+| R2A-11 processStart=null + PID 复用 | LOW | **仍开放** | `V4.ps1:619-624` 仍 `if ($j.processStart -and …)` 跳过校验 |
+| R2A-12 缺 systemProxy 时清代理 | LOW | **关闭** | `rollback-v4.ps1:62` `if (-not $KeepSystemProxy -and $m.systemProxy)`；`:75` 同样判空 |
+| R2A-13 原子写硬杀残留 | LOW | **仍开放** | `Set-V4Atomic`（`V4.ps1:940-972`）未加启动清扫；`.bak` 仍是明文凭据副本 |
+| R2A-14 DryRun 对真实 appdata 跑 mihomo | LOW | **仍开放** | `apply-v4.ps1:112-113` 仍 `-WorkDir $p.AppData` |
+| R2A-15 恢复委托缺失视为成功 | LOW | **仍开放** | `Invoke-V4Recovery`（`V4.ps1:114-173`）未改 |
+
+**统计**：关闭 10（R2A-01/02/03/04/05/07/08/09/12 + F11 根因链）；仍开放 6（R2A-06 MED + R2A-10/11/13/14/15 LOW）。
+
+---
+
+## 4. 本轮新发现
+
+### R3-01 MED — 生产写门闩只覆盖"注册表/进程入口"，其余真实副作用能力未受约束
+
+- **位置**：`V4.ps1:38-56`（门闩 + `Assert-V4ProductionOperation`）；受约束的只有 `Stop/Start-V4Clash`、`Write-V4SystemProxyRegistry`（`V4.ps1:705,752,997`）。**未受约束**：
+  - `Protect-V4Acl`（`V4.ps1:570-596`，直接 `SetAccessControl`）——生产模式任意路径可被改 DACL（即 A-21 那类能力仍在）；
+  - `Start-V4ClashCore -Launch { … }`（`V4.ps1:728-758`，公共函数，无 Assert）——可绕过 `Start-V4Clash` 的门闩直接 `Start-Process`；
+  - `Save-V4Settings`/`Set-V4Owner`/`Write-V4Journal`（写仓库内 config/owner/journal）、`New-V4Snapshot`（复制真实 appdata 到仓库 backup/）。
+- **触发**：生产模式下（`V4_TEST_MODE` 未设）任何被 dot-source 的脚本直接调用上述函数；或探针照抄 `apply/rollback` 头两行 `Enable-V4ProductionWrites` 后再调 `Set-V4SystemProxy`（L4 已证：一次 `Enable` 即恢复写入能力）。
+- **期望**：把 ACL 写入、`Start-V4ClashCore` 的 `Launch`、settings/owner/journal 写入也纳入同一门闩（或改为"按操作类型的能力 token"）；`Enable` 不应是一个可随意调用的全局开关，而应由 `apply/rollback` 主流程在明确阶段开启并在退出时关闭。
+- **实测**：L4（armed → 2 次 stub 写）；静态清单见上。
+- **最小隔离测试**：现有 L1–L7 探针（`%TEMP%`，stub 化）；再加一条"生产模式下 `Protect-V4Acl <temp 文件>` 应被拒绝"的用例——当前会成功。
+- **为何不是 HIGH**：不存在"纯 dot-source + 单次普通调用"即可触达 HKCU/进程/网络中断的路径（F11 那条已封）；剩余能力都要显式传入路径/脚本块或先 `Enable`。
+
+### R3-02 LOW — ACL 门禁改变了错误码语义，`INF-STATE-SCRIPT-01` 已不再测试"损坏 JSON"
+
+- **位置**：`V4.ps1:375-376`（`Get-V4Settings` 先查 ACL，再解析 JSON）。
+- **触发**：未加固的 `config` 目录 + 损坏的 `settings.json`（正是 `INF-STATE-SCRIPT-01` 夹具的构造）。
+- **期望/实测**：加固后损坏 JSON → 11（A1 实测）；未加固 + 损坏 JSON → **12**（A2 实测）。因此 `state-v4.ps1` 的 FAILED 原因是"ACL 未加固"而非"JSON 损坏"，该用例只因 `reasons -match 'settings'` 而通过——**用例名与断言意图不符**（覆盖由 `INF-SETTINGS-02` 在加固文件上补足）。
+- **最小隔离测试**：`%TEMP%` 下构造上述两个目录，断言 11 vs 12（我已执行，3/3）。
+- **建议**：夹具先 `Save-V4Settings` 加固再写损坏 JSON（与 INF-SETTINGS-02 一致），或把断言改为匹配 `settings`+`ACL|JSON` 二选一。
+
+### R3-03 LOW — `d5f2134` 的"清单非法不补救启动"修复没有回归用例
+
+- **位置**：`rollback-v4.ps1:57-58`（先 `Test-V4SnapshotManifest`，通过后才置 `$restoreAttempted=$true`）。
+- **触发**：篡改快照后 rollback。
+- **现状**：`INF-ROLLBACK-02` 只断言 exit 40 / live 文件不变 / 锁已释放，**未断言 `start.log` 为空**（`INF-ROLLBACK-03` 才断言该点，但那是锁忙路径）。因此若未来把 `:57` 删掉，92/92 仍会全绿。
+- **最小隔离测试**：`INF-ROLLBACK-02` 增加 `V4_TEST_START_LOG` 与"日志必须为空"的断言（照抄 `INF-ROLLBACK-03` 的写法）。
+
+### R3-04 LOW — rollback 的 41 仍会被 40 覆盖（D-24 残余）
+
+- **位置**：`rollback-v4.ps1:68/77` 置 41，`:84-91` 的 catch 无条件 `$exit=40`。
+- **触发**：系统代理校验失败后，`Start-V4Clash`/`Set-V4Owner` 再抛异常。
+- **期望**：保留 41（或 41 优先于 40），便于区分"代理未还原"与"文件恢复失败"。
+
+### R3-05 LOW — 恢复对**快照内全部文件**加固 ACL，一个 DACL 失败即把内容正确的恢复判为失败
+
+- **位置**：`V4.ps1:909`（`Restore-V4Files` 对每个条目 `Protect-V4Acl`，失败即计入 failures → `Restore-V4Snapshot` 抛错 → rollback exit 40、journal 保留）。
+- **触发**：恢复 `profiles\*.yaml`（用户订阅文件，含无关文件）时某文件 DACL 无法设置（只读卷/属主异常/被占用），或用户不希望订阅文件 ACL 被改写。
+- **期望**：只对凭据承载目标（`clash-verge.yaml`、`v4-managed.yaml`）强制加固；其余文件加固失败降级为 WARN，不把内容恢复判失败。
+- **注**：这是 R2A-04 修复带来的新副作用；风险低（fail-closed），但会放大"回滚失败 → 再回滚"的循环概率。
+
+### R3-06 LOW — 测试文档未登记两条新契约
+
+- `Harness.ps1:441-443` 现在把"零断言"判 FAIL，但 `proxy_v6/tests/README.md` 的退出码契约与用例约定未更新；
+- `Run-Tests.ps1:29-30` 会在 `%TEMP%\v6-runner-<pid>` 建根且**不清理**（临时残留）；
+- FT16–21 会**只读**真实 HKCU 与 `netsh winhttp show proxy`，属"生产只读"，应在测试契约中显式声明（否则用户中途改代理会让用例变红）；
+- **FT 的"无写入"断言是事后检测式**：若 test-mode 分支将来回归，用例会在**已经真实写入 HKCU 之后**才变红——即 CI 自身可能复现 F11 的故障。缓解只能靠隔离账户/一次性虚拟机或注册表路径注入（当前无）。这应作为测试台残余风险写入发布说明。
+
+---
+
+## 5. 92/92 与证据可信度（独立复现）
+
+| 项 | 提交证据（`b9bb9a0` 的 final.json） | 我的独立复跑（`git archive d5f2134` → `%TEMP%\r3tree-d5-*`） |
+|---|---|---|
+| 命令 | `Run-Tests.ps1 -OutFile proxy_v6\evidence\v6\final.json` | `Run-Tests.ps1 -OutFile %TEMP%\r3-final-20261118-060129.json` |
+| runId | `b0e6fadece3e437a936f88f9508acdbb` | `1c0a92ab9aee48bc90aee5973dff77ce` |
+| 时间 | 05:58:25 → 06:00:22（`d5f2134` 提交于 05:58:20，**之后**；`b9bb9a0` 提交于 06:00:32） | 06:01:29 → 06:03:29 |
+| git | `head=d5f2134`、`dirty=false` | `git.available=false`（git-archive 导出树，无 .git；代码与 d5f2134 逐字节一致） |
+| 计数 | 92/92，skipped=0，harnessErrors=0，evidenceErrors=0 | **92/92**，skipped=0，harnessErrors=0，evidenceErrors=0，exit 0 |
+| assertions | 0 个零断言用例；min=1，sum=**128** | 0 个零断言用例；min=1，sum=**128** |
+| 逐例证据 | `final.cases/0001..0092`（每例 `assertions≥1`） | 同结构，样例断言值一致（如 F07-01=2、INF-ROLLBACK-01=1、FT16=1） |
+
+**结论**：`final.json` 满足"干净树 + 代码提交锚定 + 断言>0 + 零跳过"，且与我的独立运行**逐项一致**（含 assertions 总和 128）。可信。
+**仍需声明的方法学边界**：① F07 仍是"引擎 + 全 mock ops"（`Repro-F07.ps1:97-131`），**`apply-v4.ps1` 的真实 ops/ctx 接线（含新的 `ProfileTextBuilder`）至今没有任何端到端用例执行**（DryRun/JOURNAL/PARAM/APPLY-INIT 都在 `apply:119` 之前返回或退出）；② rollback 现在有真实脚本端到端用例（`INF-ROLLBACK-01..04`），是实质进步；③ FT 用例只读生产状态。
+
+**可证伪性（本轮变异，全部在 `%TEMP%\r3tree-d5-*` 副本上）**：
+- M1 关闭代理还原（`if ($beforeProxy) {`→`if ($false) {`）→ `F07-05` **变红**（上轮为常绿空洞）、`F07-10` 变红；14/16。
+- M2 关闭恢复门槛（`if ($snap -or $applied -or ($null -ne $wasRunning)) {`→`if ($false) {`）→ `F07-09` **变红**（"recovery was skipped entirely"）等 11 项，5/16。
+→ R2A-09 的两个空洞确实被修复。
+
+---
+
+## 6. 对上一轮报告的更正（不修改旧文件）
+
+- **R2A-08 表述过强**：上一轮写"真实脚本用例仅凭继承环境变量实现隔离"。复核后：`Repro-F09.ps1`、`Run-InfraCase.ps1`、`Run-FT-Case.ps1` 都在自己进程内**显式**设 `V4_TEST_MODE/V4_TEST_ROOT` 后再 spawn 子进程，隔离并非"偶然继承"；真正的残余只是"测试辅助不注入环境、子进程无 `Root` 自证"，以及"直接手跑 `apply-v4.ps1` 会按生产根写入"（那是生产入口的设计行为）。该条现按"关闭"计，并保留"defense-in-depth"建议（runner 已兜底）。
+- **R2A-01 的"无锁启动"确实存在**（上轮 HIGH 成立）；本轮已在目标提交关闭，且 `INF-ROLLBACK-03` 的证据链（start.log 为空）能证伪回归。
+- 上一轮报告保持 `abe0eaa` 锚定不改；本文件是唯一的新结论载体。
+
+---
+
+## 7. 验收建议（事务/并发维度）
+
+**结论：SHORT_RUN 可接受（仅限本维度），附披露条件。**
+
+可接受依据：
+1. F11 根因独立确认（§2.1），写路径已在代码与用例两侧闭合（§2.2/2.3）；
+2. R2A-01…05/07/09/12 关闭，且每条都有可证伪用例或我的独立探针/变异支撑；
+3. 92/92 证据干净、锚定代码提交、断言>0，并被独立复现（§5）；
+4. 未发现新的 HIGH。
+
+必须同时披露/接受的残余（不阻塞 SHORT_RUN，但不得声称"全部关闭"）：
+- **R2A-06（MED）**：journal 无提交阶段——清除失败或"末写后崩溃"会让下一次 apply 以 34 要求回滚一个已成功的状态。当前设计是 fail-closed，需用户知情。
+- **R3-01（MED）**：门闩只覆盖注册表/进程入口；ACL 写入、`Start-V4ClashCore -Launch`、settings/owner/journal 仍不受约束，且一次 `Enable` 即恢复写能力。
+- **LOW**：R2A-10（锁路径 TOCTOU）、R2A-11（null processStart）、R2A-13（原子写残留）、R2A-14（DryRun 真实 workdir）、R2A-15（委托缺失视为成功）、R3-02/03/04/05/06。
+- **不可声称**：真实生产 `apply/rollback/state`、真实 HKCU 写入、Clash 启停、网络往返——本轮与上轮都未执行（用户环境中系统代理当前为"关闭"，任何恢复动作需用户确认）。
+- Gate 侧建议：Gate 1 可对"事务/并发"记为 PASS（无 HIGH），但 Gate 10（连续两轮独立复审无新增 HIGH）需注意本轮新 MED（R3-01）不影响 HIGH 计数；Release 文本应把 R2A-06/R3-01 列入"已披露残余"。
+
+---
+
+## 附录 A：本轮执行的命令与产物（全部 `%TEMP%`）
+
+| 项 | 路径 / ID |
+|---|---|
+| 最终套件（锚定代码提交） | `git archive --format=tar d5f2134` → `%TEMP%\r3tree-d5-060124`；`Run-Tests.ps1 -OutFile %TEMP%\r3-final-20261118-060129.json`；`runId=1c0a92ab9aee48bc90aee5973dff77ce`；92/92 exit 0；sum assertions=128；duration 118750ms |
+| F11 门闩探针 | `%TEMP%\r3latch.ps1`（stub `Set-ItemProperty`/`Start-Process`/`Stop-Process`/`Get-Process` + dot-source 后覆盖 `Update-V4WinInet`）；L1–L7 7/7 |
+| ACL 门禁顺序探针 | `%TEMP%\r3aclgate.ps1`；A1=11 / A2=12 / A3=加固已生效；3/3 |
+| F07 变异 | `%TEMP%\r3mut-*`：M1 14/16、M2 5/16（F07-05/F07-09 均变红） |
+| 只读 HKCU 比对 | 探针内 `Get-ItemProperty HKCU:\…\Internet Settings`（无任何写）；FT 系列由仓库用例负责 |
+| 未执行 | 真实 `apply/rollback/state`、HKCU 写入、Clash 启停、网络、`faultinject-v4.ps1` |
+
+## 附录 B：目标提交关键行号（`d5f2134`）
+
+- `proxy_v4/lib/V4.ps1`：`38-56` 门闩/`Assert`；`234` `ProfileTextBuilder` 调用；`374-377` `Get-V4Settings` ACL 门禁；`705/752` Stop/Start 测试模式 no-op；`884-885` 清单完整性；`909` 恢复后加固；`988-1026` 系统代理 mock/门闩。
+- `proxy_v4/apply-v4.ps1`：`24` `Enable`；`132-143` builder；`167` `ProfileTextBuilder` 接线。
+- `proxy_v4/rollback-v4.ps1`：`13` `Enable`；`20-22` mixedPort；`43-48` 锁忙 33；`54-59` `restoreAttempted` 与 manifest 预校验；`62-77` 代理/启动/校验；`84-91` 锁内补救；`96-98` 外层 catch。
+- `proxy_v6/tests`：`Harness.ps1:441-443`；`Run-Tests.ps1:29-30`；`repro/Repro-F07.ps1:93,176-182,212-221,238-247`；`cases/70-ft.tests.ps1:26-31`；`cases/fixtures/Run-FT-Case.ps1:18-20,25-48,79-154`；`cases/fixtures/Run-InfraCase.ps1:511,538-574,577-598,599-621,677-712`。
+
+---
+
+# DELTA（第三轮后）— 定向复审 code `0268e17`（证据 `1c7fdad`，自验 `ebbf2e6`，HEAD `990d896`）
+
+> 复审对象（精确提交）
+> - **代码：`0268e17`**（2026-11-18 06:14:59，"fix(v6): remove CLI password, add F12 UI/state mismatch reporting"）。
+> - **证据：`1c7fdad`** 的 `proxy_v6/evidence/v6/final.json` + `final.cases/0001..0094`；**自验：`ebbf2e6`**（`evidence/selftest/canonical/selftest.json`）；**文档：`990d896`**（HEAD，仅 README/CHANGELOG/RELEASE-GATE/TASK-STATE + 证据重绑）。
+> - 复审开始时 HEAD=`990d896`，工作树干净。`990d896` 相对 `0268e17` 在 `proxy_v4/**`、`proxy_v6/tests/**` 上无差异（仅文档与证据文件）。复审结束时 HEAD=`076c975`（`990d896..076c975` 仅改 `RELEASE-GATE-V6.md`/`TASK-STATE.md`，**代码与测试无变化**）——本 DELTA 对 `0268e17` 的结论同样适用于 `076c975`。
+> - 与上一轮目标 `d5f2134` 的 delta 范围：8 个文件、+105/−18（`apply-v4.ps1`、`lib/V4.ps1`、`state-v4.ps1`、`SECURITY-AUDIT-V4.md`、`USER-GUIDE-V4.md`、3 个测试文件）。未重跑全量静态复审，只审 delta 及其影响面。
+
+## D1. 证据可信度
+
+| 项 | 提交证据 | 我的独立复跑（`git archive 0268e17` → `%TEMP%\r4tree-*`） |
+|---|---|---|
+| 命令 | `Run-Tests.ps1 -OutFile proxy_v6\evidence\v6\final.json` | 同入口，`-OutFile %TEMP%\r4-final-20261118-062006.json` |
+| 计数 | 94/94，skipped=0，exit 0 | **94/94，skipped=0，exit 0** |
+| 断言 | zeroAssert=0，sum=**130** | zeroAssert=0，min=1，sum=**130** |
+| 锚定 | `head=0268e17`、`dirty=false`；06:15:05→06:17:01（提交后 6s 开始） | git-archive 树（无 .git），代码与 0268e17 一致 |
+| 自验 | `selftest.json`：7/7、`head=0268e17`、`dirty=false`（06:18:15→06:18:25） | 未重跑（上一轮 7/7 已独立复现；本次未改 Harness） |
+
+结论：与提交证据**逐项一致**，94/94 与 `assertions` 总和 130 均可独立复现 → 可信。新增用例为 `INF-F12-01`、`INF-APPLY-INIT-02`。
+
+## D2. C-02（移除 `-StaticPass`）— 实质关闭，但关闭证据是假阳性
+
+**实质结论：C-02 可按 CLOSED 记。** 工具已不再接受口令**值**：`apply-v4.ps1:19` 改为 `[string]$StaticPassFile`，口令从文件读取（`:51-55`），仅用于 DPAPI 存储；我的探针确认 `settings.json` 内无明文（`contains_canary_plain=False`）。命令行不再携带口令值，这是 C-02 的实质要求。
+
+**但发现两处不准确（R3D-01，MED：证据/文档，不是可利用漏洞）：**
+
+1. **`-StaticPass` 仍可被 PowerShell 前缀绑定为 `-StaticPassFile`**（参数名唯一前缀）。实测（`%TEMP%`，`V4_TEST_MODE=1`，不触 HKCU）：
+   - CASE A：CWD 无 `fixture-pass` 文件 → exit **11**，输出 `credential file not found` → 说明参数被接受并当作**文件名**，不是"参数被拒"；
+   - CASE B：CWD 放入名为 `fixture-pass` 的文件 → exit **10**，`settings written`，口令从该文件读取 → 绑定与使用均确认。
+2. 因此 `INF-APPLY-INIT-02`（"legacy `-StaticPass` parameter is rejected"）是**假阳性**：它通过是因为"文件不存在 → Fail 11"，而非"参数被拒"。若 CWD 恰好存在同名文件，该用例会走向写 settings（用例会因此变红，但性质已变）。同理 `SECURITY-AUDIT-V4.md:7` 的"不再接受 `-StaticPass`"与 `ISSUE-LEDGER` 的"VERIFIED-CLOSED：移除参数"表述不准确。
+
+**建议（最小修复）**：加一个墓碑参数 `[string]$StaticPass`，绑定后立即 `Fail 11 'the -StaticPass parameter was removed; use -StaticPassFile <protected file>'`（不记录、不注册该值），并让 `INF-APPLY-INIT-02` 断言该文案；把 SECURITY-AUDIT/ISSUE-LEDGER 改成"参数值不再被接受；旧拼写会被显式拒绝"。
+
+**附带（R3D-02，LOW）**：`-StaticPassFile` 的内容**没有 ACL/owner 校验**（新加的 C-04 owner 检查只覆盖 config/settings/恢复目标），也没有"读后删除"提示；文档要求"受保护文件"但工具不验证。建议对 pass file 调 `Test-V4AclHardened`（失败即 Fail 12）或至少在 USER-GUIDE 写明"用后删除"。`TrimEnd` 只去 CR/LF，文件尾随空格会静默进入口令（只会导致认证失败，不会泄漏）。
+
+## D3. F12（UI/HKCU 不一致报告）— 分类与报告正确
+
+- 实现：`Get-V4UiSystemProxy`（生产读 `%APPDATA%\io.github.clash-verge-rev.clash-verge-rev\verge.yaml` 的 `enable_system_proxy`；测试模式读 `V4_TEST_UI_SYSTEM_PROXY`）；`Get-V4StateCore -UiSystemProxy` 新增 `uiSystemProxy` 字段，并在状态机之后只在不一致时把状态降为 `DEGRADED`（`FAILED` 不被覆盖）并附加明确 reason；`state-v4.ps1` 输出该字段。
+- 我的独立探针（生产模式 + 重定向 `$env:APPDATA` 到 `%TEMP%`，6/6）：`true`/`false` 解析、缺键/缺文件 → `unknown`（不误报）、UI on/HKCU on → `HEALTHY`、UI off/HKCU on → `DEGRADED` + `UI reports system proxy disabled, actual HKCU is enabled`。
+- **分类正确**：当前生产态（HKCU=0、UI=on、直连 54.202.22.253、Clash 出口 192.0.2.254）应报 `DEGRADED`（exit 2）+ "UI reports enabled, actual HKCU disabled"。不是 `FAILED`（链路本身可能可用），也不是 `HEALTHY`（UI 与真实状态不一致）——这是准确的"部分降级"语义。
+- **范围说明（重要）**：F12 只比较**布尔开关**，不比较 `ProxyServer`。事故态（HKCU enabled + `ProxyServer=x` + UI enabled）**不会**触发 F12 的 mismatch reason，但会被既有 `systemProxy != 127.0.0.1:<mixedPort>` 判为 `DEGRADED`（reason: `system proxy owned by x`）——即事故态仍可见，只是原因来自旧检查。F12 新增覆盖的是"UI on/HKCU off"（当前生产态）与"UI off/HKCU on"。
+- **残余（R3D-03，LOW）**：① 生产解析器（`verge.yaml`）没有用例——`INF-F12-01` 直接注入布尔值，绕过解析器；② 带引号的值（`enable_system_proxy: "true"`）解析为 `unknown`（实测），键名变更亦然 → **静默不报**（fail-open 于报告层，不影响安全）；③ 只认行首 `^enable_system_proxy:`，不支持 flow/嵌套 YAML。建议加一条"写临时 APPDATA + verge.yaml → 解析器"的用例。
+
+## D4. 其余 delta
+
+- **C-04 owner SID 检查**（`Test-V4AclHardened` 新增 owner ∈ {me, SYSTEM, Administrators}）：逻辑正确，fail-closed；但**没有专门用例**（94 个用例中新增的只有 F12 与 APPLY-INIT-02）；owner 校验位于 `V4.ps1:556-559`；owner SID 无法解析（孤立的已删除账户）时返回 false，且 `Protect-V4Acl` 会**先重写 DACL 再因 owner 不合规失败**（destructive attempt 后 fail-closed）。影响面低（回滚会 exit 40 并保留 journal），记为 **R3D-04 LOW**。
+- **C-08 脱敏**：新增 `x-api-key|api[_-]?key|apikey`，并把 URL-userinfo 规则提前；`INF-REDACT-03` 增加 `user`/`X-Api-Key` 断言。复核正则顺序：URL 规则先行后 key/value 规则仍覆盖 `Cookie:`；末尾重复的 URL 规则无害。**无新问题**。
+- **"系统代理写补偿"（安全侧 R3-02）**：`Write-V4SystemProxyRegistry`（`V4.ps1:1003-1026`）在两次 `Set-ItemProperty` 外层加 try/catch，异常时回写旧 `ProxyServer/ProxyEnable` 并重抛。**只覆盖进程内异常**：两次写之间被硬杀仍留下半写状态（`-Init`/`-Repair` 无 journal；事务路径有 journal+快照兜底）。事故型"完整写 x"不受该补偿影响（该路径已由门闩 + 事务恢复守护）。记为 **R3D-05 LOW**。
+- **门闩覆盖面（R3-01）**：delta 未触及 `Protect-V4Acl`/`Start-V4ClashCore -Launch`/settings/owner/journal 的未门禁面 → **R3-01（MED）仍开放**，与上一轮一致。
+- **R2A-06 等**：delta 未触及 journal 结构 → **R2A-06（MED）仍开放**；R2A-10/11/13/14/15 仍开放。
+
+## D5. 新 HIGH 与结论
+
+- **新 HIGH：无。** delta 只做参数替换、状态报告、ACL owner、脱敏与写补偿，未引入新的生产写路径或权限提升。
+- delta 后本维度裁定不变：**SHORT_RUN 可接受（事务/并发维度）**，前提是发布文本同时披露：R2A-06（MED）、R3-01（MED）、R3D-01（C-02 的"参数被拒"证据不成立/文档不准确）、R3D-02/03/04/05（LOW），以及"真实生产 apply/rollback 未验证"。
+- 若要把 C-02 的关闭做成"可审计"的，最低条件：墓碑参数 + `INF-APPLY-INIT-02` 断言显式拒绝文案 + 文档改写 + （可选）pass file ACL 校验。
+
+**本轮新增计数：0×HIGH，1×MED（R3D-01），4×LOW（R3D-02…05）。**
+
+---
+
+# DELTA2 — 定向验证 code `79198fd`（证据 `32d8abc`，自验同靶，HEAD `dbbd259`）
+
+> **复审对象（精确提交）**：**代码 `79198fd`**（2026-11-18 06:31:29）；**证据 `32d8abc`** 的 `proxy_v6/evidence/v6/final.json` + `final.cases/0001..0097`；canonical selftest `head=79198fd, dirty=false, 7/7`；文档 `103f707`；HEAD `dbbd259`（仅新增 `.gitleaks.toml` 允许名单 + 文档；`79198fd..HEAD` 在 `proxy_v4/**`、`proxy_v6/tests/**` 上 `git diff` 为空）。工作树干净。
+> 与上一靶标 `0268e17` 的 delta：7 文件、+81/−28（apply/V4 + 2 文档 + 3 测试）。
+
+## E1. 证据独立复现
+
+| 项 | 提交证据 | 我的独立复跑（`git archive 79198fd`） |
+|---|---|---|
+| 计数 | 97/97，skipped=0，exit 0 | **97/97，skipped=0，exit 0** |
+| 断言 | zeroAssert=0，min=1，sum=**133** | zeroAssert=0，min=1，sum=**133** |
+| 锚定 | `head=79198fd`、`dirty=false`；06:31:35 开始（提交后 +6s） | git-archive 树（无 .git），代码与 `79198fd` 一致 |
+| 定向用例 | `INF-APPLY-INIT-01/02/03`、`INF-F12-01/02/03` 全 pass（各 1 断言） | 同六项全 pass |
+
+结论：97/97 与断言总和 133 可独立复现 → 可信。
+
+## E2. C-02：前缀假阳性**确实消失**，关闭可审计
+
+**代码机制**：`apply-v4.ps1:19-20` 把 `-StaticPass` 与 `-StaticPassFile` 声明为**墓碑参数**；`:38-40` 在**取锁与任何写之前**用 `$PSBoundParameters.ContainsKey(...)` 判定并 `Fail 11 '-X was removed; use -CredentialFile <protected file>'`。旧拼写现在是**精确匹配**（不再落为 `-StaticPassFile` 的前缀），而 `-StaticPas` 之类前缀在绑定阶段即被判为歧义。
+
+**实测**（`%TEMP%`，`V4_TEST_MODE=1`，不触 HKCU/网络；7/7）：
+- **T1（复刻上一轮假阳性场景）**：在 CWD 放入一个**与旧口令同名**的文件，再执行 `-Init … -StaticPass <同名值>` → exit **11**、输出含 `was removed` 与 `-CredentialFile` 提示、**settings 未写**、输出不含该文件内容（同名文件被忽略）。
+- T2 `-StaticPassFile <路径>` → exit 11 移除提示，无 settings。
+- T3 `-StaticPas x`（歧义前缀）→ exit 1（PowerShell 绑定拒绝），无 settings。
+- T4 `-CredentialFile` 指向**未加固**文件 → exit 11 `credential file ACL is not hardened`，无 settings。
+- T5 `-CredentialFile` 指向**已加固**文件 → exit 10（无 appdata），settings 已写 → 预期路径可用。
+- T6 墓碑 + 有效 `-CredentialFile` 同时给 → exit 11（墓碑优先），无 settings。
+- T7 `-CredentialFile` 指向目录 → exit 11（ACL 门禁拒绝）。
+
+**用例对口**：`INF-APPLY-INIT-02` 现在断言 exit 11 + `was removed` + 无 settings；`INF-APPLY-INIT-03` 覆盖 `-StaticPassFile`。上一轮的假阳性（靠"文件不存在"偶然通过）**不再成立**。
+
+**裁定**：**C-02 = VERIFIED-CLOSED（可审计）**。**R3D-01 关闭**；**R3D-02 关闭**（`-CredentialFile` 现在做 ACL + owner 校验，T4/T5 证实）。
+
+## E3. F12：当前生产态报告正确（FAILED + UI 原因，不是 DEGRADED）
+
+**真实输入（只读，无写）**：HKCU `ProxyEnable=0`、`ProxyServer=127.0.0.1:7897`；`verge.yaml` 的 `enable_system_proxy: true`；`proxy_v4\config\settings.json` **不存在** → 与 lead 描述一致（HKCU=0 / UI=on / settings missing）。
+
+**用真实 `state-v4.ps1`**（test mode，等价注入上述三输入；3/3）：
+- **S1** settings missing + UI on + HKCU off → exit **3**、`state=FAILED`、reasons 含 settings 原因 **与** `UI reports system proxy enabled, actual HKCU is disabled`，`uiSystemProxy=enabled` → **FAILED + UI 原因，而不是 DEGRADED**。
+- **S2** settings missing + UI off + HKCU off → FAILED，**无** UI 原因（不误报）。
+- **S3** UI 未知 → `uiSystemProxy=unknown`，**无** UI 原因（不臆造 mismatch）。
+
+**代码依据**：`Get-V4StateCore` 现在在 settings 分支**之前**计算 `$uiMismatch` 并 append reason（FAILED 也保留），末尾仅在 `state -ne FAILED` 时降为 DEGRADED（`V4.ps1:1399-1404, 1434`）。分类正确：settings 缺失时"无法判定链路"优先记 FAILED，UI 不一致作为附加诊断，不再被实现细节吞掉。
+
+**裁定**：**F12 分类与报告正确**；**R3D-03（解析器无用例）关闭**（`INF-F12-03` 用 `V4_TEST_UI_CONFIG` 覆盖 true/false/缺键/缺文件）。残余（LOW，不误报）：带引号值或键改名 → `unknown`。
+
+## E4. 新 HIGH 与残余
+
+- **新 HIGH：无。** delta 未新增生产写路径；墓碑在锁前失败；`-CredentialFile` 在读取前做 ACL/owner 校验；F12 仅影响报告内容。
+- **新发现 1×LOW（R5D-01）**：`-CredentialFile` 要求文件 ACL 已加固（受保护 DACL + owner ∈ 允许集），但 `USER-GUIDE-V4.md:47`、`USER-GUIDE-V6.md:12`、`SECURITY-NOTES.md:29` 只写"<受保护文件>/ACL-hardened"，**未给出可执行的加固命令或工具开关**；普通用户用记事本新建的文件会被 exit 11 拒绝且不知如何修复。建议在指南给出 `icacls <file> /inheritance:r /grant:r ...` 一行示例，或提供 `Protect-V4Acl` 的小工具入口。
+- **仍开放（与上一轮一致）**：R2A-06（MED，journal 无提交阶段）、R3-01（MED，门闩只覆盖注册表/进程入口；本 delta 未触及）、R3D-04（C-04 owner 检查无专门负向用例）、R3D-05（系统代理写补偿只覆盖进程内异常，两次写之间硬杀仍半写）。
+- **已关闭**：R3D-01（C-02 证据假阳性）、R3D-02（口令文件 ACL 未校验）、R3D-03（F12 解析器无用例）。
+
+## E5. 结论
+
+- **计数：本轮 delta 0×HIGH、0×MED、1×LOW（R5D-01），并关闭 3 项旧残余。**
+- 事务/并发维度裁定不变：**SHORT_RUN 可接受**；C-02 可记 **VERIFIED-CLOSED**；F12 可记"分类正确、当前生产态报告准确（FAILED + UI 原因）"。
+- 发布文本仍需披露：R2A-06、R3-01、R3D-04、R3D-05、R5D-01，以及"真实生产 apply/rollback/state 未执行（本报告全部结论基于隔离测试与只读观测）"。

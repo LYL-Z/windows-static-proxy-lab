@@ -1,0 +1,17 @@
+{
+    "id":  "INF-APPLY-INIT-03",
+    "requirement":  "C-02",
+    "precondition":  "legacy -StaticPassFile parameter",
+    "injectedFault":  "old file parameter",
+    "expected":  "exit 11 removal message; no settings",
+    "actual":  "legacy -StaticPassFile is rejected with a removal message",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  1439,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T07:02:52.611-08:00",
+    "finishedAt":  "2026-11-18T07:02:54.051-08:00",
+    "evidenceFile":  "C:\\CAB-Lab\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0075-INF-APPLY-INIT-03.json",
+    "testOutput":  ""
+}

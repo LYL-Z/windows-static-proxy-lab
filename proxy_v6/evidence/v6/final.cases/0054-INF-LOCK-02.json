@@ -1,0 +1,17 @@
+{
+    "id":  "INF-LOCK-02",
+    "requirement":  "LOCK-02",
+    "precondition":  "winner holds lock",
+    "injectedFault":  "wrong token exit",
+    "expected":  "lock survives",
+    "actual":  "wrong token did not delete the winner lock",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  725,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T07:02:32.160-08:00",
+    "finishedAt":  "2026-11-18T07:02:32.885-08:00",
+    "evidenceFile":  "C:\\CAB-Lab\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0054-INF-LOCK-02.json",
+    "testOutput":  ""
+}

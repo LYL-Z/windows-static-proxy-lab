@@ -4,7 +4,7 @@
 新增：`lib\V4.ps1` 引擎（JSON 设置源 + DPAPI 凭据、锁、进程退出验证、一致性快照、原子写、owner 记录、状态机）、
 `apply-v4.ps1`、`rollback-v4.ps1`、`state-v4.ps1`、`tests\faultinject-v4.ps1`、12 份交付文档。
 关闭：M5/M6（不再解析 YAML）、M8（独立本地 profile）、M9（锁）、M10（退出验证）、M3（停机快照）、H4（所有权模型）。
-验证：apply 全链路成功（exit 72.245.197.103）；state HEALTHY；故障注入 13/13。
+验证：apply 全链路成功（exit 192.0.2.254）；state HEALTHY；故障注入 13/13。
 未完成：生命周期 5+5+5+5、24h/72h、凭据轮换、V4 完整回滚往返、FT11/FT14。
 
 ## V3.0 — 2026-11-18 03:00–03:45

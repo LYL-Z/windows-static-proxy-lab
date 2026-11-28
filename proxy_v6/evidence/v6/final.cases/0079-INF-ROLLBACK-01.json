@@ -1,0 +1,17 @@
+{
+    "id":  "INF-ROLLBACK-01",
+    "requirement":  "TX-ROLLBACK",
+    "precondition":  "valid snapshot + journal",
+    "injectedFault":  "none",
+    "expected":  "real rollback script restores files, clears journal/lock",
+    "actual":  "real rollback script restored files, cleared journal and lock",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  1760,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T07:02:58.843-08:00",
+    "finishedAt":  "2026-11-18T07:03:00.604-08:00",
+    "evidenceFile":  "C:\\CAB-Lab\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0079-INF-ROLLBACK-01.json",
+    "testOutput":  ""
+}

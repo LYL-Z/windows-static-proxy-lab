@@ -1,0 +1,17 @@
+{
+    "id":  "F10-01",
+    "requirement":  "F10",
+    "precondition":  "restore and log both fail",
+    "injectedFault":  "restore throws; log throws",
+    "expected":  "returns 40 without throwing; all recovery steps attempted",
+    "actual":  "F10-01: returned 40 after all steps",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 2",
+    "durationMs":  741,
+    "assertions":  2,
+    "startedAt":  "2026-11-18T07:02:00.159-08:00",
+    "finishedAt":  "2026-11-18T07:02:00.901-08:00",
+    "evidenceFile":  "C:\\CAB-Lab\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0012-F10-01.json",
+    "testOutput":  ""
+}

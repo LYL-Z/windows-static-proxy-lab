@@ -1,0 +1,13 @@
+
+== V6 TEST HARNESS 6.0.0 ==
+Run ID: 1da308c88a4b42ef92be9fa4ffd25582
+Git HEAD: 36222c92c829a2ef08b71af2a3a3ff9a3c44b396
+Git branch: v5/short-run-hardening
+Filter: *
+--------------------------------------------------------------
+[PASS] FIX-EVIDENCE-01 (META-06) 9ms
+[EVIDENCE-ERROR] final-evidence: failed to write final evidence: path is a file, not a directory: C:\CAB-Lab\AppData\Local\Temp\v6-tests\v6-selftest-20261118-050616-730-164fbd46\META-06\blocked
+--------------------------------------------------------------
+Counts: registered=1 executed=1 passed=1 failed=0 skipped=0 available=1
+Evidence: NOT WRITTEN
+RESULT: EVIDENCE_ERROR EXIT 4

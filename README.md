@@ -31,6 +31,8 @@ Claude 服务故障及账户问题分别以[官方服务状态](https://status.c
 
 ## 项目概览
 
+统一集成候选的来源、独立复审和生产验收边界见 [CAB 接管记录](HANDOFF.md) 与 [集成验收矩阵](docs/CAB-INTEGRATION.md)。
+
 CAB 以 Windows Proxy Doctor 为工具组件，将历轮网络实验、事务恢复脚本、Agent Skill 与桌面诊断应用组织为同一产品体系。用户可以按需要选择可视化应用、自然语言助手或命令行，而不必手动阅读全部历史测试日志。每项能力分别记录测试方法、实际观测和覆盖范围。
 
 | 入口 | 面向用户 | 当前版本及获取方式 |
@@ -69,9 +71,9 @@ flowchart LR
 
 **CAB Desktop（Windows Proxy Doctor Desktop 1.0）— 开发候选。** 基于 C#、.NET 8、WPF 与 CommunityToolkit.Mvvm。默认以普通用户身份运行。
 
-[![Desktop 1.0 实机截图（开发候选）](https://raw.githubusercontent.com/LYL-Z/windows-static-proxy-lab/ec92e36422f0cee8f732ada5ee641281ac970502/desktop/overview.png)](https://github.com/LYL-Z/windows-static-proxy-lab/blob/ec92e36422f0cee8f732ada5ee641281ac970502/desktop/overview.png)
+[![Desktop 1.0 实机截图（开发候选）](desktop/overview.png)](desktop/overview.png)
 
-截图来自该候选的实机运行记录，不能代表当前访问者的网络状态。
+截图来自该候选的实机运行记录，不能代表当前访问者的网络状态。图里的页头「当前页面 / 概览」与左侧高亮就是这一版的界面；截图里的端口和进程名来自作者本机，不是凭据。
 
 | 功能 | 当前候选状态 |
 | --- | --- |

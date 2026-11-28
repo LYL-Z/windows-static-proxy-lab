@@ -1,0 +1,17 @@
+{
+    "id":  "F08-08",
+    "requirement":  "F08",
+    "precondition":  "target absent; foreign profiles exist",
+    "injectedFault":  "missing target",
+    "expected":  "append target; current set; existing blocks unchanged",
+    "actual":  "F08-08: appended, existing intact",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 2",
+    "durationMs":  737,
+    "assertions":  2,
+    "startedAt":  "2026-11-18T07:01:35.382-08:00",
+    "finishedAt":  "2026-11-18T07:01:36.119-08:00",
+    "evidenceFile":  "C:\\CAB-Lab\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0008-F08-08.json",
+    "testOutput":  ""
+}

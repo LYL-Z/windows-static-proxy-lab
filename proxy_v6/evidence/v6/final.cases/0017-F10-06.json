@@ -1,0 +1,17 @@
+{
+    "id":  "F10-06",
+    "requirement":  "F10",
+    "precondition":  "all recovery steps succeed",
+    "injectedFault":  "none",
+    "expected":  "original code preserved",
+    "actual":  "F10-06: returned 32",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 2",
+    "durationMs":  641,
+    "assertions":  2,
+    "startedAt":  "2026-11-18T07:02:03.652-08:00",
+    "finishedAt":  "2026-11-18T07:02:04.294-08:00",
+    "evidenceFile":  "C:\\CAB-Lab\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0017-F10-06.json",
+    "testOutput":  ""
+}

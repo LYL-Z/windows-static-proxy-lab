@@ -3,22 +3,44 @@
 .SYNOPSIS  Transactional rollback for proxy_v4.
 .EXAMPLE   .\rollback-v4.ps1 -List
            .\rollback-v4.ps1
-           .\rollback-v4.ps1 -SnapshotDir D:\claude防封\proxy_v4\backup\<stamp>
-  Exit: 0 ok, 40 failed, 41 system proxy could not be held.
+           .\rollback-v4.ps1 -SnapshotDir .\backup\<stamp>
+           .\rollback-v4.ps1 -ResolvePreparation ResumeClient
+           .\rollback-v4.ps1 -ResolvePreparation KeepCurrent
+  Exit: 0 ok, 32 files restored and a user-disabled proxy was left off,
+        33 lock busy, 34 review pending, 40 failed, 41 proxy selection precludes action.
 #>
 [CmdletBinding()]
-param([string]$SnapshotDir, [switch]$List, [switch]$KeepSystemProxy)
+param(
+    [string]$SnapshotDir, [switch]$List, [switch]$KeepSystemProxy,
+    [ValidateSet('ResumeClient','KeepCurrent')][string]$ResolvePreparation
+)
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'lib\V4.ps1')
-Start-V4Log 'rollback'
+if (-not $List) {
+    $null = Enable-V4ProductionWrites
+    $null = Start-V4Log 'rollback'
+}
 $exit = 0
+$lock = $null
+$userLock = $null
+$mixedPort = 7897
+
+function Get-RollbackSnapshots {
+    if (Test-Path -LiteralPath $script:BackupDir) {
+        Get-ChildItem -LiteralPath $script:BackupDir -Directory |
+            Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName 'manifest.json') } |
+            Sort-Object LastWriteTime -Descending
+    }
+}
 
 try {
-    $all = @()
-    if (Test-Path $script:BackupDir) {
-        $all = Get-ChildItem $script:BackupDir -Directory | Where-Object { Test-Path (Join-Path $_.FullName 'manifest.json') } | Sort-Object LastWriteTime -Descending
+    if ($ResolvePreparation -and ($List -or $SnapshotDir -or $PSBoundParameters.ContainsKey('KeepSystemProxy'))) {
+        Write-V4Log '-ResolvePreparation must be used separately' -Level ERROR
+        $exit = 34
+        return
     }
     if ($List) {
+        $all = @(Get-RollbackSnapshots)
         if (-not $all) { Write-V4Log 'no snapshots' -Level WARN; return }
         $all | ForEach-Object {
             $m = Get-Content (Join-Path $_.FullName 'manifest.json') -Raw | ConvertFrom-Json
@@ -26,40 +48,167 @@ try {
         }
         return
     }
-    if (-not $SnapshotDir) {
-        if (-not $all) { throw 'no snapshot available' }
-        $SnapshotDir = $all[0].FullName
+    try { $mixedPort = [int](Get-V4Settings -StatusOnly).mixedPort } catch { }
+    $userLock = Enter-V4UserMutationLock
+    if ($userLock) { $lock = Enter-V4Lock }
+    if (-not $lock) {
+        Write-V4Log 'another operation holds the lock' -Level ERROR
+        $exit = 33
+        return
     }
-    if (-not (Enter-V4Lock)) { throw 'another operation holds the lock' }
-    try {
-        Write-V4Log ("rollback -> {0}" -f (Split-Path $SnapshotDir -Leaf)) -Level STEP
-        $m = Restore-V4Snapshot -SnapshotDir $SnapshotDir
-        Write-V4Log 'files restored and hash-verified' -Level OK
 
-        if (-not $KeepSystemProxy) {
-            $want = if ($m.systemProxy.enabled) { $m.systemProxy.server } else { 'off' }
-            if ($m.systemProxy.enabled) { Set-V4SystemProxy -Server $m.systemProxy.server } else { Clear-V4SystemProxy }
-            $px = Get-V4SystemProxy
-            $have = if ($px.enabled) { $px.server } else { 'off' }
-            if ($have -ne $want) { Write-V4Log ("system proxy want {0} have {1}" -f $want, $have) -Level ERROR; $exit = 41 }
-            else { Write-V4Log ("system proxy = {0}" -f $have) -Level OK }
+    # R2A-01: lock is held until after any补救 restart. Only a failure that
+    # actually entered restore may start the app; a pre-restore failure must not.
+    try {
+        if (Get-V4RepairReceipt) {
+            Write-V4Log 'interrupted or unreadable repair receipt; review before rollback' -Level ERROR
+            $exit = 34
+            return
         }
-        if (Start-V4Clash -TimeoutSec 40) { Write-V4Log 'clash restarted' -Level OK }
-        else { Write-V4Log 'clash did not come back' -Level WARN }
-        # the app may re-take the proxy on start: verify once more and report honestly
-        if (-not $KeepSystemProxy -and $m.systemProxy.enabled) {
-            $px = Get-V4SystemProxy
-            if ($px.server -ne $m.systemProxy.server) {
-                Write-V4Log ("proxy taken by the app after start ({0}); snapshot wanted {1}" -f $px.server, $m.systemProxy.server) -Level ERROR
-                $exit = 41
+        $restoreAttempted = $false
+        try {
+            $journal = Get-V4Journal
+            if ($ResolvePreparation -or ($journal -and $journal.preparation)) {
+                if (-not $ResolvePreparation -or -not $journal -or $journal.corrupt -or -not $journal.preparation) {
+                    Write-V4Log 'review the valid preparation journal before choosing ResumeClient or KeepCurrent' -Level ERROR
+                    $exit = 34
+                    return
+                }
+                if ($ResolvePreparation -eq 'ResumeClient') {
+                    $exit = Resume-V4PreparationClient -Preparation $journal.data
+                    if ($exit -ne 0) {
+                        Write-V4Log 'client resume refused or unverified; preparation journal retained' -Level ERROR
+                        return
+                    }
+                }
+                if (-not (Clear-V4Journal)) {
+                    Write-V4Log 'preparation journal could not be retired' -Level ERROR
+                    $exit = 40
+                    return
+                }
+                Write-V4Log ('snapshot preparation resolved: ' + $ResolvePreparation + '; application paths remain untested') -Level OK
+                return
             }
+            $rollbackJournal = $journal -and -not $journal.corrupt -and $journal.data.reason -eq 'rollback'
+            if ($rollbackJournal -and -not $PSBoundParameters.ContainsKey('KeepSystemProxy')) {
+                $KeepSystemProxy = [bool]$journal.data.keepSystemProxy
+            }
+            if (-not $SnapshotDir) {
+                if ($journal -and $journal.corrupt) { throw 'transaction journal is unreadable; select a verified snapshot explicitly' }
+                if ($journal) { $SnapshotDir = [string]$journal.data.snapshot }
+                else {
+                    $latest = Get-RollbackSnapshots | Select-Object -First 1
+                    if (-not $latest) { throw 'no snapshot available' }
+                    $SnapshotDir = $latest.FullName
+                }
+            }
+            $SnapshotDir = (Get-Item -LiteralPath $SnapshotDir -ErrorAction Stop).FullName
+            # Verify the manifest before considering the app "possibly stopped".
+            $manifest = Test-V4SnapshotManifest -SnapshotDir $SnapshotDir
+            Write-V4Log ('restoring verified snapshot ' + (Split-Path $SnapshotDir -Leaf)) -Level STEP
+            $journalMatches = $rollbackJournal -and [string]$journal.data.snapshot -eq $SnapshotDir -and [bool]$journal.data.keepSystemProxy -eq [bool]$KeepSystemProxy
+            if ($KeepSystemProxy -and $journalMatches -and $journal.data.PSObject.Properties.Name -notcontains 'keptEnabled') {
+                Write-V4Log 'rollback journal does not record the proxy selection it intended to keep' -Level ERROR
+                $exit = 41
+                return
+            }
+            $keptProxy = $null
+            if ($KeepSystemProxy) {
+                if ($journalMatches) {
+                    $keptProxy = [pscustomobject]@{ enabled = [bool]$journal.data.keptEnabled; server = [string]$journal.data.keptServer }
+                } else {
+                    $keptProxy = Get-V4SystemProxy
+                }
+            }
+            $snapshotProxy = $manifest.manifest.systemProxy
+            $storedOff = $journalMatches -and $journal.data.PSObject.Properties.Name -contains 'preserveUserOff' -and [bool]$journal.data.preserveUserOff
+            $preserveUserOff = [bool]$storedOff
+            if (-not $KeepSystemProxy -and -not $preserveUserOff -and $snapshotProxy -and [bool]$snapshotProxy.enabled -and -not (Get-V4SystemProxy).enabled) {
+                $preserveUserOff = $true
+            }
+            if (-not $journalMatches -or ($preserveUserOff -and -not $storedOff)) {
+                Write-V4Journal -SnapshotDir $SnapshotDir -Reason 'rollback' -KeepSystemProxy:$KeepSystemProxy -PreserveUserOff:$preserveUserOff -KeptProxy $keptProxy
+            }
+            if ($script:TestMode -and $env:V4_TEST_EXIT_AFTER_JOURNAL -eq '1') {
+                Write-V4Log 'test injection stopped after the rollback journal was durable' -Level WARN
+                $exit = 41
+                return
+            }
+            $restoreAttempted = $true
+            $m = Restore-V4Snapshot -SnapshotDir $SnapshotDir -Port $mixedPort
+            Write-V4Log 'files restored and hash-verified' -Level OK
+
+            $restoreProxy = -not $KeepSystemProxy -and -not $preserveUserOff -and $null -ne $m.systemProxy
+            if ($restoreProxy) {
+                if ($m.systemProxy.enabled) { Set-V4SystemProxy -Server $m.systemProxy.server } else { Clear-V4SystemProxy }
+            }
+            $ready = Start-V4Clash -TimeoutSec 40 -Port $mixedPort
+            # A restart can reassert the UI setting. Preserve the snapshot's
+            # established "off" behavior and verify the actual final proxy.
+            if ($restoreProxy -and -not $m.systemProxy.enabled) { Clear-V4SystemProxy }
+            if ($preserveUserOff) {
+                $now = Get-V4SystemProxy
+                if ($now.enabled -and [string]$now.server -eq [string]$m.systemProxy.server) { Clear-V4SystemProxy }
+                elseif ($now.enabled) {
+                    Write-V4Log 'a different proxy was enabled during rollback; left unchanged and journal retained' -Level ERROR
+                    $exit = 41
+                    return
+                }
+                $now = Get-V4SystemProxy
+                if ($now.enabled -or -not $ready) {
+                    Write-V4Log 'user-disabled proxy could not be confirmed after rollback; journal retained' -Level ERROR
+                    $exit = $(if ($ready) { 41 } else { 40 })
+                    return
+                }
+                Set-V4Owner -Owner 'rollback' -SystemProxy 'off' -Note ('user-off preserved; snapshot=' + (Split-Path $SnapshotDir -Leaf))
+                if (-not (Clear-V4Journal)) {
+                    Write-V4Log 'user-off was preserved but the journal remains' -Level ERROR
+                    $exit = 40
+                    return
+                }
+                Write-V4Log 'rollback restored files and left the user-disabled proxy off' -Level OK
+                $exit = 32
+                return
+            }
+            if (-not $ready) {
+                Write-V4Log 'Clash listener did not become ready; rollback journal retained' -Level ERROR
+                $exit = 40
+                return
+            }
+            $px = Get-V4SystemProxy
+            $expectedProxy = if ($KeepSystemProxy) { $keptProxy } else { $m.systemProxy }
+            if ($expectedProxy -and -not (Test-V4SystemProxyMatch -Expected $expectedProxy -Actual $px)) {
+                Write-V4Log 'Windows proxy changed after Clash start; rollback journal retained' -Level ERROR
+                $exit = 41
+                return
+            }
+            Set-V4Owner -Owner 'rollback' -SystemProxy $px.server -Note ('snapshot=' + (Split-Path $SnapshotDir -Leaf))
+            if (-not (Clear-V4Journal)) {
+                Write-V4Log 'rollback completed but the transaction journal remains; review before another apply' -Level ERROR
+                $exit = 40
+                return
+            }
+            Write-V4Log 'rollback complete; Clash listener ready' -Level OK
         }
-        Set-V4Owner -Owner 'rollback' -SystemProxy ((Get-V4SystemProxy).server) -Note ('snapshot=' + (Split-Path $SnapshotDir -Leaf))
+        catch {
+            Write-V4Log ('rollback failed: ' + (Get-V4Redacted $_.Exception.Message)) -Level ERROR
+            if ($restoreAttempted) {
+                try {
+                    if (Start-V4Clash -TimeoutSec 40 -Port $mixedPort) { Write-V4Log 'clash restarted after failed restore' -Level WARN }
+                    else { Write-V4Log 'clash did not come back after failed restore' -Level ERROR }
+                }
+                catch { Write-V4Log ('clash restart after failed restore also failed: ' + (Get-V4Redacted $_.Exception.Message)) -Level ERROR }
+            }
+            $exit = 40
+        }
     }
-    finally { Exit-V4Lock }
+    finally { if ($lock) { $null = Exit-V4Lock $lock } }
 }
 catch {
-    Write-V4Log ('rollback failed: ' + (Get-V4Redacted $_.Exception.Message)) -Level ERROR
+    Write-V4Log ('rollback refused/failed before restore: ' + (Get-V4Redacted $_.Exception.Message)) -Level ERROR
     $exit = 40
 }
-finally { exit $exit }
+finally {
+    if ($userLock) { $userLock.ReleaseMutex(); $userLock.Dispose() }
+    exit $exit
+}

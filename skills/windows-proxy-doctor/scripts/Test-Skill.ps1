@@ -10,8 +10,10 @@ $root = Split-Path -Parent $PSScriptRoot
 $issues = New-Object System.Collections.Generic.List[string]
 $required = @('SKILL.md','README.md','SECURITY.md','CHANGELOG.md','LICENSE','RELEASE-GATE.md','examples',
     'scripts/Start-ProxyDoctor.ps1','scripts/Get-ProxyDoctorEnvironment.ps1','scripts/Test-ProxyDoctorInstaller.ps1',
-    'scripts/ProxyDoctorVerification.ps1',
-    'tests/Run-Tests.ps1','tests/Run-OnboardingTests.ps1','templates/onboarding-checkpoint.json')
+    'scripts/ProxyDoctorVerification.ps1','scripts/ProxyFaultClass.ps1','scripts/RecoveryVerdict.ps1',
+    'tests/Run-Tests.ps1','tests/Run-OnboardingTests.ps1','tests/Run-FaultClassTests.ps1',
+    'tests/fixtures/recovery-fixtures.json','templates/onboarding-checkpoint.json',
+    'recovery/Invoke-Recovery.ps1','tests/Run-RecoveryTests.ps1')
 foreach ($r in $required) { if (-not (Test-Path -LiteralPath (Join-Path $root $r))) { $issues.Add('missing ' + $r) } }
 $skill = Join-Path $root 'SKILL.md'
 if (Test-Path $skill) {

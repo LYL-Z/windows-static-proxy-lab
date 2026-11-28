@@ -1,0 +1,17 @@
+{
+    "id":  "INF-APPLY-INIT-02",
+    "requirement":  "C-02",
+    "precondition":  "legacy -StaticPass parameter",
+    "injectedFault":  "command-line password",
+    "expected":  "exit 11 removal message; no settings",
+    "actual":  "legacy -StaticPass is rejected with a removal message",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  1462,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T07:02:51.145-08:00",
+    "finishedAt":  "2026-11-18T07:02:52.607-08:00",
+    "evidenceFile":  "C:\\CAB-Lab\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0074-INF-APPLY-INIT-02.json",
+    "testOutput":  ""
+}

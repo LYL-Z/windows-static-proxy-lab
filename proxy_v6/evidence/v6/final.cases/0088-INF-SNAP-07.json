@@ -1,0 +1,17 @@
+{
+    "id":  "INF-SNAP-07",
+    "requirement":  "TX-07",
+    "precondition":  "manifest missing profiles.yaml coverage",
+    "injectedFault":  "partial manifest",
+    "expected":  "refused",
+    "actual":  "snapshot not covering profiles.yaml refused",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  868,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T07:03:30.195-08:00",
+    "finishedAt":  "2026-11-18T07:03:31.062-08:00",
+    "evidenceFile":  "C:\\CAB-Lab\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0088-INF-SNAP-07.json",
+    "testOutput":  ""
+}

@@ -10,7 +10,7 @@
 | 组件 | 协议 | 实际路径 | 观测出口 | 状态 | 证据 |
 |---|---|---|---|---|---|
 | curl `--noproxy` | TCP | utun119 → StarSky | `142.111.173.93` | VERIFIED | §3.1 |
-| curl `-x socks5h://127.0.0.1:7897` | TCP | Clash → StarSky → NexIP | **`72.245.197.103`** | VERIFIED | §3.1 |
+| curl `-x socks5h://127.0.0.1:7897` | TCP | Clash → StarSky → NexIP | **`192.0.2.254`** | VERIFIED | §3.1 |
 | Python 裸 socket（无代理） | TCP | utun119 → StarSky | `142.111.173.93` | VERIFIED | V1 探测 |
 | STUN 客户端（UDP，直连） | **UDP** | utun119 → StarSky | **`142.111.173.93`** | VERIFIED | `tools/stun_probe.py` |
 | STUN 经 Clash UDP ASSOCIATE | **UDP** | Clash 中继 → **回落** → utun119 → StarSky | **`142.111.173.93`** | VERIFIED | `tools/udp_relay_test.py` |
@@ -19,14 +19,14 @@
 | HTTPS 请求 | HTTP/3 | —— | 未测（客户端无 h3） | **NOT_TESTED** | §3.2 |
 | 任意流量 | IPv6 | —— | 主机 0 个全局 v6 地址 | **N/A** | §3.3 |
 | 域名解析 | DNS/UDP | `utun119` → `10.99.0.2` | StarSky 侧解析 | VERIFIED（配置） | §3.3 |
-| 浏览器 HTTPS | TCP | WinINET `7897` | `72.245.197.103` | VERIFIED | 用户截图 + `state.ps1` |
+| 浏览器 HTTPS | TCP | WinINET `7897` | `192.0.2.254` | VERIFIED | 用户截图 + `state.ps1` |
 | 浏览器 QUIC/WebRTC | UDP | utun119 → StarSky | `142.111.173.93` | VERIFIED（推断+实测） | §2 |
 | 走 WinHTTP 的应用 | —— | **直连，完全绕过代理** | 取决于路由（StarSky） | VERIFIED（配置） | §3.3 |
 | Node.js 应用 | TCP | 未测 | —— | **NOT_TESTED** | —— |
 
 ## 2. 为什么两个检测网站结论相反（这是本次最重要的发现）
 
-- `ip.net.coffee` 的「Claude AI IP 检测」测的是**TCP/HTTPS** → 看到 `72.245.197.103`；
+- `ip.net.coffee` 的「Claude AI IP 检测」测的是**TCP/HTTPS** → 看到 `192.0.2.254`；
 - `IPPure` 的 WebRTC 检测测的是 **STUN over UDP** → 看到 `142.111.173.93`。
 
 **两个结果都是真的，它们测的是不同协议。** 本机实测复现：
@@ -34,7 +34,7 @@
 ```
 STUN 直连        -> mapped 142.111.173.93
 STUN 经 Clash 中继 -> mapped 142.111.173.93   ← 即使走 Clash 的 UDP 端口，也没走静态 IP
-HTTPS 经 Clash   -> 72.245.197.103
+HTTPS 经 Clash   -> 192.0.2.254
 ```
 
 原因：节点配置 `udp: false`，NexIP 静态 IP 这一跳**只承载 TCP**。UDP 在 mihomo 里回落，最终由 `utun119` 的 StarSky 承载。
@@ -47,7 +47,7 @@ HTTPS 经 Clash   -> 72.245.197.103
 
 ```
 curl --noproxy '*'            https://api.ipify.org -> 142.111.173.93
-curl -x socks5h://127.0.0.1:7897 https://api.ipify.org -> 72.245.197.103
+curl -x socks5h://127.0.0.1:7897 https://api.ipify.org -> 192.0.2.254
 ```
 
 ### 3.2 HTTP 版本

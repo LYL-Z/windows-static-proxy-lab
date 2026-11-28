@@ -1,0 +1,17 @@
+{
+    "id":  "INF-SNAP-01",
+    "requirement":  "TX-11",
+    "precondition":  "snapshot without managed profile",
+    "injectedFault":  "file created after snapshot",
+    "expected":  "restore deletes it",
+    "actual":  "absent managed profile deleted; profiles.yaml hash restored; snapshot ACL restricted",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  992,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T07:02:40.422-08:00",
+    "finishedAt":  "2026-11-18T07:02:41.415-08:00",
+    "evidenceFile":  "C:\\CAB-Lab\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0064-INF-SNAP-01.json",
+    "testOutput":  ""
+}

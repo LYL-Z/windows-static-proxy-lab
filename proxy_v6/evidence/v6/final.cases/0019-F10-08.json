@@ -1,0 +1,17 @@
+{
+    "id":  "F10-08",
+    "requirement":  "F10",
+    "precondition":  "file restore ok; proxy restore fails",
+    "injectedFault":  "proxy delegate throws",
+    "expected":  "returns 40",
+    "actual":  "F10-08: returned 40",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 2",
+    "durationMs":  669,
+    "assertions":  2,
+    "startedAt":  "2026-11-18T07:02:04.957-08:00",
+    "finishedAt":  "2026-11-18T07:02:05.627-08:00",
+    "evidenceFile":  "C:\\CAB-Lab\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0019-F10-08.json",
+    "testOutput":  ""
+}

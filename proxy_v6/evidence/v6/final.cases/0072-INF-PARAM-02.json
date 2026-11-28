@@ -1,0 +1,17 @@
+{
+    "id":  "INF-PARAM-02",
+    "requirement":  "PARAM-06",
+    "precondition":  "no settings",
+    "injectedFault":  "invalid Mode",
+    "expected":  "nonzero; no settings",
+    "actual":  "invalid Mode refused with exit 1",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 1",
+    "durationMs":  1077,
+    "assertions":  1,
+    "startedAt":  "2026-11-18T07:02:48.251-08:00",
+    "finishedAt":  "2026-11-18T07:02:49.328-08:00",
+    "evidenceFile":  "C:\\CAB-Lab\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0072-INF-PARAM-02.json",
+    "testOutput":  ""
+}

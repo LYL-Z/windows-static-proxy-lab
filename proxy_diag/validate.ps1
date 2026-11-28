@@ -1,7 +1,7 @@
 # =====================================================================
 #  VALIDATE: 20 次 / 约 10 分钟的验收测试 (经由 Clash 7897 全链路)
 #  每轮: TCP -> SOCKS5 -> CONNECT -> TLS -> HTTPS 取出口IP
-#  输出: 控制台表格 + D:\claude防封\proxy_diag\validate-result.jsonl
+#  输出: 控制台表格 + C:\CAB-Lab\proxy_diag\validate-result.jsonl
 # =====================================================================
 $ErrorActionPreference = 'Continue'
 $env:PYTHONIOENCODING = 'utf-8'
@@ -16,8 +16,8 @@ $hop = (Get-NetTCPConnection -LocalPort 11119 -State Listen -ErrorAction Silentl
 Write-Host ("first hop 11119: " + $(if ($hop) { "listening (pid $hop)" } else { "NOT LISTENING  <-- open StarSky" }))
 Write-Host ''
 
-& python.exe 'D:\claude防封\proxy_diag\monitor.py' --runs 20 --interval 30 `
-    --out 'D:\claude防封\proxy_diag\validate-result.jsonl'
+& python.exe 'C:\CAB-Lab\proxy_diag\monitor.py' --runs 20 --interval 30 `
+    --out 'C:\CAB-Lab\proxy_diag\validate-result.jsonl'
 
 Write-Host ''
-Write-Host 'PASS 标准: success=20/20 且 所有 exit_ip 均为 72.245.197.103'
+Write-Host 'PASS 标准: success=20/20 且 所有 exit_ip 均为 192.0.2.254'

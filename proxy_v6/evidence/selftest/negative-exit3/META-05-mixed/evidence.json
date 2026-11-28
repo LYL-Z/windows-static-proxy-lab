@@ -1,0 +1,78 @@
+{
+    "schemaVersion":  1,
+    "tool":  "proxy_v6/tests/Harness.ps1",
+    "harnessVersion":  "6.0.0",
+    "runId":  "7a968ac141044f6c874be040477179e1",
+    "host":  {
+                 "psVersion":  "5.1.26100.9818",
+                 "psEdition":  "Desktop",
+                 "os":  "Microsoft Windows NT 10.0.26300.0",
+                 "clr":  "4.0.30319.42000",
+                 "is64BitProcess":  true,
+                 "pid":  41680
+             },
+    "git":  {
+                "available":  true,
+                "head":  "36222c92c829a2ef08b71af2a3a3ff9a3c44b396",
+                "branch":  "v5/short-run-hardening",
+                "dirty":  true,
+                "error":  null
+            },
+    "repoRoot":  "C:\\CAB-Lab\\publish",
+    "filter":  "*",
+    "startedAt":  "2026-11-18T05:06:33.198-08:00",
+    "finishedAt":  "2026-11-18T05:06:33.483-08:00",
+    "durationMs":  82,
+    "counts":  {
+                   "registered":  2,
+                   "executed":  1,
+                   "passed":  1,
+                   "failed":  0,
+                   "skipped":  1,
+                   "available":  2
+               },
+    "exitCode":  0,
+    "outcome":  "PASS",
+    "harnessErrors":  [
+
+                      ],
+    "evidenceErrors":  [
+
+                       ],
+    "cases":  [
+                  {
+                      "id":  "FIX-SKIP-PASS",
+                      "requirement":  "META-05",
+                      "precondition":  "isolated child process",
+                      "injectedFault":  "none",
+                      "expected":  "this test executes and passes",
+                      "actual":  "all assertions passed",
+                      "status":  "pass",
+                      "passed":  true,
+                      "detail":  "assertions passed: 1",
+                      "durationMs":  8,
+                      "assertions":  1,
+                      "startedAt":  "2026-11-18T05:06:33.229-08:00",
+                      "finishedAt":  "2026-11-18T05:06:33.244-08:00",
+                      "evidenceFile":  "C:\\CAB-Lab\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-050628-121-6078b2a5\\META-05-mixed\\cases\\0001-FIX-SKIP-PASS.json",
+                      "testOutput":  ""
+                  },
+                  {
+                      "id":  "FIX-SKIP-ONE",
+                      "requirement":  "META-05",
+                      "precondition":  "dependency intentionally absent",
+                      "injectedFault":  "registration skip",
+                      "expected":  "this test is recorded as skipped, never as passed",
+                      "actual":  "skipped",
+                      "status":  "skip",
+                      "passed":  false,
+                      "detail":  "skipped at registration: fixture registration skip: dependency not present",
+                      "durationMs":  0,
+                      "assertions":  0,
+                      "startedAt":  "2026-11-18T05:06:33.276-08:00",
+                      "finishedAt":  "2026-11-18T05:06:33.277-08:00",
+                      "evidenceFile":  "C:\\CAB-Lab\\AppData\\Local\\Temp\\v6-tests\\v6-selftest-20261118-050628-121-6078b2a5\\META-05-mixed\\cases\\0002-FIX-SKIP-ONE.json",
+                      "testOutput":  ""
+                  }
+              ]
+}

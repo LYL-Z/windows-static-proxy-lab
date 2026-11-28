@@ -1,0 +1,17 @@
+{
+    "id":  "F08-04",
+    "requirement":  "F08",
+    "precondition":  "duplicate exact target UID",
+    "injectedFault":  "duplicate uid",
+    "expected":  "fail closed",
+    "actual":  "F08-04: duplicate rejected",
+    "status":  "pass",
+    "passed":  true,
+    "detail":  "assertions passed: 2",
+    "durationMs":  672,
+    "assertions":  2,
+    "startedAt":  "2026-11-18T07:01:32.656-08:00",
+    "finishedAt":  "2026-11-18T07:01:33.328-08:00",
+    "evidenceFile":  "C:\\CAB-Lab\\AppData\\Local\\Temp\\v6-postdeploy\\final.cases\\0004-F08-04.json",
+    "testOutput":  ""
+}
