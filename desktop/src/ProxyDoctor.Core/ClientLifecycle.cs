@@ -49,6 +49,42 @@ public static class ClientLifecycle
             observation.UpstreamOk,
             observation.UserTurnedOff);
 
+    public static IReadOnlyList<string> ManualSteps(ClientLifecycleState state)
+    {
+        switch (state)
+        {
+            case ClientLifecycleState.UserOff:
+                return One("保持关闭。不要启动进程，也不要重新打开加速。重启不是加速已经恢复的证明。");
+            case ClientLifecycleState.ProcessDown:
+                return One("由你自己打开已经安装的客户端。进程出现之后，还要另看本地监听和这次上游。启动进程不是加速已经恢复的证明。重启不是加速已经恢复的证明。");
+            case ClientLifecycleState.ProcessUpNoListener:
+                return One("在该客户端自己的界面里查看加速开关和它显示的本地端口。界面上的“正在加速”和一次上游结果都不能补上监听。重启不是加速已经恢复的证明。");
+            case ClientLifecycleState.ListenerUpstreamUnknown:
+                return ClashStillListening(false);
+            case ClientLifecycleState.ListenerUpstreamFailed:
+                return ClashStillListening(true);
+            case ClientLifecycleState.ListenerUpstreamOk:
+                return One("只保留这一次上游可达的结论。重启不是加速已经恢复的证明。界面显示正在加速也不能延长这一次结果。");
+            default:
+                return One("现有输入还不能归入已知状态。不要启动或重启客户端。重启不是加速已经恢复的证明。");
+        }
+    }
+
+    private static IReadOnlyList<string> ClashStillListening(bool upstreamFailed)
+    {
+        var steps = new List<string>
+        {
+            "不要调用正在运行的 external-controller，也不要发送 POST /restart。Clash 仍在监听只说明本地监听还在。重启不是加速已经恢复的证明。",
+            "在 StarSky 自己的界面里查看节点和日志，并由你自己决定是否重试。重试不是加速已经恢复的证明；界面文案不能代替这次上游。",
+            "加速若是你自己关的，就保持关闭，不要重新打开。只查看系统代理是否仍选中本机正在监听的地址，不要修改它。然后重新检查真实应用路径。只有新的上游结果说明这一次是否可达。"
+        };
+        if (upstreamFailed)
+            steps.Add("这次上游已经失败。本地监听仍在，不能把这次上游失败写成已经恢复。上游失败不能靠重启写成已经恢复。");
+        return steps;
+    }
+
+    private static IReadOnlyList<string> One(string step) => new[] { step };
+
     private static ClientLifecycleState Resolve(
         bool processPresent,
         bool listenerPresent,

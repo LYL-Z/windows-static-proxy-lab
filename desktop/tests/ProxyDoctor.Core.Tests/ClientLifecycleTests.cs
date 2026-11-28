@@ -105,6 +105,52 @@ public class ClientLifecycleTests
             names);
     }
 
+    [Fact]
+    public void Manual_steps_for_each_state_are_stable_and_restart_is_not_acceleration()
+    {
+        const string restart = "重启不是加速已经恢复的证明。";
+        foreach (var state in Enum.GetValues<ClientLifecycleState>())
+        {
+            var first = ClientLifecycle.ManualSteps(state);
+            var second = ClientLifecycle.ManualSteps(state);
+            Assert.Equal(first, second);
+            Assert.NotEmpty(first);
+            Assert.Contains(restart, string.Join("\n", first));
+        }
+
+        var listening = ClientLifecycle.ManualSteps(ClientLifecycleState.ListenerUpstreamUnknown);
+        Assert.Equal(3, listening.Count);
+        Assert.Contains("external-controller", listening[0]);
+        Assert.Contains("POST /restart", listening[0]);
+        Assert.Contains("Clash 仍在监听只说明本地监听还在", listening[0]);
+        Assert.Contains("查看节点和日志", listening[1]);
+        Assert.Contains("由你自己决定是否重试", listening[1]);
+        Assert.Contains("重试不是加速已经恢复的证明", listening[1]);
+        Assert.Contains("界面文案不能代替这次上游", listening[1]);
+        Assert.Contains("保持关闭", listening[2]);
+        Assert.Contains("不要修改它", listening[2]);
+        Assert.Contains("真实应用路径", listening[2]);
+        Assert.Contains("只有新的上游结果", listening[2]);
+
+        var failed = ClientLifecycle.ManualSteps(ClientLifecycleState.ListenerUpstreamFailed);
+        Assert.Equal(4, failed.Count);
+        Assert.Equal(listening, failed.Take(3));
+        Assert.Contains("本地监听仍在，不能把这次上游失败写成已经恢复", failed[3]);
+        Assert.Contains("上游失败不能靠重启写成已经恢复", failed[3]);
+
+        Assert.Contains("不要启动进程", string.Join("\n", ClientLifecycle.ManualSteps(ClientLifecycleState.UserOff)));
+        Assert.Contains("不要重新打开加速", string.Join("\n", ClientLifecycle.ManualSteps(ClientLifecycleState.UserOff)));
+        Assert.Contains("由你自己打开已经安装的客户端", string.Join("\n", ClientLifecycle.ManualSteps(ClientLifecycleState.ProcessDown)));
+        Assert.Contains("启动进程不是加速已经恢复的证明", string.Join("\n", ClientLifecycle.ManualSteps(ClientLifecycleState.ProcessDown)));
+        Assert.Contains("都不能补上监听", string.Join("\n", ClientLifecycle.ManualSteps(ClientLifecycleState.ProcessUpNoListener)));
+        Assert.Contains("这一次上游可达", string.Join("\n", ClientLifecycle.ManualSteps(ClientLifecycleState.ListenerUpstreamOk)));
+        Assert.Contains("界面显示正在加速也不能延长这一次结果", string.Join("\n", ClientLifecycle.ManualSteps(ClientLifecycleState.ListenerUpstreamOk)));
+
+        var unnamed = string.Join("\n", ClientLifecycle.ManualSteps((ClientLifecycleState)(-1)));
+        Assert.Contains("不要启动或重启客户端", unnamed);
+        Assert.Contains(restart, unnamed);
+    }
+
     private static ClientLifecycleVerdict ClassifyReady(bool? uiSaysAccelerating, bool? upstreamOk) =>
         ClientLifecycle.Classify(true, true, uiSaysAccelerating, upstreamOk, false);
 
