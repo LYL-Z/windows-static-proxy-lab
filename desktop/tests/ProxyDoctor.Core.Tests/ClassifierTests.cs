@@ -226,16 +226,29 @@ public class ClassifierTests
     [Fact]
     public async Task Wrong_authorization_does_not_start_the_rollback_script()
     {
-        var run = await IsolatedRecovery.ExecuteAsync("no", CancellationToken.None);
-        Assert.False(run.ScriptStarted);
-        Assert.Equal(-1, run.TransactionExit);
+        // F72: neither a missing grant nor a grant bound to a different target may start
+        // the script. The wrong target is derived from the live one, so this is stable.
+        var live = RecoveryConsent.ReadTarget();
+        var stale = live == RecoveryConsent.TargetOff ? RecoveryConsent.TargetOther : RecoveryConsent.TargetOff;
+        var fromMissingPhrase = await IsolatedRecovery.ExecuteAsync(null, CancellationToken.None);
+        var fromStaleTarget = await IsolatedRecovery.ExecuteAsync(RecoveryApproval.FromDialog(stale), CancellationToken.None);
+        var fromBadPhrase = RecoveryApproval.FromPhrase("no");
+        Assert.False(fromMissingPhrase.ScriptStarted);
+        Assert.False(fromStaleTarget.ScriptStarted);
+        Assert.Null(fromBadPhrase);
+        Assert.Equal(-1, fromMissingPhrase.TransactionExit);
+        Assert.Equal(-1, fromStaleTarget.TransactionExit);
+        Assert.True(fromMissingPhrase.AuthorizationRefused);
+        Assert.True(fromStaleTarget.AuthorizationRefused);
     }
 
     [Fact]
     public async Task Isolated_rollback_returns_32_and_leaves_the_live_proxy()
     {
         var before = NetworkReader.LiveProxyStamp();
-        var run = await IsolatedRecovery.ExecuteAsync(IsolatedRecovery.AuthorizationText, CancellationToken.None);
+        var approval = RecoveryApproval.FromPhrase(RecoveryConsent.Phrase(RecoveryConsent.ReadTarget()));
+        Assert.NotNull(approval);
+        var run = await IsolatedRecovery.ExecuteAsync(approval, CancellationToken.None);
         Assert.True(run.ScriptStarted, run.Detail);
         Assert.Equal(32, run.TransactionExit);
         Assert.True(run.LiveUnchanged);
@@ -252,7 +265,8 @@ public class ClassifierTests
     {
         using var cancel = new CancellationTokenSource();
         cancel.Cancel();
-        var run = await IsolatedRecovery.ExecuteAsync(IsolatedRecovery.AuthorizationText, cancel.Token);
+        var approval = RecoveryApproval.FromPhrase(RecoveryConsent.Phrase(RecoveryConsent.ReadTarget()));
+        var run = await IsolatedRecovery.ExecuteAsync(approval, cancel.Token);
         Assert.False(run.ScriptStarted);
         Assert.True(run.Cancelled);
         Assert.False(run.CompleteSuccess);

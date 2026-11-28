@@ -46,6 +46,61 @@ jobs:
           & dotnet test desktop/tests/ProxyDoctor.Core.Tests/ProxyDoctor.Core.Tests.csproj --configuration Release --verbosity minimal
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      # F72: the CLI must refuse a one-key flag and a wrong phrase, then run the
+      # isolated rehearsal only for the operation-bound phrase read from this machine.
+      # The rehearsal owns its own TEMP root; no live proxy value is written.
+      - name: CLI requires the bound phrase and refuses one-key authorization
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & dotnet build desktop/src/ProxyDoctor.Cli/ProxyDoctor.Cli.csproj --configuration Release --verbosity minimal
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $cli = 'desktop/src/ProxyDoctor.Cli/bin/Release/net8.0-windows/proxy-doctor.exe'
+          if (-not (Test-Path -LiteralPath $cli -PathType Leaf)) { throw 'the CLI executable was not built' }
+
+          $key = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings'
+          $enable = (Get-ItemProperty -LiteralPath $key -Name ProxyEnable -ErrorAction SilentlyContinue).ProxyEnable
+          $server = (Get-ItemProperty -LiteralPath $key -Name ProxyServer -ErrorAction SilentlyContinue).ProxyServer
+          $target = 'unknown'
+          if ($enable -is [int]) {
+            if ($enable -eq 0) { $target = 'off' }
+            elseif ($enable -eq 1 -and $server -match '^127\.0\.0\.1:(\d{1,5})$') { $target = '127.0.0.1:' + $Matches[1] }
+            elseif ($enable -eq 1) { $target = 'other' }
+          }
+          $phrase = 'RECOVER-ISOLATED ' + $target
+          $outFile = Join-Path $env:RUNNER_TEMP 'cli-recovery-out.json'
+          $errFile = Join-Path $env:RUNNER_TEMP 'cli-recovery-err.txt'
+          $inFile = Join-Path $env:RUNNER_TEMP 'cli-recovery-in.txt'
+
+          function Invoke-Cli([string]$Arguments, [string]$StandardInput) {
+            Set-Content -LiteralPath $inFile -Value $StandardInput -Encoding ASCII
+            Remove-Item -LiteralPath $outFile, $errFile -ErrorAction SilentlyContinue
+            $started = Start-Process -FilePath $cli -ArgumentList $Arguments -RedirectStandardInput $inFile `
+              -RedirectStandardOutput $outFile -RedirectStandardError $errFile -NoNewWindow -Wait -PassThru
+            return [pscustomobject]@{ Exit = $started.ExitCode; Json = (Get-Content -LiteralPath $outFile -Raw | ConvertFrom-Json) }
+          }
+
+          $flagged = Invoke-Cli '--isolated-recovery --yes' ''
+          if ($flagged.Exit -ne 2) { throw ('--yes exited ' + $flagged.Exit + ', expected 2') }
+          if ($flagged.Json.AuthorizationRefused -ne $true -or $flagged.Json.ScriptStarted -ne $false) {
+            throw '--yes was not refused as an authorization failure'
+          }
+
+          $wrongTarget = if ($target -eq 'off') { 'other' } else { 'off' }
+          $wrong = Invoke-Cli '--isolated-recovery' ('RECOVER-ISOLATED ' + $wrongTarget)
+          if ($wrong.Exit -ne 2) { throw ('the wrong phrase exited ' + $wrong.Exit + ', expected 2') }
+          if ($wrong.Json.AuthorizationRefused -ne $true -or $wrong.Json.ScriptStarted -ne $false) {
+            throw 'a phrase for another target was accepted'
+          }
+
+          $run = Invoke-Cli '--isolated-recovery' $phrase
+          if ($run.Exit -ne 0) { throw ('the bound phrase exited ' + $run.Exit + ': ' + $run.Json.Detail) }
+          if ($run.Json.CompleteSuccess -ne $true) { throw ('isolated rehearsal incomplete: ' + $run.Json.Detail) }
+          if ($run.Json.GrantedBy -ne 'phrase' -or $run.Json.Target -ne $target) { throw 'the grant was not bound to this target' }
+          if ($run.Json.TransactionExit -ne 32 -or $run.Json.WritesMatch -ne $true) { throw 'isolated transaction evidence is missing' }
+          if ($run.Json.AuthorizationRefused -ne $false) { throw 'an accepted run reported an authorization refusal' }
+          Write-Host 'CLI authorization flow verified: one-key flag refused, wrong phrase refused, bound phrase ran the isolated rehearsal.'
+
   packaging-tests:
     name: Packaging rollback tests
     runs-on: windows-latest
@@ -95,7 +150,8 @@ jobs:
           $scripts = @(
             'skills/windows-proxy-doctor/tests/Run-Tests.ps1',
             'skills/windows-proxy-doctor/tests/Run-FaultClassTests.ps1',
-            'skills/windows-proxy-doctor/tests/Run-OnboardingTests.ps1'
+            'skills/windows-proxy-doctor/tests/Run-OnboardingTests.ps1',
+            'skills/windows-proxy-doctor/tests/Run-RecoveryTests.ps1'
           )
           foreach ($relative in $scripts) {
             Write-Host ("RUN " + $relative)
@@ -127,7 +183,8 @@ jobs:
           $scripts = @(
             'skills/windows-proxy-doctor/tests/Run-Tests.ps1',
             'skills/windows-proxy-doctor/tests/Run-FaultClassTests.ps1',
-            'skills/windows-proxy-doctor/tests/Run-OnboardingTests.ps1'
+            'skills/windows-proxy-doctor/tests/Run-OnboardingTests.ps1',
+            'skills/windows-proxy-doctor/tests/Run-RecoveryTests.ps1'
           )
           foreach ($relative in $scripts) {
             Write-Host ("RUN pwsh " + $relative)

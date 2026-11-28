@@ -1,6 +1,6 @@
-# CAB Skill · Windows Proxy Doctor 2.0.0 RC2
+# CAB Skill · Windows Proxy Doctor 2.1.0 RC3
 
-Windows 10/11 的新手设置向导和网络故障诊断 Skill。RC2 的证据范围及剩余发布门槛见 [验收清单](RELEASE-GATE.md)。
+Windows 10/11 的新手设置向导和网络故障诊断 Skill。RC3 增加 Skill 侧的隔离演练入口，并把三种模式分开写清。RC2 的证据范围及剩余发布门槛见 [验收清单](RELEASE-GATE.md)。
 
 ## 第一次使用
 
@@ -21,6 +21,7 @@ powershell.exe -NoProfile -File .\scripts\Get-ProxyDoctorEnvironment.ps1 -Json
 powershell.exe -NoProfile -File .\tests\Run-Tests.ps1
 powershell.exe -NoProfile -File .\tests\Run-OnboardingTests.ps1
 powershell.exe -NoProfile -File .\tests\Run-FaultClassTests.ps1
+powershell.exe -NoProfile -File .\tests\Run-RecoveryTests.ps1
 ```
 
 当前环境发现不要求指定端口。旧版的独立 Snapshot 和 Watch 脚本保留自身参数默认值。使用它们前，确认 `-MixedPort` 和可选 `-FirstHopPort` 与本机监听一致。Snapshot 的保存意图来自标准用户配置位置，可执行程序位置、代理规则和应用行为需独立确认。 [环境发现](references/environment-discovery.md)
@@ -30,6 +31,25 @@ powershell.exe -NoProfile -File .\tests\Run-FaultClassTests.ps1
     powershell.exe -NoProfile -File .\scripts\Test-ProxyConsistency.ps1 -SnapshotFile .\examples\snapshot-mismatch.json
 
 在用户选择并确认目标后，用向导的 `-VerifyUrl` 测量当前系统代理路径上的 HTTPS。高级工具 `Test-NetworkPath.ps1` 支持显式代理或直连探测，分别报告代理 CONNECT、TLS、HTTP 或 DNS 的观测结果。现有浏览器会话、UDP、IPv6 和其他应用各有自己的路径。 [故障处理手册](references/troubleshooting.md)
+
+## 三种模式
+
+| 模式 | 做什么 | 写系统代理 |
+| --- | --- | --- |
+| 只读诊断 | `Start-ProxyDoctor.ps1`、Snapshot、Lifecycle 观察等，只读本机状态并给证据 | 不写 |
+| 隔离演练 | `recovery\Invoke-Recovery.ps1` 调随包 `engine\scripts\Invoke-IsolatedRecovery.ps1`，在 `%TEMP%` 一次性目录里以 `V4_TEST_MODE=1` 跑一次回滚 | 不写 |
+| 需要授权的真实操作 | 安装、启动/停止客户端、改配置、清理数据：每次单独授权，由用户执行 | 由用户决定 |
+
+真实生产写入未实现。`V4_TEST_MODE` 是进程内逻辑隔离，不是操作系统沙箱。
+
+隔离演练要一句与本次操作绑定的确认短语。先不带短语运行一次，把打印出来的授权清单原样给用户看；用户明确同意后，再把它打印的短语原样传入：
+
+```powershell
+powershell.exe -NoProfile -File .\recovery\Invoke-Recovery.ps1 -AppRoot '<随包 Desktop/CLI 目录>'
+powershell.exe -NoProfile -File .\recovery\Invoke-Recovery.ps1 -AppRoot '<随包 Desktop/CLI 目录>' -ConfirmPhrase 'RECOVER-ISOLATED 127.0.0.1:7897' -Json
+```
+
+短语错误、目标不同、空值或 `--yes` 都会被拒绝（exit 1，`ScriptStarted=false`），拒绝后仍可继续只读诊断。判定仍由 `scripts/RecoveryVerdict.ps1` 的 `CompleteSuccess` 负责。
 
 ## 观察重连
 

@@ -14,6 +14,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         DataContext = _model;
+        _model.ConfirmRecovery = ShowRecoveryConsent;
         _model.PropertyChanged += (_, args) =>
         {
             if (args.PropertyName == nameof(ShellViewModel.Dark))
@@ -32,6 +33,16 @@ public partial class MainWindow : Window
             await Dispatcher.InvokeAsync(SaveCapture, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
             System.Windows.Application.Current.Shutdown();
         };
+    }
+
+    /// <summary>
+    /// F72: the person grants one isolated exercise for one target by clicking confirm
+    /// in the dialog. Cancelling, closing the window or Esc grants nothing.
+    /// </summary>
+    private bool ShowRecoveryConsent(RecoveryConsentBrief brief)
+    {
+        var window = new RecoveryConsentWindow(brief) { Owner = this };
+        return window.ShowDialog() == true;
     }
 
     private void ApplyTheme(bool dark)

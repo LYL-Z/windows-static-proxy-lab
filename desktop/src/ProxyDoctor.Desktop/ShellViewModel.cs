@@ -30,13 +30,19 @@ public partial class ShellViewModel : ObservableObject
     [ObservableProperty] private string _monitor = "监测尚未开始";
     [ObservableProperty] private string _recoveryLog = "还没有预览。授权之前不会运行恢复脚本。";
     [ObservableProperty] private string _channels = "本地心跳、上游和协议检查还没有各自的采样。";
-    [ObservableProperty] private string _upstreamLine = "上游通道还没有采样。本地监听正常不等于上游可用。";
     [ObservableProperty] private string _clientLine = "还没有把进程、监听和上游放在一起看。";
     [ObservableProperty] private string _clientSteps = "还没有采样。手动步骤只在读完进程、监听和这次上游之后才给出。";
     [ObservableProperty] private string _monitorEvents = "监测事件窗口还没有内容。";
 
     public ObservableCollection<CheckRow> Checks { get; } = new();
     public event Action<string>? AlertRequested;
+
+    /// <summary>
+    /// F72: set by the window. It must show the same consent text a person would see
+    /// on the CLI or in the Skill and return true only after they clicked confirm.
+    /// There is deliberately no default: without a host dialog nothing is authorized.
+    /// </summary>
+    public Func<RecoveryConsentBrief, bool>? ConfirmRecovery { get; set; }
 
     private readonly Dispatcher _dispatcher = Dispatcher.CurrentDispatcher;
     private readonly DispatcherTimer _refresh = new() { Interval = TimeSpan.FromSeconds(1) };
@@ -279,7 +285,7 @@ public partial class ShellViewModel : ObservableObject
         var port = !Demo && _latestLocal?.Observation.MixedPortOpen == true;
         RecoveryLog = IsolatedRecovery.Preview(
             Enum.TryParse<FaultClass>(Status, out var fault) ? fault : FaultClass.Unknown,
-            IntentStore.Read() == true, process, port, null);
+            IntentStore.Read() == true, process, port, CurrentUpstreamOk(), RecoveryConsent.ReadTarget());
         Section = "recovery";
     }
 
@@ -290,15 +296,35 @@ public partial class ShellViewModel : ObservableObject
         Busy = true;
         Interlocked.Increment(ref _epoch);
         Section = "recovery";
-        RecoveryLog = "正在临时目录里运行 rollback-v4.ps1。当前 Windows 代理不会被写入。";
         try
         {
-            var run = await IsolatedRecovery.ExecuteAsync(IsolatedRecovery.AuthorizationText, _monitorStop.Token);
+            var brief = RecoveryConsent.Describe();
+            var confirm = ConfirmRecovery;
+            if (confirm is null)
+            {
+                RecoveryLog = "没有可用的确认对话框，所以这次没有授权。没有启动脚本。" + Environment.NewLine
+                    + RecoveryConsent.RefusalText;
+                return;
+            }
+            if (!confirm(brief))
+            {
+                RecoveryLog = string.Join(Environment.NewLine,
+                [
+                    "已拒绝授权。没有启动脚本。",
+                    "目标：" + brief.Target,
+                    RecoveryConsent.RefusalText
+                ]);
+                EventLog.Append("用户拒绝授权隔离演练。没有启动脚本。");
+                Events = FormatEvents(EventLog.Recent());
+                return;
+            }
+            RecoveryLog = "正在临时目录里运行 rollback-v4.ps1。当前 Windows 代理不会被写入。";
+            var run = await IsolatedRecovery.ExecuteAsync(RecoveryApproval.FromDialog(brief.Target), _monitorStop.Token);
             RecoveryLog = FormatRun(run);
             EventLog.Append(run.ScriptStarted
                 ? "隔离回滚退出 " + run.TransactionExit + "。当前 Windows 代理" + (run.LiveUnchanged ? "未变" : "指纹发生变化") + "。"
                 : "恢复没有启动。");
-            Events = string.Join("\n", EventLog.Recent());
+            Events = FormatEvents(EventLog.Recent());
         }
         catch (Exception ex)
         {
@@ -456,7 +482,6 @@ public partial class ShellViewModel : ObservableObject
               + (sample.Expired ? "等待新的采样。" : sample.Evidence)
               + $"  连续失败 {sample.ConsecutiveFailures}  状态变化 {sample.Flaps}";
         Channels = string.Join("\n", snapshot.Channels.Select(Line));
-        UpstreamLine = Line(snapshot.Channels.Single(item => item.Id == MonitorEngine.UpstreamChannelId));
         RenderMonitorEvents();
         RenderClientLine();
     }
@@ -496,12 +521,16 @@ public partial class ShellViewModel : ObservableObject
         var observation = report.Observation;
         var hopRunning = report.RunningClients.Any(item => item is "StarSky" or "magicspeed");
         var userOff = observation.UserTurnedProxyOff == true;
-        string Describe(string name, bool running, bool? listening) =>
+        // D3: one upstream source for both the topology line and the manual steps.
+        var upstreamOk = CurrentUpstreamOk();
+        string Describe(string name, bool running, bool? listening, bool? upstream) =>
             listening is null && !userOff
                 ? name + " 监听证据不完整。"
-                : name + " " + ClientLifecycle.Classify(running, listening == true, null, null, userOff).State;
-        ClientLine = Describe("StarSky", hopRunning, observation.FirstHopOpen) + "\n"
-            + Describe("Clash 核心", observation.CoreRunning == true, observation.MixedPortOpen) + "\n"
+                : name + " " + ClientLifecycle.Classify(running, listening == true, null, upstream, userOff).State;
+        // StarSky has no first-hop upstream sample in this build; the Clash core gets the
+        // same upstream value the manual steps use, so one page cannot say both.
+        ClientLine = Describe("StarSky", hopRunning, observation.FirstHopOpen, null) + "\n"
+            + Describe("Clash 核心", observation.CoreRunning == true, observation.MixedPortOpen, upstreamOk) + "\n"
             + "默认路径 HTTPS 单独显示。要恢复加速，请先在客户端界面确认状态，随后重新检查真实应用路径。";
         // ManualSteps is rendered from the Clash core state: it is the only client with a
         // documented local listener. Everything it says stays advice; nothing here acts.
@@ -509,7 +538,7 @@ public partial class ShellViewModel : ObservableObject
             observation.CoreRunning == true,
             observation.MixedPortOpen == true,
             null,
-            CurrentUpstreamOk(),
+            upstreamOk,
             userOff).State;
         ClientSteps = RenderSteps(coreState);
     }
@@ -569,10 +598,16 @@ public partial class ShellViewModel : ObservableObject
 
     private static string FormatRun(RecoveryResult run)
     {
-        if (!run.ScriptStarted) return run.Detail;
+        var header = run.AuthorizationRefused
+            ? "没有授权。没有启动脚本。" + Environment.NewLine + RecoveryConsent.RefusalText
+            : "这次是" + RecoveryConsent.ModeLabel + "，不是真实生产写入。" + Environment.NewLine
+              + RecoveryConsent.NotImplementedText;
+        if (!run.ScriptStarted) return header + Environment.NewLine + run.Detail;
         return string.Join(Environment.NewLine,
         [
+            header,
             run.CompleteSuccess ? "隔离事务证据齐全。" : "证据不齐全，不能记成恢复成功。",
+            "授权目标：" + run.Target + "（授权方式：" + run.GrantedBy + "）",
             run.Isolation,
             "事务退出码 " + run.TransactionExit + "，预期 " + run.ExpectedTransactionExit + "。进程退出码 " + run.ProcessExit + "。",
             run.LiveUnchanged ? "开始和结束时，当前用户的 ProxyEnable 和 ProxyServer 相同。" : "开始和结束时，当前用户的代理指纹不同。",

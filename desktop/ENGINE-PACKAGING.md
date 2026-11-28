@@ -64,11 +64,35 @@ hash compiled into the build, or `engineVersion` is incompatible. Trust requires
 both the manifest hash and the reviewed hash to agree.
 
 `--engine-check` inspects the engine folder and starts nothing; it exits `0` only
-when the package validates. `--isolated-recovery` refuses (exit `2`,
-`ScriptStarted=false`) on the same conditions.
+when the package validates.
+
+## Authorization (F72)
+
+The program never supplies its own authorization. Both surfaces require a grant that
+is bound to the operation and to the target read at the moment of the request:
+
+- `--recovery-brief` prints the canonical consent text (operation, target, scope,
+  affected resources, system-proxy answer, rollback) as JSON plus `lines`.
+- `--isolated-recovery` prints that same text to stderr and then reads one line from
+  stdin. Only the exact phrase `RECOVER-ISOLATED <target>` (surrounding whitespace
+  ignored) is a grant. A different target, different case, an extra word, an empty
+  line or a one-key `--yes`/`-y`/`--always` flag is refused with
+  `AuthorizationRefused=true`, `ScriptStarted=false` and exit `2`.
+- The desktop window shows a modal dialog with the same fields; its confirm button
+  creates the grant, and cancelling grants nothing. There is no default grant path:
+  the view model refuses when no dialog host is wired.
+- The grant is re-checked at execution time: if the target changed between the grant
+  and the run, the run is refused instead of proceeding on a stale approval.
+
+The Skill entry `skills/windows-proxy-doctor/recovery/Invoke-Recovery.ps1` shows the
+same text, verifies the manifest plus the reviewed hashes, then runs
+`engine\scripts\Invoke-IsolatedRecovery.ps1` and passes the result through
+`skills/windows-proxy-doctor/scripts/RecoveryVerdict.ps1`. It implements no recovery
+logic of its own.
 
 ## Not verified
 
 - Starting the WPF window from a published folder.
 - Real recovery writes to the live user proxy: `--isolated-recovery` still runs the
   fixed `V4_TEST_MODE` fixture under a temporary root, which writes no live state.
+  A production write path is **not implemented**; every surface says so.

@@ -20,6 +20,8 @@
 ## 候选范围
 
 - Desktop 自包含 Windows x64 从 `desktop/ProxyDoctor.sln` 构建，CLI 为独立可执行程序。便携和文件夹安装均以同一来源提交为准。回滚演示只加载随包两份对应哈希的 Engine 文件并在临时根下运行。
+- 授权不由程序传常量：Desktop 用确认框（操作名、目标、操作范围、受影响资源、是否写系统代理、回滚方式），CLI 要求交互输入 `RECOVER-ISOLATED <目标>` 这类与本次操作绑定的短语，`--yes` 不能替代；Skill 的 `recovery/Invoke-Recovery.ps1` 先展示同一段文字，再要求用户同意的短语，然后只调用随包 `engine\scripts\Invoke-IsolatedRecovery.ps1` 并透传结果。拒绝授权后仍可继续只读诊断。
+- 真实生产写入未实现：Executor 仍固定 `V4_TEST_MODE` + stub，界面、CLI 与 Skill 都标注这一点，不把隔离演练写成生产恢复。
 - 回归包含 Engine 114 项、独立跨进程恢复 15 项、Desktop 和 CLI 共用 Core 的 81 项、Skill 的 15 项基础、24 项向导和 21 项故障分类。Desktop 和 Skill 还对同一份 25 条恢复契约夹具进行校验。
 - 两种语言拒绝证据自报的事务失败码、缺失的原始写入日志及不匹配的日志。核对当前 Windows 代理是前后两次采样。
 - Windows Sandbox 配置通过静态预检。测试主机缺少 Sandbox 启动器，访客运行保留 NOT_TESTED。短期资源采样和窗口交互不构成 24 或 72 小时长稳验收。

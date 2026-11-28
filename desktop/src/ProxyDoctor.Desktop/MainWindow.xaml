@@ -5,6 +5,7 @@
         Title="网络代理医生"
         Width="1180" Height="760" MinWidth="980" MinHeight="640"
         Background="{DynamicResource App.Background}"
+        Foreground="{DynamicResource App.Ink}"
         FontFamily="Segoe UI" FontSize="14">
   <Window.Resources>
     <local:SectionVisibilityConverter x:Key="SectionVisible" />
@@ -136,7 +137,6 @@
                        FontFamily="Georgia" FontSize="32" Foreground="{DynamicResource App.Accent}" Margin="0,2,0,0" />
             <TextBlock Text="{Binding Status}" FontSize="22" FontWeight="SemiBold" Margin="0,8,0,0" />
             <TextBlock Text="{Binding Summary}" Foreground="{DynamicResource App.Muted}" TextWrapping="Wrap" Margin="0,6,0,0" />
-            <TextBlock Text="{Binding UpstreamLine}" TextWrapping="Wrap" Margin="0,8,0,0" />
           </StackPanel>
         </DockPanel>
       </Border>
@@ -211,7 +211,7 @@
           <Border Style="{StaticResource Card}" Margin="0,12,0,0">
             <StackPanel>
               <TextBlock Text="出现故障时" FontWeight="SemiBold" />
-              <TextBlock Text="先确认哪些路径有证据。恢复页可以预览方案并验证一次隔离回滚。首次配置、软件渠道、费用说明及人工步骤可由 CAB Skill 引导。" TextWrapping="Wrap" Margin="0,8,0,10" />
+              <TextBlock Text="先确认哪些路径有证据。恢复页可以预览方案，并在确认框里逐项确认后才运行一次隔离演练；真实生产写入仍未实现。首次配置、软件渠道、费用说明及人工步骤可由 CAB Skill 引导。" TextWrapping="Wrap" Margin="0,8,0,10" />
               <Button Content="查看恢复方案" Command="{Binding PreviewRecoveryCommand}" HorizontalAlignment="Left" IsEnabled="{Binding Busy, Converter={StaticResource NotBusy}}" />
             </StackPanel>
           </Border>
@@ -257,7 +257,6 @@
             <StackPanel>
               <TextBlock Text="{Binding Monitor}" TextWrapping="Wrap" />
               <TextBlock Text="{Binding Channels}" TextWrapping="Wrap" LineHeight="26" Margin="0,12,0,0" />
-              <TextBlock Text="{Binding UpstreamLine}" TextWrapping="Wrap" Margin="0,12,0,0" />
               <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
                 <Button Content="{Binding PauseLabel}" Command="{Binding TogglePauseCommand}" Margin="0,0,8,0" />
                 <Button Content="重测上游 HTTPS" Command="{Binding RecheckCommand}" CommandParameter="https">
@@ -350,11 +349,12 @@
               <TextBlock Text="恢复" FontSize="20" FontWeight="SemiBold" />
               <TextBlock Text="{Binding Advice}" TextWrapping="Wrap" Margin="0,8,0,12" />
               <TextBlock Text="{Binding RecoveryLog}" TextWrapping="Wrap" LineHeight="24" />
-              <TextBlock Text="授权文字是：授权隔离事务，不修改当前 Windows。点击执行才会启动脚本。预览不启动脚本。" TextWrapping="Wrap" Margin="0,12,0,0" Foreground="{DynamicResource App.Muted}" />
+              <TextBlock Text="三段要分开看：1）只读诊断，读取系统代理、进程、监听和探测，不写任何设置；2）隔离演练，在 %TEMP% 下的一次性目录里用 V4_TEST_MODE + stub 跑一次回滚，不写系统代理；3）真实生产写入，未实现。" TextWrapping="Wrap" Margin="0,12,0,0" Foreground="{DynamicResource App.Muted}" />
+              <TextBlock Text="执行隔离演练会弹出确认框，写明操作范围、受影响资源、是否写系统代理和回滚方式；点确认才算这次授权，取消后仍可只做只读诊断。V4_TEST_MODE 是进程内逻辑隔离，不是操作系统强制沙箱。" TextWrapping="Wrap" Margin="0,6,0,0" Foreground="{DynamicResource App.Muted}" />
               <WrapPanel Margin="0,16,0,0">
                 <Button Content="预览方案" Command="{Binding PreviewRecoveryCommand}" Margin="0,0,8,8"
                         IsEnabled="{Binding Busy, Converter={StaticResource NotBusy}}" />
-                <Button Content="授权并执行隔离回滚" Command="{Binding RunIsolatedRecoveryCommand}" Margin="0,0,8,8"
+                <Button Content="确认后执行隔离演练" Command="{Binding RunIsolatedRecoveryCommand}" Margin="0,0,8,8"
                         IsEnabled="{Binding Busy, Converter={StaticResource NotBusy}}" />
                 <Button Content="记录我关闭了代理" Command="{Binding RecordOffCommand}" Margin="0,0,8,8"
                         IsEnabled="{Binding Busy, Converter={StaticResource NotBusy}}" />
