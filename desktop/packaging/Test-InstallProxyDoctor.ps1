@@ -2,6 +2,7 @@
 <#
   Installs and uninstalls under a TEMP allowed root.
   Reads startup and WinINET proxy values only to prove they do not change.
+  A copy that fails after the first file must not change the previous version directory.
 #>
 $ErrorActionPreference = 'Stop'
 $installer = Join-Path $PSScriptRoot 'Install-ProxyDoctor.ps1'
@@ -25,8 +26,8 @@ function Assert-Throws([scriptblock]$Action, [string]$Pattern) {
     throw "expected '$Pattern' but no error was thrown"
 }
 
-function Invoke-Install([string]$DestinationPath, [string]$SourcePath, [string]$Allowed) {
-    & $installer -Action Install -Destination $DestinationPath -Source $SourcePath -AllowedRoot $Allowed
+function Invoke-Install([string]$DestinationPath, [string]$SourcePath, [string]$Allowed, [int]$FaultAfterCopiedFiles = -1) {
+    & $installer -Action Install -Destination $DestinationPath -Source $SourcePath -AllowedRoot $Allowed -FaultAfterCopiedFiles $FaultAfterCopiedFiles
 }
 
 function Invoke-Uninstall([string]$DestinationPath, [string]$Allowed) {
@@ -93,6 +94,22 @@ function Get-FolderStamp([string]$Folder) {
     } catch {
         return 'denied'
     }
+}
+
+function Get-TreeStamp([string]$Root) {
+    $rootFull = [System.IO.Path]::GetFullPath($Root).TrimEnd('\', '/')
+    $rootItem = Get-Item -LiteralPath $rootFull -Force
+    $lines = New-Object System.Collections.Generic.List[string]
+    [void]$lines.Add(('root|{0}|{1}' -f $rootItem.LastWriteTimeUtc.Ticks, [int]$rootItem.Attributes))
+    foreach ($dir in @(Get-ChildItem -LiteralPath $rootFull -Recurse -Force -Directory | Sort-Object FullName)) {
+        [void]$lines.Add(('dir|{0}|{1}|{2}' -f $dir.FullName.Substring($rootFull.Length + 1), $dir.LastWriteTimeUtc.Ticks, [int]$dir.Attributes))
+    }
+    foreach ($file in @(Get-ChildItem -LiteralPath $rootFull -Recurse -Force -File | Sort-Object FullName)) {
+        $hash = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToUpperInvariant()
+        $relative = $file.FullName.Substring($rootFull.Length + 1)
+        [void]$lines.Add(('file|{0}|{1}|{2}|{3}' -f $relative, $file.Length, $file.LastWriteTimeUtc.Ticks, $hash))
+    }
+    return ($lines -join "`n")
 }
 
 function Get-SafetyStamp {
@@ -334,9 +351,84 @@ try {
     New-Item -ItemType Directory -Path $missing -Force | Out-Null
     Assert-Throws { Invoke-Uninstall $missing $allowed } 'manifest is missing'
 
+    $keptSource = Join-Path $sandbox 'kept-source'
+    New-Item -ItemType Directory -Path $keptSource -Force | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $keptSource 'only.txt'), 'previous-version')
+    $keptVersion = Join-Path $allowed 'version-kept'
+    $partialVersion = Join-Path $allowed 'version-partial'
+    if (-not $keptVersion.StartsWith($sandbox + '\', [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'previous version is outside the temp sandbox'
+    }
+    if (-not $partialVersion.StartsWith($sandbox + '\', [StringComparison]::OrdinalIgnoreCase)) {
+        throw 'partial version is outside the temp sandbox'
+    }
+    Invoke-Install $keptVersion $keptSource $allowed
+    $keptStamp = Get-TreeStamp $keptVersion
+
+    $partialSource = Join-Path $sandbox 'partial-source'
+    New-Item -ItemType Directory -Path (Join-Path $partialSource 'a') -Force | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $partialSource 'a\1-first.txt'), 'first-copy')
+    [System.IO.File]::WriteAllText((Join-Path $partialSource 'z-second.txt'), 'second-copy')
+    Assert-Throws { Invoke-Install $partialVersion $partialSource $allowed 1 } 'file copy failed after 1'
+    if (-not (Test-Path -LiteralPath $keptVersion -PathType Container)) {
+        throw 'previous version directory is missing after a failed copy'
+    }
+    if ((Get-TreeStamp $keptVersion) -ne $keptStamp) {
+        throw 'previous version directory changed after a failed copy'
+    }
+    if ([System.IO.File]::ReadAllText((Join-Path $keptVersion 'only.txt')) -ne 'previous-version') {
+        throw 'previous version bytes changed after a failed copy'
+    }
+    if (Test-Path -LiteralPath $partialVersion) {
+        $failedMarker = Join-Path $partialVersion 'install-failed.json'
+        if (-not (Test-Path -LiteralPath $failedMarker -PathType Leaf)) {
+            throw 'incomplete version directory was not removed and has no failed marker'
+        }
+        $failedRaw = [System.IO.File]::ReadAllText($failedMarker)
+        if ($failedRaw -notmatch '"status"\s*:\s*"failed"') { throw 'failed marker does not record status failed' }
+        if (Test-Path -LiteralPath (Join-Path $partialVersion 'install-manifest.json')) {
+            throw 'failed copy left an install manifest'
+        }
+        Assert-Throws { Invoke-Uninstall $partialVersion $allowed } 'manifest is missing'
+        if ((Get-TreeStamp $keptVersion) -ne $keptStamp) {
+            throw 'uninstall of a failed version changed the previous version directory'
+        }
+        Write-Output 'ROLLBACK: marked incomplete version'
+    } else {
+        Write-Output 'ROLLBACK: removed incomplete version'
+    }
+    if (Test-Path -LiteralPath (Join-Path $partialVersion 'a\1-first.txt')) {
+        throw 'failed copy left the partial payload in the new version directory'
+    }
+    if (Test-Path -LiteralPath (Join-Path $partialVersion 'z-second.txt')) {
+        throw 'failed copy left the interrupted file in the new version directory'
+    }
+
+    $mixed = Join-Path $allowed 'version-mixed'
+    New-Item -ItemType Directory -Path $mixed -Force | Out-Null
+    [System.IO.File]::WriteAllText((Join-Path $mixed 'keep.txt'), 'keep-me')
+    Assert-Throws { Invoke-Install $mixed $partialSource $allowed 1 } 'file copy failed after 1'
+    if ([System.IO.File]::ReadAllText((Join-Path $mixed 'keep.txt')) -ne 'keep-me') {
+        throw 'failed copy removed a pre-existing file'
+    }
+    if (Test-Path -LiteralPath (Join-Path $mixed 'install-manifest.json')) {
+        throw 'failed copy wrote an install manifest beside a pre-existing file'
+    }
+    if (Test-Path -LiteralPath (Join-Path $mixed 'a\1-first.txt')) {
+        throw 'failed copy left a partial file beside a pre-existing file'
+    }
+    if (Test-Path -LiteralPath (Join-Path $mixed 'z-second.txt')) {
+        throw 'failed copy left the interrupted file beside a pre-existing file'
+    }
+    if ((Get-TreeStamp $keptVersion) -ne $keptStamp) {
+        throw 'previous version directory changed after a failed copy into another folder'
+    }
+    Invoke-Uninstall $keptVersion $allowed
+    if (Test-Path -LiteralPath $keptVersion) { throw 'previous version uninstall failed after a rolled-back copy' }
+
     $stampAfter = Get-SafetyStamp
     if ($stampBefore -ne $stampAfter) { throw 'startup or system proxy snapshot changed' }
-    Write-Output 'PASS: temp install, hash manifest, outside-root refusal, uninstall, startup and proxy unchanged'
+    Write-Output 'PASS: temp install, hash manifest, outside-root refusal, uninstall, failed-copy rollback, startup and proxy unchanged'
 } catch {
     $exitCode = 1
     [Console]::Error.WriteLine($_.Exception.Message)
