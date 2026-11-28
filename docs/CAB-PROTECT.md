@@ -1,56 +1,81 @@
 # CAB 保护边界
 
-本文件只根据已读代码和已有记录说明失败关闭的覆盖范围。它不授权新增、修改或删除任何生产防火墙规则，也不授权关闭 Defender，或改动代理、DNS、IPv6、TUN、路由和启动项。
+本文件根据 `proxy_v6/tests/repro/v69-failclose/failclose.py` 的实现，以及 2026-11-28 在 `cab/d-protect`（基线 `f2454c0`）上的一次本地重跑，记录进程级失败关闭实际覆盖的范围。它不授权新增、修改或删除防火墙规则，也不授权关闭 Defender，或改动代理、DNS、IPv6、TUN、路由和启动项。
+
+不能把它写成整机断网开关。套件打印的覆盖声明是 `processes started inside this job only`。
 
 相关记录：[集成验收](CAB-INTEGRATION.md) · [AppContainer 结果](V69-CONTAINER.md) · [验收矩阵](V69-ACCEPTANCE.md) · [操作边界](V69-OPERATOR.md)
 
-## 作业对象守卫覆盖什么
+## 本次重跑
 
-实现在 `proxy_v6/tests/repro/v69-failclose/failclose.py`。`guard` 命令创建一个匿名 Windows Job，设置并回读 `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`，然后以挂起方式启动一个回环发送进程，把它放进这个作业，确认该子进程在作业内、守卫进程自己不在作业内，再恢复线程。守卫持有作业句柄。
+在工作树根目录执行，未调用防火墙 cmdlet：
 
-因此，这套守卫覆盖的是**它放进该作业的进程**。套件汇总里的覆盖声明是 `processes started inside this job only`。文件开头同样写明：这里不改防火墙、路由、DNS，也不处理守卫没有启动的进程。
+```powershell
+python proxy_v6/tests/repro/v69-failclose/failclose.py
+```
 
-守卫在测试目录内的锁文件上取得独占锁。第二个 `guard` 重试一次后仍拿不到锁，就以退出码 2 发出 `lock_busy` 并返回；它在创建作业和子进程之前退出。先启动的那个子进程继续向 `127.0.0.1` 发送。
+进程退出码 **2**。汇总状态 `UNKNOWN`，回环地址 `127.0.0.1`。四个作业场景为 `PASS`，同文件里的 AppContainer 场景为 `UNKNOWN`，所以汇总不是通过。`rollup` 只有在四个作业场景都是 `PASS`、且 AppContainer 场景恰好是 `BLOCKED` 时才返回退出码 0；任一作业场景为 `FAILED` 或 AppContainer 为 `FAILED` 时返回 1；其余非通过状态返回 2。
 
-同一文件里的四个作业场景是 `listener_close`、`guard_killed`、`user_disabled`、`second_guard`。[集成验收](CAB-INTEGRATION.md) 把这四项记为覆盖该作业创建的测试进程，整机持久阻断和生产故障仍待验。本文件没有重跑这套实进程套件：它没有不启动进程的 self-test 入口。
+| 场景 | 状态 | 本次观察到的结果 |
+| --- | --- | --- |
+| `listener_close` | PASS | 守卫退出码 0，作业内子进程退出码 3，健康事件 `terminate`。安静窗口内作业内新标记 0，作业外新标记 9。 |
+| `guard_killed` | PASS | 守卫退出码 9，子进程退出码 0 且已结束。作业内新标记 0，作业外新标记 10。 |
+| `user_disabled` | PASS | 健康事件 `action` 为 `ignore`。关闭后作业内又送达 2 个标记，子进程、守卫、作业外对照都还活着。随后放开守卫标准输入，观察到子进程退出码 0 且已结束；该事后观察不参与本场景的通过条件。 |
+| `second_guard` | PASS | 第二个守卫退出码 2，事件 `lock_busy` 且 `attempts` 为 2，没有 `ready`。第一个子进程和守卫仍活着，作业内标记继续增加（增量 4）。 |
+| `appcontainer` | UNKNOWN | 受限探测的令牌是 AppContainer（`appcontainer` 为 1），阶段 `connect`，Winsock 10060，进程退出码 10060，接收端没有 `appcontainer` 标记。不受限对照退出码 0，阶段 `ok`，Winsock 0，接收端收到对照标记。 |
 
-## 它不构成整机断网开关
+10060 在判定函数里与超时、退出码 72、缺少结果一样，保持 `UNKNOWN`。`BLOCKED` 还要求阶段是 `connect`、Winsock 与进程退出码都是 10013、对照成功，并且接收端没有该进程的数据。这次超时不能改写成操作系统已经拒绝该套接字，也不能改写成整机出站已被切断。
 
-作业外的进程继续使用自己的网络。测试里的 `unguarded` 发送端由套件直接启动，不加入作业；健康监听关闭或守卫被结束后，场景仍要求它继续送达标记。已经在运行的浏览器、Clash、StarSky 和其他桌面程序都不在这个作业里。[验收矩阵](V69-ACCEPTANCE.md) 记录隔离 Chrome 的直连对照在代理故障期间仍能到达接收端，进程级守卫没有保护当时已经运行的浏览器。
+收尾时，套件只结束了它自己启动且映像匹配的作业外对照进程（退出码 74），`orphans` 为空。当前用户的 AppContainer 映射里没有名称含 `FailClose` 的配置。测试目录、探测程序和结果文件上没有留下 `S-1-15-2-` 访问项。脚本会在同目录生成 `loopback_probe.exe` 和 `runtime\`；这些是运行产物，不纳入本次提交。
 
-守卫进程自身被明确排除在作业之外。健康信号关闭的是守卫启动的作业成员，不是本机出站。套件使用的是回环 TCP 标记，不测量公网、UDP、IPv6、DNS 或生产应用故障。
-
-同一文件后部的 AppContainer 场景是另一件事。它给一个临时探测程序零项网络能力，结果对象里的范围是 `this process only`。接收端收到该进程的数据则判 `FAILED`；`connect` 返回 Winsock 10013、进程退出码也是 10013、对照成功且接收端为零，才判 `BLOCKED`；超时或 10060 保持 `UNKNOWN`。这不是整机防火墙，也不是作业终止。[AppContainer 结果](V69-CONTAINER.md) 写明：公网出口、任意桌面应用及其全部子进程、代理链、系统级防火墙规则，以及故障时的整机断网，都要单独验收。
-
-`Offline.wsb` 只描述一个从启动起关闭网络的 Windows Sandbox 访客。宿主里原有的浏览器和桌面应用仍按各自配置联网，该配置也不提供宿主应用故障时的自动切换。本轮只运行了它的内存自检：
+同一次只读预检：
 
 ```powershell
 python proxy_v6/tests/repro/v69-container/check_offline.py --self-test
 ```
 
-静态配置为 PASS，九个异常输入全部 REJECTED，系统目录中没有 `WindowsSandbox.exe`，退出码 2，`sandboxRuntime` 为 NOT_TESTED。这次自检只读相邻配置并在内存中拒绝变体，没有启动访客，也没有触碰防火墙。
+退出码 **2**。`Offline.wsb` 静态配置为 PASS，九个内存中的异常输入全部 REJECTED，系统目录没有 `WindowsSandbox.exe`，`sandboxRuntime` 为 NOT_TESTED。预检没有启动访客，也没有改防火墙。
 
-Clash 代理组去掉 DIRECT，只表示匹配到该代理组的流量没有组内直连回退。它不覆盖不走系统代理的程序、UDP、DNS，或被关闭、被改写的系统代理。见 `skills/windows-proxy-doctor/references/reliability-gaps.md`。
+`proxy_v6/tests/repro/v69-program-block/program_block.py` 会创建并删除一条防火墙规则，本轮没有运行。
 
-## 进程终止、测试模式逻辑、操作系统网络拒绝
+## 作业对象覆盖什么
 
-这三件事的结果不同。
+`guard` 创建一个匿名作业（`CreateJobObjectW` 的名称为空），只设置 `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`，并用 `QueryInformationJobObject` 回读。标志没有置上就关闭句柄并失败。随后以 `CREATE_SUSPENDED` 启动一个发送进程，`AssignProcessToJobObject` 之后检查该子进程在作业内、守卫进程自己不在这个作业内，再 `ResumeThread`。分配失败时，守卫把这个尚未恢复的子进程以退出码 74 结束。守卫在 `finally` 里关闭自己持有的作业句柄。
 
-**进程终止**发生在作业守卫的 `armed` 路径。回环健康监听关闭后，守卫调用 `TerminateJobObject`，子进程预期退出码是 3，守卫自身退出码是 0，事件动作为 `terminate`。另一条路径是守卫进程被 `TerminateProcess` 结束（预期退出码 9）：它持有的作业句柄随之关闭，`KILL_ON_JOB_CLOSE` 结束同一作业里的进程，子进程预期退出码是 0。两条路径都是进程退出。该进程的套接字随进程消失；作业外的发送端仍可继续连接接收端。安静窗口里，作业内新标记应为 0，作业外新标记应继续增加。
+发送端只连接 `127.0.0.1` 上的套件接收端，并重复发送 `guarded` 加 32 位标记。接收端丢掉非回环对端，以及角色不在允许集合中的行。作业外对照由套件直接启动，角色是 `unguarded`，不加入作业。
 
-**测试模式逻辑**不安装网络过滤，也不把一次健康信号变成断网。
+健康信号是守卫连到 `127.0.0.1` 上另一个监听套接字。对端关闭或读失败后：
 
-- 守卫的 `user-disabled` 模式看到同一个健康监听关闭后，发出 `action` 为 `ignore`，不调用 `TerminateJobObject`。通过条件是关闭之后子进程、守卫和作业外对照都还活着，并且作业内发送端又送达至少两个标记。这是守卫内部的分支：监听关闭期间网络路径保持可用。守卫返回时仍会关闭作业句柄，句柄上的 kill-on-close 限制还在；该场景的通过条件只断言忽略窗口内继续发送。
-- `proxy_v4/lib/V4.ps1` 在 `V4_TEST_MODE=1` 时走测试模式。`Start-V4Clash` 和 `Stop-V4Clash` 直接返回 true，不启动、不结束真实客户端；`Get-V4AppPids` 返回空列表。没有测试用注册表写入器时，系统代理写入会抛出 “V4 test mode blocks a real system-proxy write”。`Enable-V4ProductionWrites` 在测试模式返回 false。测试模式通过，只说明真实启停或真实代理写入被跳过或拒绝。它不能当作进程已被终止，也不能当作套接字已被操作系统拒绝。
+- `armed` 调用 `TerminateJobObject`，退出码常量是 3，然后守卫以 0 返回。`listener_close` 还要求安静窗口里作业内新标记为 0、作业外新标记至少增加 2。
+- 套件用 `TerminateProcess` 把守卫打成退出码 9。进程消亡后操作系统关闭它的句柄，kill-on-close 结束作业内进程。`guard_killed` 要求子进程退出码为 0 且不再存活，作业外对照继续送达标记。
+- `user-disabled` 发出 `ignore`，不调用 `TerminateJobObject`，并阻塞在标准输入。通过条件只看这个窗口：子进程、守卫、作业外对照都存活，作业内至少再送达两个标记。守卫随后返回时仍执行同一个 `CloseHandle`。本次重跑看到子进程因此结束，但代码没有把这个事后结果写成通过条件。
 
-**操作系统网络拒绝**是套接字在进程仍可运行时收到拒绝。`proxy_v6/tests/repro/v69-program-block/program_block.py` 的覆盖声明是一个临时可执行文件、仅 TCP、远端 `127.0.0.1`。脚本把“退出码 10013 且接收端没有数据”记为 `NETWORK_BLOCK`；超时或 10060 记为 `UNKNOWN`；接收端仍收到数据则是 `FAILED`。文件自己写明这不是整机断网开关。[验收矩阵](V69-ACCEPTANCE.md) 记录当时创建该规则被拒绝，规则没有留下，已有沙箱规则数量没有变化。那次拒绝访问不是整机保护已经生效。本轮没有运行该脚本。
+锁文件必须位于该测试目录内。`LockFileEx` 独占锁失败后等待 50 毫秒再试一次，两次都失败就以退出码 2 返回。第二个守卫在创建作业和子进程之前退出，所以它不会替换或结束第一个子进程。
 
-AppContainer 的 10013 也只在上面的单进程条件下记为 `BLOCKED`。对照进程同样得到 10013 时，[AppContainer 结果](V69-CONTAINER.md) 把它记为主机回环条件，不能单独证明 AppContainer 策略或整机防火墙已经生效。
+生产脚本和桌面程序没有调用这个再现脚本。`CreateJobObjectW` 与 `TerminateJobObject` 的调用只写在 `failclose.py`。
+
+## 这次实验没有覆盖的范围
+
+- 作业外的进程继续使用自己的网络。四个作业场景都要求作业内标记停止新增之后，`unguarded` 仍继续送达；本次均已观察到。已经在运行的浏览器、Clash、StarSky 和其他桌面程序不会被放进这个作业。[验收矩阵](V69-ACCEPTANCE.md) 记录隔离 Chrome 的直连对照在代理故障期间仍能到达接收端。
+- 守卫进程被显式排除在自己的作业之外。结束作业成员不会凭作业成员身份结束守卫。
+- 只设置了 kill-on-close 这一项作业限制。代码没有测试孙进程、脱离作业、嵌套作业，也没有测试别的进程另持一份作业句柄。句柄仍被别处持有时，关闭守卫自己的那一份不会触发 kill-on-close；这条路径没有用例。
+- 作业是匿名的，不写入启动项，重启后不存在。
+- 触发器是套件自己的回环 TCP 关闭，不是生产代理故障检测，也不转发用户流量。发送端不测量公网、UDP、IPv6 或 DNS。
+- 锁只拒绝使用同一锁文件的第二个守卫。它不停止已经运行的子进程，也不作用到测试目录之外。
+- AppContainer 场景单独编译 `loopback_probe.c`，创建一个名为 `V69.FailClose.` 加随机后缀的临时配置，网络能力数量为 0，只让该进程对 `127.0.0.1` 做 TCP bind/connect/send/recv。结果对象的范围字段是 `this process only`。接收端若收到它的标记则判 `FAILED`。本次是 `connect` / 10060 / 接收端 0 次，状态保持 `UNKNOWN`。它不约束其他进程，也不代替 [另一套 IPv4/IPv6 TCP/UDP 实验](V69-CONTAINER.md)；那套实验本轮没有重跑。
+- `Offline.wsb` 描述的是访客从启动起关闭网络。宿主里原有的程序仍按各自配置联网。本次只做了上面的静态预检，访客运行仍是 NOT_TESTED。
+- Clash 代理组去掉 DIRECT，只去掉该组内部的直连回退。`skills/windows-proxy-doctor/references/reliability-gaps.md` 写明：它不覆盖不走系统代理的程序、UDP、DNS，以及被关闭或改写的系统代理。
+
+## 进程终止、测试模式、套接字拒绝是三件不同的事
+
+**进程终止**是上面的作业路径。`armed` 在健康监听关闭后结束作业内进程；杀死守卫则靠最后一份作业句柄关闭。两种都是那些进程退出。套接字随进程消失。作业外发送端仍可连接接收端。
+
+**测试模式**不安装网络过滤。`proxy_v4/lib/V4.ps1` 在 `V4_TEST_MODE=1` 时，`Start-V4Clash` 和 `Stop-V4Clash` 直接返回 true，不启动、不结束真实客户端；`Get-V4AppPids` 返回空列表。没有安装测试注册表写入器时，系统代理写入抛出 “V4 test mode blocks a real system-proxy write and no test registry writer is installed”。`Enable-V4ProductionWrites` 在测试模式返回 false。这些分支通过，只说明真实启停或真实代理写入被跳过或拒绝。
+
+**套接字拒绝**是进程仍在时 Winsock 返回拒绝。`program_block.py` 的覆盖声明是一个临时可执行文件、仅 TCP、远端 `127.0.0.1`。它把“退出码 10013 且接收端没有数据”记为 `NETWORK_BLOCK`；接收端仍收到数据则是 `FAILED`；10060、退出码 4，或其他非零退出且接收端没有数据，记为 `UNKNOWN`。文件写明这不是整机断网开关。该脚本会调用 `New-NetFirewallRule` 和 `Remove-NetFirewallRule`，所以本轮没有运行。[验收矩阵](V69-ACCEPTANCE.md) 记录此前创建该规则被拒绝，规则没有留下，已有沙箱规则数量没有变化。那次拒绝访问不是整机保护已经生效。
+
+AppContainer 只有在单进程、对照成功、`connect` 的 10013 且接收端为零时才记 `BLOCKED`。对照进程同样得到 10013 时，[AppContainer 结果](V69-CONTAINER.md) 把它记为主机回环条件，不能单独证明该策略或整机防火墙已经生效。
 
 ## 新的生产防火墙规则未获授权
 
-本文件不授权新增生产防火墙规则，也不授权删除或停用现有规则。
-
-[集成验收](CAB-INTEGRATION.md) 要求防火墙、DNS、TUN、IPv6、启动项和客户端重启各自单独授权。[操作边界](V69-OPERATOR.md) 写明本候选的实验和诊断不需要修改宿主防火墙；全机出站阻断会同时影响国内网站和局域网。[验收矩阵](V69-ACCEPTANCE.md) 的 `PRODUCTION_GATE` 仍是 `WAITING_USER`，并为“给指定测试程序添加再删除一条出站阻止”单独列为尚未授权的操作。需求原文的工程边界同样要求：未批准时不修改防火墙，不关闭 Defender。
-
-因此，指定程序的出站阻止实验和生产用的整机失败关闭都还没有授权。已有的 `codex_sandbox_offline_block_*` 规则保持不动。
+[集成验收](CAB-INTEGRATION.md) 要求防火墙、DNS、TUN、IPv6、启动项和客户端重启各自单独授权。[操作边界](V69-OPERATOR.md) 写明本候选的实验和诊断不需要修改宿主防火墙；全机出站阻断会同时影响国内网站和局域网。[验收矩阵](V69-ACCEPTANCE.md) 的 `PRODUCTION_GATE` 仍是 `WAITING_USER`。指定程序的出站阻止实验和生产用的整机失败关闭都还没有授权。已有的 `codex_sandbox_offline_block_*` 规则保持不动。
