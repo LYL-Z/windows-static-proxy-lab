@@ -81,8 +81,11 @@ jobs:
           } else {
             $command = Get-Command pwsh -ErrorAction SilentlyContinue
             if (-not $command) {
-              Write-Host 'pwsh is not installed. Second skill run skipped.'
-              exit 0
+              # A silent skip used to turn a reduced-coverage run into a green job.
+              # PowerShell 7 is not a product dependency (every script is 5.1), but the
+              # dual-version regression IS a required check, so a missing pwsh must fail
+              # loudly instead of degrading the run.
+              throw 'pwsh is not installed. The dual-PowerShell regression may not be skipped; install PowerShell 7 on the runner.'
             }
             $pwshPath = $command.Source
           }
