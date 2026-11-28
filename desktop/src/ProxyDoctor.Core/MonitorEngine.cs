@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace ProxyDoctor;
 
 public enum MonitorRunState
@@ -66,6 +68,7 @@ public sealed record MonitorSnapshot(
 /// In-memory channel monitor. Polling is not instant detection: the caller supplies
 /// the measured latency, and this type does not schedule timers or open sockets.
 /// A local heartbeat never writes the upstream channel.
+/// <see cref="SaveEvents"/> replaces a caller-supplied file with the in-memory window and never writes more than <see cref="MaxEvents"/> lines.
 /// </summary>
 public sealed class MonitorEngine
 {
@@ -207,6 +210,37 @@ public sealed class MonitorEngine
         return upstream.DisplayState == EvidenceState.Verified && upstream.Failure is null && !upstream.Expired;
     }
 
+    /// <summary>
+    /// Replaces <paramref name="path"/> with the current event window. The file stays at or under <see cref="MaxEvents"/> lines.
+    /// Channel samples are not written, and this method does not open a socket.
+    /// </summary>
+    public void SaveEvents(string path)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        MonitorEvent[] events;
+        lock (_gate) events = _events.ToArray();
+        WriteEventFile(path, events);
+    }
+
+    /// <summary>
+    /// Replaces the in-memory event window with the newest <see cref="MaxEvents"/> lines from <paramref name="path"/>.
+    /// Run state and channel samples stay as they are, so a stored local heartbeat cannot refresh upstream.
+    /// </summary>
+    public void LoadEvents(string path)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        var events = ReadEventFile(path);
+        lock (_gate)
+        {
+            _events.Clear();
+            foreach (var item in events)
+                _events.Enqueue(item);
+            _sequence = 0;
+            foreach (var item in _events)
+                if (item.Sequence > _sequence) _sequence = item.Sequence;
+        }
+    }
+
     private void ChangeRunState(MonitorRunState next, string kind, DateTimeOffset at, string detail)
     {
         lock (_gate)
@@ -248,6 +282,41 @@ public sealed class MonitorEngine
         _events.Enqueue(new MonitorEvent(_sequence, at, kind, channelId, detail));
         while (_events.Count > MaxEvents)
             _events.Dequeue();
+    }
+
+    private static void WriteEventFile(string path, IReadOnlyList<MonitorEvent> events)
+    {
+        var start = Math.Max(0, events.Count - MaxEvents);
+        var lines = new string[events.Count - start];
+        for (var i = start; i < events.Count; i++)
+            lines[i - start] = JsonSerializer.Serialize(events[i]);
+
+        var full = Path.GetFullPath(path);
+        var directory = Path.GetDirectoryName(full);
+        if (!string.IsNullOrEmpty(directory))
+            Directory.CreateDirectory(directory);
+        var temp = full + ".tmp";
+        File.WriteAllLines(temp, lines);
+        File.Move(temp, full, overwrite: true);
+    }
+
+    private static MonitorEvent[] ReadEventFile(string path)
+    {
+        if (!File.Exists(path))
+            throw new FileNotFoundException("Monitor event file was not found.", path);
+
+        var parsed = new List<MonitorEvent>();
+        foreach (var line in File.ReadAllLines(path))
+        {
+            if (string.IsNullOrWhiteSpace(line)) continue;
+            var item = JsonSerializer.Deserialize<MonitorEvent>(line);
+            if (item is null)
+                throw new InvalidDataException("A monitor event line did not contain an event.");
+            parsed.Add(item);
+        }
+
+        if (parsed.Count <= MaxEvents) return parsed.ToArray();
+        return parsed.GetRange(parsed.Count - MaxEvents, MaxEvents).ToArray();
     }
 
     private static MonitorTransition Map(string observed, bool wasFailing, string? failure)

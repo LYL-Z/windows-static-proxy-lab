@@ -1,3 +1,4 @@
+using System.Text.Json;
 using ProxyDoctor;
 using Xunit;
 
@@ -69,6 +70,35 @@ public class MonitorEngineTests
         Assert.Equal("上游超时", upstream.Failure);
         Assert.False(engine.UpstreamIsSuccessful(later));
         Assert.Equal(1, upstream.ConsecutiveFailures);
+    }
+
+    [Fact]
+    public void Local_heartbeat_sample_does_not_refresh_the_upstream_channel()
+    {
+        var engine = Running();
+        engine.Record(MonitorEngine.UpstreamChannelId, Verified("HTTP 204"), T0);
+        var heartbeatAt = T0.AddSeconds(10);
+        var local = engine.Record(MonitorEngine.LocalChannelId, Healthy("本地心跳"), heartbeatAt);
+
+        Assert.True(local.Accepted);
+        Assert.Equal(MonitorEngine.LocalChannelId, engine.Events[^1].ChannelId);
+        Assert.Contains("本地心跳", engine.Events[^1].Detail);
+
+        var upstream = engine.Read(MonitorEngine.UpstreamChannelId, heartbeatAt);
+        Assert.Equal(T0, upstream.SampledAt);
+        Assert.NotEqual(heartbeatAt, upstream.SampledAt);
+        Assert.Equal(EvidenceState.Verified, upstream.RecordedState);
+        Assert.Equal(EvidenceState.Verified, upstream.DisplayState);
+        Assert.Null(upstream.Failure);
+        Assert.False(upstream.Expired);
+        Assert.Equal(TimeSpan.FromMilliseconds(40), upstream.Latency);
+        Assert.Equal("HTTP 204", upstream.Evidence);
+        Assert.True(engine.UpstreamIsSuccessful(heartbeatAt));
+
+        var localRow = engine.Read(MonitorEngine.LocalChannelId, heartbeatAt);
+        Assert.Equal(heartbeatAt, localRow.SampledAt);
+        Assert.Equal("本地心跳", localRow.Evidence);
+        Assert.Equal(TimeSpan.FromMilliseconds(3), localRow.Latency);
     }
 
     [Fact]
@@ -191,6 +221,89 @@ public class MonitorEngineTests
         Assert.Equal(249, upstream.Flaps);
         Assert.False(upstream.Expired);
         Assert.False(engine.UpstreamIsSuccessful(T0.AddSeconds(burst)));
+    }
+
+    [Fact]
+    public void Event_file_rotates_to_200_lines_and_reloads_the_same_window()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "proxy-doctor-monitor-" + Guid.NewGuid().ToString("N"));
+        var path = Path.Combine(directory, "events.jsonl");
+        try
+        {
+            var engine = Running();
+            engine.Record(MonitorEngine.LocalChannelId, Healthy("本地心跳"), T0);
+            Assert.Null(engine.Read(MonitorEngine.UpstreamChannelId, T0).SampledAt);
+            Assert.False(engine.UpstreamIsSuccessful(T0));
+
+            for (var i = 0; i < 250; i++)
+                engine.Record(MonitorEngine.UpstreamChannelId, Failed("f" + i), T0.AddSeconds(i + 1));
+
+            Assert.Throws<ArgumentException>(() => engine.SaveEvents(" "));
+            Assert.Throws<ArgumentException>(() => engine.LoadEvents(""));
+            engine.SaveEvents(path);
+
+            var lines = File.ReadAllLines(path);
+            Assert.Equal(MonitorEngine.MaxEvents, lines.Length);
+            Assert.Equal(engine.Events.Count, lines.Length);
+            Assert.Equal("NewFailure f50", engine.Events[0].Detail);
+            Assert.Equal(engine.Events[0].Sequence, JsonSerializer.Deserialize<MonitorEvent>(lines[0])!.Sequence);
+            Assert.Equal(engine.Events[^1].Sequence, JsonSerializer.Deserialize<MonitorEvent>(lines[^1])!.Sequence);
+            Assert.DoesNotContain(lines, line => line.Contains("本地心跳", StringComparison.Ordinal));
+            Assert.False(File.Exists(path + ".tmp"));
+
+            var restored = new MonitorEngine();
+            Assert.Throws<FileNotFoundException>(() => restored.LoadEvents(path + ".missing"));
+            restored.LoadEvents(path);
+            Assert.Equal(engine.Events, restored.Events);
+            Assert.Equal(MonitorRunState.Stopped, restored.RunState);
+            Assert.Null(restored.Read(MonitorEngine.UpstreamChannelId, T0.AddSeconds(300)).SampledAt);
+            Assert.Equal(EvidenceState.Unknown, restored.Read(MonitorEngine.UpstreamChannelId, T0.AddSeconds(300)).DisplayState);
+            Assert.False(restored.UpstreamIsSuccessful(T0.AddSeconds(300)));
+
+            var older = new string[50];
+            for (var i = 0; i < older.Length; i++)
+            {
+                older[i] = JsonSerializer.Serialize(new MonitorEvent(
+                    i + 1, T0, MonitorEngine.EventSample, MonitorEngine.LocalChannelId, "old " + i));
+            }
+            File.WriteAllLines(path, older.Concat(lines));
+            Assert.Equal(250, File.ReadAllLines(path).Length);
+
+            var capped = new MonitorEngine();
+            capped.LoadEvents(path);
+            Assert.Equal(MonitorEngine.MaxEvents, capped.Events.Count);
+            Assert.Equal(restored.Events, capped.Events);
+            Assert.DoesNotContain(capped.Events, item => item.Detail.StartsWith("old ", StringComparison.Ordinal));
+            Assert.Null(capped.Read(MonitorEngine.UpstreamChannelId, T0.AddSeconds(300)).SampledAt);
+            Assert.False(capped.UpstreamIsSuccessful(T0.AddSeconds(300)));
+
+            var continued = capped.Events[^1].Sequence;
+            capped.Start(T0.AddHours(1));
+            Assert.Equal(MonitorEngine.MaxEvents, capped.Events.Count);
+            Assert.Equal(continued + 1, capped.Events[^1].Sequence);
+            Assert.Equal(MonitorEngine.EventStart, capped.Events[^1].Kind);
+            Assert.NotEqual(MonitorEngine.UpstreamChannelId, capped.Events[^1].ChannelId);
+
+            engine.Record(MonitorEngine.LocalChannelId, Healthy("窗口之后的心跳"), T0.AddSeconds(251));
+            Assert.Equal(T0.AddSeconds(250), engine.Read(MonitorEngine.UpstreamChannelId, T0.AddSeconds(251)).SampledAt);
+            Assert.Equal("f249", engine.Read(MonitorEngine.UpstreamChannelId, T0.AddSeconds(251)).Failure);
+            engine.SaveEvents(path);
+            var rotated = File.ReadAllLines(path);
+            Assert.Equal(MonitorEngine.MaxEvents, rotated.Length);
+            var reloaded = new MonitorEngine();
+            reloaded.LoadEvents(path);
+            Assert.Equal(engine.Events, reloaded.Events);
+            Assert.Equal("NewFailure f51", reloaded.Events[0].Detail);
+            Assert.Contains("窗口之后的心跳", reloaded.Events[^1].Detail);
+            Assert.Equal(MonitorEngine.LocalChannelId, reloaded.Events[^1].ChannelId);
+            Assert.Null(reloaded.Read(MonitorEngine.UpstreamChannelId, T0.AddSeconds(300)).SampledAt);
+            Assert.False(reloaded.UpstreamIsSuccessful(T0.AddSeconds(300)));
+        }
+        finally
+        {
+            if (Directory.Exists(directory))
+                Directory.Delete(directory, recursive: true);
+        }
     }
 
     [Fact]
