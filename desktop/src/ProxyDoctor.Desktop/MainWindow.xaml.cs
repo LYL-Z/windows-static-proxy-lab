@@ -71,6 +71,26 @@ public sealed class SectionVisibilityConverter : IValueConverter
         throw new NotSupportedException();
 }
 
+public sealed class SectionTitleConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture) =>
+        (value as string) switch
+        {
+            "overview" => "概览",
+            "checks" => "检查",
+            "monitor" => "监测",
+            "privacy" => "隐私",
+            "clients" => "客户端",
+            "recovery" => "恢复",
+            "events" => "事件",
+            "guide" => "开始使用",
+            _ => "概览"
+        };
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}
+
 public sealed class SectionMatchConverter : IMultiValueConverter
 {
     public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
