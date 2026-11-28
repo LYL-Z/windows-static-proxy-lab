@@ -2,7 +2,9 @@
 <#
 .SYNOPSIS  Local loopback HTTP origin fixture for the INC checks.
 .DESCRIPTION
-  Listens on 127.0.0.1 only.  A GET is answered with 200 (body "ok").  A POST to a
+  Listens on 127.0.0.1 only.  A GET is answered with 200 (body "ok"), except
+  GET /error500 which is answered 500 (body "origin-error") so a failing HTTP
+  status can be asserted without any external host (F75).  A POST to a
   /upload-ok path is answered 200 (body "accepted"); every other POST is answered
   500 (body "upload-rejected"); anything else with 404.  No TLS, no external host,
   no file is read or written.  Used to prove GET/upload divergence (INC-04) and as
@@ -52,6 +54,7 @@ while ($true) {
             if ($head -match '^POST\s+[^\s]*/upload-ok') { $status = '200 OK'; $body = 'accepted' }
             else { $status = '500 Internal Server Error'; $body = 'upload-rejected' }
         }
+        elseif ($null -ne $head -and $head -match '^GET\s+[^\s]*/error500') { $status = '500 Internal Server Error'; $body = 'origin-error' }
         elseif ($null -ne $head -and $head -match '^GET ') { $status = '200 OK'; $body = 'ok' }
         else { $status = '404 Not Found'; $body = 'unexpected-request' }
         $resp = "HTTP/1.1 $status`r`nContent-Type: text/plain`r`nContent-Length: $($body.Length)`r`nConnection: close`r`n`r`n$body"
