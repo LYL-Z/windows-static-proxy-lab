@@ -153,3 +153,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -File proxy_v4\tools\cab-doctor.ps
 输出：系统代理 / 环境变量（脱敏）/ 直连基线 / 每个代理的监听与成功率 / 失败类型 / 判定 / 恢复命令。
 判定值：`HEALTHY` `PARTIAL` `SYSTEM_PROXY_MISMATCH` `PROXY_BROKEN_DIRECT_OK` `DIRECT_ONLY` `BROKEN`；退出码 0/2/3。
 实测：`HEALTHY`，7897 与 11119 各 2/2，p50 分别为 4584ms / 7206ms（**偏慢，已如实记录**）。
+### 契约与默认行为（`48d0940` 之后）
+
+- 契约：`cab-diag-contract/v1`，字段 `target/via/proxy/transport/httpStatus/ok/state/rc/metrics/err`，退出码 0/2/3。
+- **默认只做本机只读检查**，外部目标标记 `SKIPPED_NO_CONSENT`、`probes=0`，判定 `LOCAL_ONLY_UNVERIFIED`、**exit 2**。要真实探测必须显式 `-AllowExternal`，脚本头部与输出都会列出将访问的域名。
+- `transport`（curl 退出码枚举）与 `httpStatus` 分离：500 是 `transport=OK, httpStatus=500, ok=false`，任何判定都不会是 HEALTHY。
+- 上传失败无条件进入判定（即使系统代理关闭、即使直连全通）。
+- 我方仍不可靠处：F74 的"零外发"是行为断言而非抓包；HTTPS/CONNECT 未进本地 fixture；`-IgnoreSystemProxy` 是模拟而非真实关闭注册表。
