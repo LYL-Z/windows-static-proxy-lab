@@ -19,6 +19,19 @@
 
 界面是否显示加速只写进引导，不单独构成一个状态。
 
+## 手动恢复清单
+
+下面四项只由用户在自己的客户端里核对。`ClientLifecycle` 不执行它们。做完任何一项都不能写成加速已经恢复。
+
+1. **进程不在。** 由用户自己打开已经安装的客户端。进程出现之后，还要另看本地监听和这次上游。启动进程不是已恢复的加速。
+2. **进程在，本地监听没有确认。** 由用户在该客户端自己的界面里看加速开关和它显示的本地端口。界面上的“正在加速”，以及一次上游结果，都不能补上监听。
+3. **监听在，这次上游失败。** 由用户在客户端里查看节点和日志，并自行决定是否重试。本地监听仍在，不能把这次上游失败写成已经恢复。文档里的 `POST /restart` 也不等于恢复。
+4. **用户已经关闭客户端。** 保持关闭。不要启动进程，也不要重新打开加速。
+
+没有找到已安装 StarSky 界面的公开重连 API。本次打开的 [https://www.skystars.top/](https://www.skystars.top/) 和 [https://skystars.top/](https://skystars.top/) 只有产品说明和 Windows 下载，没有开发者重连接口。[腾讯云聚通 API 概览](https://cloud.tencent.com/document/product/1385/126853) 写的是 `linkboost.exe` 和 `/api/v2/client/mp-speeder/restart`，不是 StarSky，也不是 `magicspeed`。[qdraw/starsky](https://github.com/qdraw/starsky) 是按图片元数据整理文件的程序，不是这个加速客户端。
+
+Clash 的 mihomo external-controller 有公开文档，本构建不调用正在运行的控制器。[通用配置](https://wiki.metacubex.one/en/config/general/) 写了 `external-controller` 和 `secret`。[API](https://wiki.metacubex.one/en/api/) 写了 `GET /version` 和 `POST /restart`。[讨论 #6951](https://github.com/clash-verge-rev/clash-verge-rev/discussions/6951) 说明未打开 External Controller 时不暴露外部控制器，Windows 命名管道不提供文档。[讨论 #7417](https://github.com/clash-verge-rev/clash-verge-rev/discussions/7417) 说明打开后会在本机暴露 HTTP，该项目不打算被远程控制。[其他问题](https://clash-verge-rev.github.io/faq/other.html) 的设置路径是「Clash 设置 → 外部控制」，监听错误示例地址是 `127.0.0.1:9097`。
+
 ## StarSky / magicspeed
 
 没有找到适用于 StarSky 界面进程或 `magicspeed` 核心的受支持重连 API，所以这个分类器不提供重连调用。
